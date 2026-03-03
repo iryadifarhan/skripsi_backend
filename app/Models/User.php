@@ -10,6 +10,16 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
+    public const ROLE_PATIENT = 'patient';
+    public const ROLE_DOCTOR = 'doctor';
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLES = [
+        self::ROLE_PATIENT,
+        self::ROLE_DOCTOR,
+        self::ROLE_ADMIN,
+    ];
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -20,7 +30,9 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
+        'role',
         'password',
     ];
 
@@ -45,5 +57,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    protected function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
     }
 }

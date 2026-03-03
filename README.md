@@ -7,6 +7,58 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Clinic Auth API (Sanctum SPA)
+
+This project is configured for Next.js SPA authentication using Laravel Sanctum (cookie/session based).
+
+### Supported actors
+
+- `patient`
+- `doctor`
+- `admin`
+
+All actor types use the same `users` table with a `role` column.
+
+### API endpoints
+
+- `POST /api/auth/register`
+  - body: `name`, `username`, `email`, `password`, `password_confirmation`, optional `role`
+- `POST /api/auth/login`
+  - body: `username`, `password`, optional `remember`
+- `POST /api/auth/logout` (auth required)
+- `GET /api/auth/me` (auth required)
+- `POST /api/auth/forgot-password`
+  - body: `email`
+- `POST /api/auth/reset-password`
+  - body: `token`, `email`, `password`, `password_confirmation`
+
+### Next.js SPA flow
+
+1. `GET /sanctum/csrf-cookie` (with credentials)
+2. `POST /api/auth/login` (with credentials)
+3. `GET /api/auth/me` (with credentials)
+4. `POST /api/auth/logout` (with credentials)
+
+Request headers for SPA/API calls:
+
+- `Accept: application/json`
+- `Content-Type: application/json`
+- `X-Requested-With: XMLHttpRequest`
+
+### Environment
+
+Ensure these are set:
+
+- `APP_URL=http://localhost:8000`
+- `FRONTEND_URL=http://localhost:3000`
+- `SANCTUM_STATEFUL_DOMAINS=localhost:3000,localhost:8000,127.0.0.1:3000,127.0.0.1:8000`
+
+### Run tests
+
+```bash
+php artisan test
+```
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

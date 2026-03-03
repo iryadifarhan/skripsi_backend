@@ -1,69 +1,23 @@
 <?php
 
-use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AdminController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Validation\ValidationException;
 
-Route::post('/token/login', function (Request $request) {
-    $credentials = $request->validate([
-        'email' => ['required', 'email'],
-        'password' => ['required', 'string']
-    ]);
+Route::middleware('web')->group(function (): void {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
-    $user = User::where('email', $credentials['email'])->first();
+    Route::middleware(['auth:sanctum', 'authorize:admin'])->group(function (): void {
+        Route::post('/admin/user/create', [AdminController::class, 'createUser']);
+        Route::get('/admin/user/{usernameOrEmail}', [AdminController::class, 'getUser']);
+        Route::patch('/admin/user/{usernameOrEmail}', [AdminController::class, 'updateUser']);
+    });
 
-    if (! $user || ! Hash::check($credentials['password'], $user->password)) {
-        throw ValidationException::withMessages([
-            'email' => ['The provided credentials are incorrect.'],
-        ]);
-    }
-
-    $token = $user->createToken('postman-api-testing')->plainTextToken;
-
-    return response()->json([
-        'token_type' => 'Bearer',
-        'access_token' => $token,
-        'user' => $user,
-    ]);
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/user', [AuthController::class, 'me']);
+        Route::post('/logout', [AuthController::class, 'logout']);
+    });
 });
-
-Route::post('/session/login', function (Request $request) {
-    $credentials = $request->validate([
-        'email' => ['required', 'email'],
-        'password' => ['required', 'string'],
-        'remember' => ['nullable', 'boolean'],
-    ]);
-
-    if (! Auth::attempt([
-        'email' => $credentials['email'],
-        'password' => $credentials['password'],
-    ], $credentials['remember'] ?? false)) {
-        throw ValidationException::withMessages([
-            'email' => ['The provided credentials are incorrect.'],
-        ]);
-    }
-
-    $request->session()->regenerate();
-
-    return response()->json([
-        'user' => $request->user(),
-    ]);
-});
-
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
-Route::post('/session/logout', function (Request $request) {
-    Auth::guard('web')->logout();
-
-    if ($request->hasSession()) {
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-    }
-
-    return response()->noContent();
-})->middleware('auth:sanctum');

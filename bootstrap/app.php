@@ -18,6 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
             return $request->is('api/*') ? null : '/login';
         });
     })
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->alias([
+            'authorize' => \App\Http\Middleware\AuthorizeRole::class,
+        ]);
+    })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function (Request $request, \Throwable $exception): bool {
             return $request->is('api/*') || $request->expectsJson();
