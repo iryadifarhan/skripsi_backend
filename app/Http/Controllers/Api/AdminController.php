@@ -12,17 +12,8 @@ use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AdminController extends Controller
 {
-    private function authorizeAdmin(Request $request): void
-    {
-        if ($request->user()->role !== User::ROLE_ADMIN) {
-            abort(403, 'Unauthorized');
-        }
-    }
-
     public function getUser(Request $request, $usernameOrEmail): JsonResponse
     {
-        $this->authorizeAdmin($request);
-
         $user = User::where('username', $usernameOrEmail)
             ->orWhere('email', $usernameOrEmail)
             ->first();
@@ -41,8 +32,6 @@ class AdminController extends Controller
 
     public function createUser(Request $request): JsonResponse
     {
-        $this->authorizeAdmin($request);
-
         $payload = $request->validate([
             'name'     => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:users,username'],
@@ -67,8 +56,6 @@ class AdminController extends Controller
 
     public function updateUser(Request $request, $usernameOrEmail): JsonResponse
     {
-        $this->authorizeAdmin($request);
-
         $user = User::where('username', $usernameOrEmail)
             ->orWhere('email', $usernameOrEmail)
             ->first();
