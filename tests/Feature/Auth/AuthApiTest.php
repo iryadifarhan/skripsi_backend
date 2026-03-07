@@ -152,6 +152,119 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.id', $user->id);
     }
 
+    public function test_authenticated_user_can_update_general_profile_data(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'Patient Before',
+            'username' => 'patient_before',
+            'email' => 'patient-before@example.com',
+            'role' => 'patient',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->patchJson('/api/profile', [
+            'name' => 'Patient After',
+            'username' => 'patient_after',
+            'email' => 'patient-after@example.com',
+            'role' => 'admin',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.name', 'Patient After')
+            ->assertJsonPath('user.username', 'patient_after')
+            ->assertJsonPath('user.email', 'patient-after@example.com')
+            ->assertJsonPath('user.role', 'patient');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'name' => 'Patient After',
+            'username' => 'patient_after',
+            'email' => 'patient-after@example.com',
+            'role' => 'patient',
+        ]);
+    }
+
+    public function test_profile_update_validates_unique_username_and_email(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'profile-owner@example.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        User::factory()->create([
+            'username' => 'taken_username',
+            'email' => 'taken@example.com',
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->patchJson('/api/profile', [
+            'username' => 'taken_username',
+            'email' => 'taken@example.com',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['username', 'email']);
+    }
+
+    public function test_authenticated_user_can_update_password_with_current_password(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'password-owner@example.com',
+            'password' => Hash::make('OldPassword123!'),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'OldPassword123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->patchJson('/api/profile/password', [
+            'current_password' => 'OldPassword123!',
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
+        ], $this->spaHeaders())
+            ->assertOk();
+
+        $this->assertTrue(Hash::check('NewPassword123!', $user->fresh()->password));
+
+        $this->postJson('/api/logout', [], $this->spaHeaders())->assertOk();
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'NewPassword123!',
+        ], $this->spaHeaders())->assertOk();
+    }
+
+    public function test_password_update_fails_with_invalid_current_password(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'wrong-current-pass@example.com',
+            'password' => Hash::make('CurrentPassword123!'),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'CurrentPassword123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->patchJson('/api/profile/password', [
+            'current_password' => 'InvalidCurrentPassword123!',
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['current_password']);
+
+        $this->assertTrue(Hash::check('CurrentPassword123!', $user->fresh()->password));
+    }
+
     /**
      * @return array<string, string>
      */

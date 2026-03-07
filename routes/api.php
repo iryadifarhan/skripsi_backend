@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('web')->group(function (): void {
@@ -18,6 +19,9 @@ Route::middleware('web')->group(function (): void {
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/user', [AuthController::class, 'me']);
+        Route::get('/profile', [UserController::class, 'show']);
+        Route::patch('/profile', [UserController::class, 'update']);
+        Route::patch('/profile/password', [UserController::class, 'updatePassword']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 });
