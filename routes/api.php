@@ -6,22 +6,27 @@ use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('web')->group(function (): void {
+    // Authenthication flow routes
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
+    // Admin routes
     Route::middleware(['auth:sanctum', 'authorize:admin'])->group(function (): void {
         Route::post('/admin/user/create', [AdminController::class, 'createUser']);
         Route::get('/admin/user/{usernameOrEmail}', [AdminController::class, 'getUser']);
         Route::patch('/admin/user/{usernameOrEmail}', [AdminController::class, 'updateUser']);
     });
 
+    // Authenticated user routes
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/user', [AuthController::class, 'me']);
         Route::get('/profile', [UserController::class, 'show']);
         Route::patch('/profile', [UserController::class, 'update']);
         Route::patch('/profile/password', [UserController::class, 'updatePassword']);
+        Route::get('/profile/picture-options', [UserController::class, 'profilePictureOptions']);
+        Route::patch('/profile/picture', [UserController::class, 'updateProfilePicture']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 });

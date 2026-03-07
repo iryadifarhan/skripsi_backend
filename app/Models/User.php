@@ -23,6 +23,13 @@ class User extends Authenticatable
         self::ROLE_ADMIN,
     ];
 
+    public const PROFILE_PICTURES = [
+        self::ROLE_PATIENT => ['patient_1', 'patient_2', 'patient_3', 'patient_4'],
+        self::ROLE_DOCTOR => ['doctor_1', 'doctor_2', 'doctor_3', 'doctor_4'],
+        self::ROLE_ADMIN => ['admin_1'],
+        self::ROLE_SUPERADMIN => ['admin_1'],
+    ];
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -37,6 +44,7 @@ class User extends Authenticatable
         'email',
         'phone_number',
         'role',
+        'profile_picture',
         'password',
         'clinic_id',
     ];
@@ -77,5 +85,23 @@ class User extends Authenticatable
     protected function isAdmin(): bool
     {
         return $this->role === self::ROLE_ADMIN;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function profilePicturesForRole(string $role): array
+    {
+        return self::PROFILE_PICTURES[$role] ?? [];
+    }
+
+    public static function defaultProfilePictureForRole(string $role): ?string
+    {
+        return self::profilePicturesForRole($role)[0] ?? null;
+    }
+
+    public static function isValidProfilePictureForRole(string $role, string $profilePicture): bool
+    {
+        return in_array($profilePicture, self::profilePicturesForRole($role), true);
     }
 }

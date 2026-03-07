@@ -31,6 +31,7 @@ class AuthController extends Controller
             'email'    => $payload['email'],
             'phone_number' => $payload['phone_number'] ?? null,
             'role'     => User::ROLE_PATIENT,
+            'profile_picture' => User::defaultProfilePictureForRole(User::ROLE_PATIENT),
             'password' => $payload['password'],
         ]);
 

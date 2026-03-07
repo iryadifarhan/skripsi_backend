@@ -274,6 +274,81 @@ class AuthApiTest extends TestCase
         $this->assertTrue(Hash::check('CurrentPassword123!', $user->fresh()->password));
     }
 
+    public function test_authenticated_user_can_get_profile_picture_options_by_role(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'doctor',
+            'profile_picture' => 'doctor_1',
+            'email' => 'doctor-pic-options@example.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->getJson('/api/profile/picture-options', $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('role', 'doctor')
+            ->assertJsonPath('selected_profile_picture', 'doctor_1')
+            ->assertJsonPath('profile_pictures.0', 'doctor_1')
+            ->assertJsonPath('profile_pictures.1', 'doctor_2');
+    }
+
+    public function test_authenticated_user_can_update_profile_picture_from_predefined_list(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'patient',
+            'profile_picture' => 'patient_1',
+            'email' => 'patient-change-picture@example.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->patchJson('/api/profile/picture', [
+            'profile_picture' => 'patient_3',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.profile_picture', 'patient_3');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'profile_picture' => 'patient_3',
+        ]);
+    }
+
+    public function test_profile_picture_update_rejects_role_mismatch_or_custom_value(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'doctor',
+            'profile_picture' => 'doctor_1',
+            'email' => 'doctor-reject-picture@example.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->patchJson('/api/profile/picture', [
+            'profile_picture' => 'patient_2',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['profile_picture']);
+
+        $this->patchJson('/api/profile/picture', [
+            'profile_picture' => 'my_custom_photo.png',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['profile_picture']);
+    }
+
     /**
      * @return array<string, string>
      */

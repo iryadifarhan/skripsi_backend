@@ -47,6 +47,7 @@ class AdminController extends Controller
             'email'    => $payload['email'],
             'phone_number' => $payload['phone_number'] ?? null,
             'role'     => $payload['role'],
+            'profile_picture' => User::defaultProfilePictureForRole($payload['role']),
             'password' => $payload['password'],
         ]);
 
@@ -75,6 +76,10 @@ class AdminController extends Controller
             'phone_number' => ['nullable', 'string', 'max:30', Rule::unique('users', 'phone_number')->ignore($user->id)],
             'role'     => ['required', 'string', 'in:' . implode(',', User::ROLES)],
         ]);
+
+        if (!User::isValidProfilePictureForRole($payload['role'], (string) $user->profile_picture)) {
+            $payload['profile_picture'] = User::defaultProfilePictureForRole($payload['role']);
+        }
 
         $user->update($payload);
 

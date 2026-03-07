@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -57,6 +58,39 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Password update successful.',
+        ]);
+    }
+
+    public function profilePictureOptions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'role' => $user->role,
+            'profile_pictures' => User::profilePicturesForRole($user->role),
+            'selected_profile_picture' => $user->profile_picture,
+        ]);
+    }
+
+    public function updateProfilePicture(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $payload = $request->validate([
+            'profile_picture' => [
+                'required',
+                'string',
+                Rule::in(User::profilePicturesForRole($user->role)),
+            ],
+        ]);
+
+        $user->update([
+            'profile_picture' => $payload['profile_picture'],
+        ]);
+
+        return response()->json([
+            'message' => 'Profile picture update successful.',
+            'user' => $user->fresh(),
         ]);
     }
 }
