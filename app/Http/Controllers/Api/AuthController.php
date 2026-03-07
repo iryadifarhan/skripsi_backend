@@ -21,6 +21,7 @@ class AuthController extends Controller
             'name'     => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:users,username'],
             'email'    => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'phone_number' => ['nullable', 'string', 'max:30', 'unique:users,phone_number'],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
         ]);
 
@@ -28,6 +29,7 @@ class AuthController extends Controller
             'name'     => $payload['name'],
             'username' => $payload['username'],
             'email'    => $payload['email'],
+            'phone_number' => $payload['phone_number'] ?? null,
             'role'     => User::ROLE_PATIENT,
             'password' => $payload['password'],
         ]);

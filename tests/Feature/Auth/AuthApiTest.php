@@ -31,16 +31,19 @@ class AuthApiTest extends TestCase
             'name' => 'Patient One',
             'username' => 'patient_one',
             'email' => 'patient@example.com',
+            'phone_number' => '+628111111111',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
         ], $this->spaHeaders());
 
         $response->assertCreated()
             ->assertJsonPath('user.username', 'patient_one')
+            ->assertJsonPath('user.phone_number', '+628111111111')
             ->assertJsonPath('user.role', 'patient');
 
         $this->assertDatabaseHas('users', [
             'username' => 'patient_one',
+            'phone_number' => '+628111111111',
             'role' => 'patient',
         ]);
 
@@ -158,6 +161,7 @@ class AuthApiTest extends TestCase
             'name' => 'Patient Before',
             'username' => 'patient_before',
             'email' => 'patient-before@example.com',
+            'phone_number' => '+628111111112',
             'role' => 'patient',
             'password' => Hash::make('Password123!'),
         ]);
@@ -171,12 +175,14 @@ class AuthApiTest extends TestCase
             'name' => 'Patient After',
             'username' => 'patient_after',
             'email' => 'patient-after@example.com',
+            'phone_number' => '+628111111113',
             'role' => 'admin',
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.name', 'Patient After')
             ->assertJsonPath('user.username', 'patient_after')
             ->assertJsonPath('user.email', 'patient-after@example.com')
+            ->assertJsonPath('user.phone_number', '+628111111113')
             ->assertJsonPath('user.role', 'patient');
 
         $this->assertDatabaseHas('users', [
@@ -184,6 +190,7 @@ class AuthApiTest extends TestCase
             'name' => 'Patient After',
             'username' => 'patient_after',
             'email' => 'patient-after@example.com',
+            'phone_number' => '+628111111113',
             'role' => 'patient',
         ]);
     }
@@ -198,6 +205,7 @@ class AuthApiTest extends TestCase
         User::factory()->create([
             'username' => 'taken_username',
             'email' => 'taken@example.com',
+            'phone_number' => '+628111111114',
         ]);
 
         $this->postJson('/api/login', [
@@ -208,9 +216,10 @@ class AuthApiTest extends TestCase
         $this->patchJson('/api/profile', [
             'username' => 'taken_username',
             'email' => 'taken@example.com',
+            'phone_number' => '+628111111114',
         ], $this->spaHeaders())
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['username', 'email']);
+            ->assertJsonValidationErrors(['username', 'email', 'phone_number']);
     }
 
     public function test_authenticated_user_can_update_password_with_current_password(): void
