@@ -44,7 +44,7 @@ class AuthorizeRoleTest extends TestCase
         $superadmin = $this->makeUser(User::ROLE_SUPERADMIN);
 
         $response = $this->middleware->handle(
-            $this->makeRequest($superadmin, ['clinic_name' => 'missing-clinic']),
+            $this->makeRequest($superadmin),
             fn (Request $request) => response('passed', 200),
             User::ROLE_DOCTOR,
             'clinic-scoped'
@@ -91,7 +91,7 @@ class AuthorizeRoleTest extends TestCase
         $admin = $this->makeUser(User::ROLE_ADMIN, $clinic->id);
 
         $response = $this->middleware->handle(
-            $this->makeRequest($admin, ['clinic_name' => $clinic->name]),
+            $this->makeRequest($admin, ['clinic_id' => (string) $clinic->id]),
             fn (Request $request) => response('ok', 200),
             User::ROLE_ADMIN,
             'clinic-scoped'
@@ -109,13 +109,13 @@ class AuthorizeRoleTest extends TestCase
 
         $this->assertAbortWithStatusAndMessage(
             fn () => $this->middleware->handle(
-                $this->makeRequest($admin, ['clinic_name' => $targetClinic->name]),
+                $this->makeRequest($admin, ['clinic_id' => (string) $targetClinic->id]),
                 fn (Request $request) => response('ok', 200),
                 User::ROLE_ADMIN,
                 'clinic-scoped'
             ),
             403,
-            'Forbidden, you are not authorized to this clinic.'
+            'Forbidden, you are not authorized as an admin to this clinic.'
         );
     }
 
@@ -126,7 +126,7 @@ class AuthorizeRoleTest extends TestCase
         $doctor->clinics()->attach($clinic->id);
 
         $response = $this->middleware->handle(
-            $this->makeRequest($doctor, ['clinic_name' => $clinic->name]),
+            $this->makeRequest($doctor, ['clinic_id' => (string) $clinic->id]),
             fn (Request $request) => response('ok', 200),
             User::ROLE_DOCTOR,
             'clinic-scoped'
@@ -143,17 +143,17 @@ class AuthorizeRoleTest extends TestCase
 
         $this->assertAbortWithStatusAndMessage(
             fn () => $this->middleware->handle(
-                $this->makeRequest($doctor, ['clinic_name' => $clinic->name]),
+                $this->makeRequest($doctor, ['clinic_id' => (string) $clinic->id]),
                 fn (Request $request) => response('ok', 200),
                 User::ROLE_DOCTOR,
                 'clinic-scoped'
             ),
             403,
-            'Forbidden, you are not authorized to this clinic.'
+            'Forbidden, you are not authorized as a doctor to this clinic.'
         );
     }
 
-    public function test_handle_returns_422_when_clinic_name_missing_for_clinic_scoped_route(): void
+    public function test_handle_returns_422_when_clinic_id_missing_for_clinic_scoped_route(): void
     {
         $admin = $this->makeUser(User::ROLE_ADMIN);
 
@@ -165,23 +165,23 @@ class AuthorizeRoleTest extends TestCase
                 'clinic-scoped'
             ),
             422,
-            'clinic_name is required for clinic-scoped access.'
+            'clinic_id is required for clinic-scoped access.'
         );
     }
 
-    public function test_handle_returns_404_when_clinic_name_is_not_found(): void
+    public function test_handle_returns_404_when_clinic_id_is_not_found(): void
     {
         $admin = $this->makeUser(User::ROLE_ADMIN);
 
         $this->assertAbortWithStatusAndMessage(
             fn () => $this->middleware->handle(
-                $this->makeRequest($admin, ['clinic_name' => 'tidak-ada']),
+                $this->makeRequest($admin, ['clinic_id' => '999999']),
                 fn (Request $request) => response('ok', 200),
                 User::ROLE_ADMIN,
                 'clinic-scoped'
             ),
             404,
-            'Clinic name provided is not found at database.'
+            'Clinic id provided is not found or deleted.'
         );
     }
 

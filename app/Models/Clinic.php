@@ -29,4 +29,19 @@ class Clinic extends Model
             ->where('users.role', User::ROLE_DOCTOR)
             ->withTimestamps();
     }
+
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
+    }
+
+    public function operatingHours(): HasMany
+    {
+        return $this->hasMany(ClinicOperatingHour::class)->orderBy('day_of_week');
+    }
+
+    public function doctorClinicSchedules(): HasMany
+    {
+        return $this->hasMany(DoctorClinicSchedule::class);
+    }
 }

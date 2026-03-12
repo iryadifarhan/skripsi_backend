@@ -88,4 +88,29 @@ class AdminController extends Controller
             'user'    => $user,
         ]);
     }
+
+    public function deleteUser(Request $request, $usernameOrEmail): JsonResponse
+    {
+        $user = User::where('username', $usernameOrEmail)
+            ->orWhere('email', $usernameOrEmail)
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'User not found.',
+            ], 404);
+        }
+
+        if ($user->id === Auth::id()) {
+            return response()->json([
+                'message' => 'You cannot delete your own account.',
+            ], 400);
+        }
+
+        $user->delete();
+
+        return response()->json([
+            'message' => 'User deletion successful.',
+        ]);
+    }
 }

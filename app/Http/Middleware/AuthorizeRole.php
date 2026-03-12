@@ -16,7 +16,7 @@ class AuthorizeRole
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized to this clinic.');
+        abort(403, 'Forbidden, you are not authorized as an admin to this clinic.');
     }
 
     private function authorizeClinicDoctor(User $user, Clinic $clinic): void
@@ -25,21 +25,21 @@ class AuthorizeRole
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized to this clinic.');
+        abort(403, 'Forbidden, you are not authorized as a doctor to this clinic.');
     }
 
     private function resolveClinicFromRequest(Request $request): Clinic
     {
-        $clinicName = $request->input('clinic_name');
+        $clinicId = $request->input('clinic_id');
 
-        if (!is_string($clinicName) || $clinicName === '') {
-            abort(422, 'clinic_name is required for clinic-scoped access.');
+        if ($clinicId === null || $clinicId === '') {
+            abort(422, 'clinic_id is required for clinic-scoped access.');
         }
 
-        $clinic = Clinic::where('name', $clinicName)->first();
+        $clinic = Clinic::where('id', $clinicId)->first();
 
         if (!$clinic) {
-            abort(404, 'Clinic name provided is not found at database.');
+            abort(404, 'Clinic id provided is not found or deleted.');
         }
 
         return $clinic;
@@ -62,12 +62,15 @@ class AuthorizeRole
             return $next($request);
         }
 
-        $requiresClinicScope = in_array('clinic-scoped', $roles, true);
+        // Check if user role is in allowed roles (ignoring 'clinic-scoped' flag)
         $allowedRoles = array_values(array_filter($roles, fn (string $role): bool => $role !== 'clinic-scoped'));
 
         if (!in_array($user->role, $allowedRoles, true)) {
             return response()->json(['message' => 'Forbidden, you are not authorized.'], 403);
         }
+
+        // Decide if clinic scope check is needed based on presence of 'clinic-scoped' flag
+        $requiresClinicScope = in_array('clinic-scoped', $roles, true) && in_array($user->role, User::CLINIC_SCOPED_ROLES, true);
 
         if (!$requiresClinicScope) {
             return $next($request);

@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -21,6 +22,11 @@ class User extends Authenticatable
         self::ROLE_PATIENT,
         self::ROLE_DOCTOR,
         self::ROLE_ADMIN,
+    ];
+
+    public const CLINIC_SCOPED_ROLES = [
+        self::ROLE_DOCTOR,
+        self::ROLE_ADMIN
     ];
 
     public const PROFILE_PICTURES = [
@@ -57,6 +63,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'pivot',
     ];
 
     /**
@@ -80,6 +87,26 @@ class User extends Authenticatable
     public function clinics(): BelongsToMany
     {
         return $this->belongsToMany(Clinic::class)->withTimestamps();
+    }
+
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class, 'patient_id');
+    }
+
+    public function assignedReservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class, 'doctor_id');
+    }
+
+    public function handledReservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class, 'handled_by_admin_id');
+    }
+
+    public function doctorClinicSchedules(): HasMany
+    {
+        return $this->hasMany(DoctorClinicSchedule::class, 'doctor_id');
     }
 
     protected function isAdmin(): bool
