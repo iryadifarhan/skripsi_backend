@@ -5,13 +5,20 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\ReservationQueueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AdminReservationController extends Controller
 {
+    public function __construct(
+        private readonly ReservationQueueService $queueService,
+    ) {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $clinicId = $request->input('clinic_id');
@@ -40,7 +47,7 @@ class AdminReservationController extends Controller
 
         return response()->json([
             'message' => 'Reservation retrieval successful.',
-            'reservations' => $query->get(),
+            'reservations' => $this->queueService->serializeReservations($query->get()),
         ]);
     }
 
@@ -50,12 +57,12 @@ class AdminReservationController extends Controller
 
         return response()->json([
             'message' => 'Reservation retrieval successful.',
-            'reservation' => $reservation->load([
+            'reservation' => $this->queueService->serializeReservation($reservation->load([
                 'patient:id,name,username,email,phone_number',
                 'doctor:id,name,username,email,phone_number',
                 'clinic:id,name,address,phone_number,email',
                 'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
-            ]),
+            ])),
         ]);
     }
 
@@ -75,52 +82,77 @@ class AdminReservationController extends Controller
             ]);
         }
 
-        if (isset($payload['status'])) {
-            if (
-                in_array($reservation->status, [Reservation::STATUS_CANCELLED, Reservation::STATUS_COMPLETED], true)
-                && $payload['status'] !== $reservation->status
-            ) {
-                throw ValidationException::withMessages([
-                    'status' => ['Terminal reservation status cannot be changed.'],
-                ]);
+        $reservation = DB::transaction(function () use ($payload, $request, $reservation): Reservation {
+            $lockedReservation = Reservation::query()
+                ->lockForUpdate()
+                ->findOrFail($reservation->id);
+
+            $queueStatusToApply = null;
+
+            if (isset($payload['status'])) {
+                if (
+                    in_array($lockedReservation->status, [Reservation::STATUS_CANCELLED, Reservation::STATUS_COMPLETED, Reservation::STATUS_REJECTED], true)
+                    && $payload['status'] !== $lockedReservation->status
+                ) {
+                    throw ValidationException::withMessages([
+                        'status' => ['Terminal reservation status cannot be changed.'],
+                    ]);
+                }
+
+                if ($payload['status'] === Reservation::STATUS_CANCELLED && empty($payload['cancellation_reason'])) {
+                    throw ValidationException::withMessages([
+                        'cancellation_reason' => ['Cancellation reason is required when status is cancelled.'],
+                    ]);
+                }
+
+                if ($payload['status'] !== Reservation::STATUS_CANCELLED && array_key_exists('cancellation_reason', $payload)) {
+                    $payload['cancellation_reason'] = null;
+                    $payload['cancelled_at'] = null;
+                }
+
+                if ($payload['status'] !== Reservation::STATUS_CANCELLED && $lockedReservation->status === Reservation::STATUS_CANCELLED) {
+                    $payload['cancellation_reason'] = null;
+                    $payload['cancelled_at'] = null;
+                }
+
+                if ($payload['status'] !== $lockedReservation->status) {
+                    $payload['handled_by_admin_id'] = $request->user()->id;
+                    $payload['handled_at'] = now();
+                }
+
+                if ($payload['status'] === Reservation::STATUS_CANCELLED) {
+                    $payload['cancelled_at'] = now();
+                    $queueStatusToApply = Reservation::QUEUE_STATUS_CANCELLED;
+                }
+
+                if ($payload['status'] === Reservation::STATUS_COMPLETED) {
+                    $queueStatusToApply = Reservation::QUEUE_STATUS_COMPLETED;
+                }
+
+                if ($payload['status'] === Reservation::STATUS_REJECTED) {
+                    $queueStatusToApply = Reservation::QUEUE_STATUS_CANCELLED;
+                }
             }
 
-            if ($payload['status'] === Reservation::STATUS_CANCELLED && empty($payload['cancellation_reason'])) {
-                throw ValidationException::withMessages([
-                    'cancellation_reason' => ['Cancellation reason is required when status is cancelled.'],
-                ]);
+            unset($payload['queue_status']);
+
+            $lockedReservation->update($payload);
+
+            if ($queueStatusToApply !== null) {
+                $this->queueService->applyQueueStatus($lockedReservation, $queueStatusToApply);
             }
 
-            if ($payload['status'] !== Reservation::STATUS_CANCELLED && array_key_exists('cancellation_reason', $payload)) {
-                $payload['cancellation_reason'] = null;
-                $payload['cancelled_at'] = null;
-            }
-
-            if ($payload['status'] !== Reservation::STATUS_CANCELLED && $reservation->status === Reservation::STATUS_CANCELLED) {
-                $payload['cancellation_reason'] = null;
-                $payload['cancelled_at'] = null;
-            }
-
-            if ($payload['status'] !== $reservation->status) {
-                $payload['handled_by_admin_id'] = $request->user()->id;
-                $payload['handled_at'] = now();
-            }
-
-            if ($payload['status'] === Reservation::STATUS_CANCELLED) {
-                $payload['cancelled_at'] = now();
-            }
-        }
-
-        $reservation->update($payload);
+            return $lockedReservation->fresh();
+        });
 
         return response()->json([
             'message' => 'Reservation update successful.',
-            'reservation' => $reservation->fresh()->load([
+            'reservation' => $this->queueService->serializeReservation($reservation->fresh()->load([
                 'patient:id,name,username,email,phone_number',
                 'doctor:id,name,username,email,phone_number',
                 'clinic:id,name,address,phone_number,email',
                 'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
-            ]),
+            ])),
         ]);
     }
 

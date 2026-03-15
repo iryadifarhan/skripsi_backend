@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminReservationController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\QueueController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\ClinicController;
 use App\Http\Controllers\UserController;
@@ -31,12 +32,16 @@ Route::middleware('web')->group(function (): void {
 
         Route::patch('/admin/clinic/update/{clinicId}', [ClinicController::class, 'update']);
         Route::delete('/admin/clinic/delete/{clinicId}', [ClinicController::class, 'delete']);
+
         Route::patch('/admin/clinic/doctor/{clinicId}', [ClinicController::class, 'assignDoctor']);
         Route::delete('/admin/clinic/doctor/{clinicId}', [ClinicController::class, 'removeDoctor']);
 
         Route::get('/admin/reservations', [AdminReservationController::class, 'index']);
         Route::get('/admin/reservations/{reservation}', [AdminReservationController::class, 'show']);
         Route::patch('/admin/reservations/{reservation}', [AdminReservationController::class, 'update']);
+       
+        Route::get('/admin/queues', [QueueController::class, 'adminIndex']);
+        Route::patch('/admin/queues/{reservation}', [QueueController::class, 'adminUpdate']);
     });
 
     // Doctor and Admin (Clinic Scoped) routes
@@ -45,11 +50,20 @@ Route::middleware('web')->group(function (): void {
         Route::patch('/clinic/schedules/{schedule}', [ClinicController::class, 'updateDoctorClinicSchedule']);
     });
 
+    Route::middleware(['auth:sanctum', 'authorize:doctor,clinic-scoped'])->group(function (): void {
+        Route::get('/doctor/queues', [QueueController::class, 'doctorIndex']);
+    });
+
     // Patient reservation routes
     Route::middleware(['auth:sanctum', 'authorize:admin,patient,clinic-scoped'])->group(function (): void {
         Route::get('/reservations', [ReservationController::class, 'index']);
         Route::post('/reservations', [ReservationController::class, 'store']);
+        Route::patch('/reservations/{reservation}/reschedule', [ReservationController::class, 'reschedule']);
         Route::patch('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel']);
+    });
+
+    Route::middleware(['auth:sanctum', 'authorize:patient'])->group(function (): void {
+        Route::get('/queues/my', [QueueController::class, 'patientIndex']);
     });
 
     // Authenticated user routes

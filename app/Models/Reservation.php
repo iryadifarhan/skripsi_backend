@@ -29,14 +29,48 @@ class Reservation extends Model
         self::STATUS_APPROVED,
     ];
 
+    public const QUEUE_STATUS_WAITING = 'waiting';
+    public const QUEUE_STATUS_CALLED = 'called';
+    public const QUEUE_STATUS_IN_PROGRESS = 'in_progress';
+    public const QUEUE_STATUS_SKIPPED = 'skipped';
+    public const QUEUE_STATUS_COMPLETED = 'completed';
+    public const QUEUE_STATUS_CANCELLED = 'cancelled';
+
+    public const QUEUE_ORDER_SOURCE_DERIVED = 'derived';
+    public const QUEUE_ORDER_SOURCE_MANUAL = 'manual';
+
+    public const QUEUE_STATUSES = [
+        self::QUEUE_STATUS_WAITING,
+        self::QUEUE_STATUS_CALLED,
+        self::QUEUE_STATUS_IN_PROGRESS,
+        self::QUEUE_STATUS_SKIPPED,
+        self::QUEUE_STATUS_COMPLETED,
+        self::QUEUE_STATUS_CANCELLED,
+    ];
+
+    public const ACTIVE_QUEUE_STATUSES = [
+        self::QUEUE_STATUS_WAITING,
+        self::QUEUE_STATUS_CALLED,
+        self::QUEUE_STATUS_IN_PROGRESS,
+        self::QUEUE_STATUS_SKIPPED,
+    ];
+
     protected $fillable = [
         'reservation_number',
+        'queue_number',
+        'queue_status',
+        'queue_order_source',
+        'queue_called_at',
+        'queue_started_at',
+        'queue_completed_at',
+        'queue_skipped_at',
         'patient_id',
+        'guest_name',
+        'guest_phone_number',
         'clinic_id',
         'doctor_id',
         'doctor_clinic_schedule_id',
         'reservation_date',
-        'reservation_time',
         'window_start_time',
         'window_end_time',
         'window_slot_number',
@@ -52,11 +86,15 @@ class Reservation extends Model
     protected function casts(): array
     {
         return [
+            'queue_number' => 'integer',
             'reservation_date' => 'date',
-            'reservation_time' => 'string',
             'window_start_time' => 'string',
             'window_end_time' => 'string',
             'window_slot_number' => 'integer',
+            'queue_called_at' => 'datetime',
+            'queue_started_at' => 'datetime',
+            'queue_completed_at' => 'datetime',
+            'queue_skipped_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'handled_at' => 'datetime',
         ];

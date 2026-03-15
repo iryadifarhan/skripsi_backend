@@ -63,9 +63,85 @@ class ReservationApiTest extends TestCase
             ->assertJsonPath('reservation.patient_id', $patient->id)
             ->assertJsonPath('reservation.clinic_id', $clinic->id)
             ->assertJsonPath('reservation.doctor_id', $doctor->id)
+            ->assertJsonPath('reservation.queue_summary.number', 1)
+            ->assertJsonPath('reservation.queue_summary.status', Reservation::QUEUE_STATUS_WAITING)
             ->assertJsonPath('reservation.window_start_time', '09:00:00')
             ->assertJsonPath('reservation.window_slot_number', 1)
             ->assertJsonPath('reservation.status', Reservation::STATUS_PENDING);
+    }
+
+    public function test_clinic_admin_can_create_reservation_for_existing_patient(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-admin-assisted-booking');
+        $doctor = $this->makeUser('doctor', 'doctor-admin-assisted-booking@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser('admin', 'admin-assisted-booking@example.com', $clinic->id);
+        $patient = $this->makeUser('patient', 'patient-assisted-booking@example.com');
+
+        $this->login($admin, 'Password123!');
+
+        $this->postJson('/api/reservations', [
+            'clinic_id' => $clinic->id,
+            'patient_id' => $patient->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '09:00',
+            'complaint' => 'Walk-in booking handled by admin',
+        ], $this->spaHeaders())
+            ->assertCreated()
+            ->assertJsonPath('reservation.patient_id', $patient->id)
+            ->assertJsonPath('reservation.queue_summary.number', 1)
+            ->assertJsonPath('reservation.window_start_time', '09:00:00');
+    }
+
+    public function test_clinic_admin_can_create_walk_in_reservation_without_patient_account(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-admin-walk-in-booking');
+        $doctor = $this->makeUser('doctor', 'doctor-admin-walk-in-booking@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser('admin', 'admin-walk-in-booking@example.com', $clinic->id);
+
+        $this->login($admin, 'Password123!');
+
+        $this->postJson('/api/reservations', [
+            'clinic_id' => $clinic->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '09:00',
+            'guest_name' => 'Walk In One',
+            'guest_phone_number' => '+628123450001',
+            'complaint' => 'Walk-in handled by clinic admin',
+        ], $this->spaHeaders())
+            ->assertCreated()
+            ->assertJsonPath('reservation.patient_id', null)
+            ->assertJsonPath('reservation.guest_name', 'Walk In One')
+            ->assertJsonPath('reservation.guest_phone_number', '+628123450001')
+            ->assertJsonPath('reservation.queue_summary.number', 1);
+    }
+
+    public function test_walk_in_reservation_requires_guest_name_when_patient_id_is_missing(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-admin-walk-in-validation');
+        $doctor = $this->makeUser('doctor', 'doctor-admin-walk-in-validation@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser('admin', 'admin-walk-in-validation@example.com', $clinic->id);
+
+        $this->login($admin, 'Password123!');
+
+        $this->postJson('/api/reservations', [
+            'clinic_id' => $clinic->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '09:00',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['guest_name']);
     }
 
     public function test_reservation_uses_first_empty_slot_in_time_window(): void
@@ -128,8 +204,10 @@ class ReservationApiTest extends TestCase
         $doctor->clinics()->attach($clinic->id);
         $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
         $patient = $this->makeUser('patient', 'patient-cancel@example.com');
+        $otherPatient = $this->makeUser('patient', 'patient-cancel-other@example.com');
 
         $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $otherReservation = $this->createReservation($otherPatient, $schedule, $reservationDate, '10:00:00', 1, Reservation::STATUS_PENDING);
 
         $this->login($patient, 'Password123!');
 
@@ -138,7 +216,269 @@ class ReservationApiTest extends TestCase
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservation.status', Reservation::STATUS_CANCELLED)
+            ->assertJsonPath('reservation.queue_summary.number', null)
             ->assertJsonPath('reservation.cancellation_reason', 'Recovered at home');
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'queue_number' => null,
+            'queue_status' => Reservation::QUEUE_STATUS_CANCELLED,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $otherReservation->id,
+            'queue_number' => 1,
+        ]);
+    }
+
+    public function test_admin_cannot_cancel_other_clinic_reservation_through_general_cancel_route(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinicA = $this->makeClinic('clinic-cancel-scope-a');
+        $clinicB = $this->makeClinic('clinic-cancel-scope-b');
+
+        $doctorB = $this->makeUser('doctor', 'doctor-cancel-scope-b@example.com');
+        $doctorB->clinics()->attach($clinicB->id);
+        $scheduleB = $this->makeScheduleForDate($clinicB, $doctorB, $reservationDate);
+
+        $admin = $this->makeUser('admin', 'admin-cancel-scope@example.com', $clinicA->id);
+        $patient = $this->makeUser('patient', 'patient-cancel-scope@example.com');
+        $reservation = $this->createReservation($patient, $scheduleB, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/api/reservations/{$reservation->id}/cancel", [
+            'clinic_id' => $clinicA->id,
+            'cancellation_reason' => 'Invalid scope attempt',
+        ], $this->spaHeaders())
+            ->assertForbidden();
+    }
+
+    public function test_patient_can_reschedule_own_active_reservation_and_queue_lines_are_updated(): void
+    {
+        $currentDate = now()->addDay();
+        $reservationDate = $currentDate->toDateString();
+        $nextReservationDate = $currentDate->copy()->addWeek()->toDateString();
+
+        $clinic = $this->makeClinic('clinic-reschedule');
+        $doctor = $this->makeUser('doctor', 'doctor-reschedule@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate, 60, 4);
+
+        $patientA = $this->makeUser('patient', 'patient-reschedule-a@example.com');
+        $patientB = $this->makeUser('patient', 'patient-reschedule-b@example.com');
+        $patientC = $this->makeUser('patient', 'patient-reschedule-c@example.com');
+        $patientD = $this->makeUser('patient', 'patient-reschedule-d@example.com');
+
+        $reservationA = $this->createReservation($patientA, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $reservationToMove = $this->createReservation($patientB, $schedule, $reservationDate, '10:00:00', 1, Reservation::STATUS_APPROVED);
+        $reservationC = $this->createReservation($patientC, $schedule, $reservationDate, '11:00:00', 1, Reservation::STATUS_PENDING);
+        $existingTargetReservation = $this->createReservation($patientD, $schedule, $nextReservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($patientB, 'Password123!');
+
+        $this->patchJson("/api/reservations/{$reservationToMove->id}/reschedule", [
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $nextReservationDate,
+            'window_start_time' => '10:00',
+            'complaint' => 'Updated complaint after reschedule',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('reservation.id', $reservationToMove->id)
+            ->assertJsonPath('reservation.reservation_date', Carbon::parse($nextReservationDate)->toJSON())
+            ->assertJsonPath('reservation.window_start_time', '10:00:00')
+            ->assertJsonPath('reservation.window_slot_number', 1)
+            ->assertJsonPath('reservation.status', Reservation::STATUS_PENDING)
+            ->assertJsonPath('reservation.complaint', 'Updated complaint after reschedule')
+            ->assertJsonPath('reservation.queue_summary.number', 2)
+            ->assertJsonPath('reservation.queue_summary.status', Reservation::QUEUE_STATUS_WAITING);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservationToMove->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $nextReservationDate.' 00:00:00',
+            'window_start_time' => '10:00:00',
+            'window_slot_number' => 1,
+            'queue_number' => 2,
+            'queue_status' => Reservation::QUEUE_STATUS_WAITING,
+            'status' => Reservation::STATUS_PENDING,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservationA->id,
+            'queue_number' => 1,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservationC->id,
+            'queue_number' => 2,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $existingTargetReservation->id,
+            'queue_number' => 1,
+        ]);
+    }
+
+    public function test_patient_reschedule_within_same_queue_line_resequences_queue_by_window_order(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-reschedule-same-line');
+        $doctor = $this->makeUser('doctor', 'doctor-reschedule-same-line@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate, 60, 4);
+
+        $patientA = $this->makeUser('patient', 'patient-reschedule-same-line-a@example.com');
+        $patientB = $this->makeUser('patient', 'patient-reschedule-same-line-b@example.com');
+        $patientC = $this->makeUser('patient', 'patient-reschedule-same-line-c@example.com');
+
+        $this->createReservation($patientA, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $reservation = $this->createReservation($patientB, $schedule, $reservationDate, '10:00:00', 1, Reservation::STATUS_PENDING);
+        $reservationC = $this->createReservation($patientC, $schedule, $reservationDate, '11:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($patientB, 'Password123!');
+
+        $this->patchJson("/api/reservations/{$reservation->id}/reschedule", [
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '11:00',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('reservation.queue_summary.number', 3)
+            ->assertJsonPath('reservation.window_start_time', '11:00:00')
+            ->assertJsonPath('reservation.window_slot_number', 2);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservationC->id,
+            'queue_number' => 2,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'queue_number' => 3,
+        ]);
+    }
+
+    public function test_reschedule_compacts_old_window_slot_numbers_after_moving_reservation(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-reschedule-window-slots');
+        $doctor = $this->makeUser('doctor', 'doctor-reschedule-window-slots@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate, 30, 4);
+
+        $patientA = $this->makeUser('patient', 'patient-window-slot-a@example.com');
+        $patientB = $this->makeUser('patient', 'patient-window-slot-b@example.com');
+        $patientC = $this->makeUser('patient', 'patient-window-slot-c@example.com');
+        $patientD = $this->makeUser('patient', 'patient-window-slot-d@example.com');
+
+        $reservationA = $this->createReservation($patientA, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $reservationToMove = $this->createReservation($patientB, $schedule, $reservationDate, '09:00:00', 2, Reservation::STATUS_PENDING);
+        $reservationC = $this->createReservation($patientC, $schedule, $reservationDate, '09:00:00', 3, Reservation::STATUS_PENDING);
+        $reservationD = $this->createReservation($patientD, $schedule, $reservationDate, '09:00:00', 4, Reservation::STATUS_PENDING);
+
+        $this->login($patientB, 'Password123!');
+
+        $this->patchJson("/api/reservations/{$reservationToMove->id}/reschedule", [
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '10:00',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('reservation.window_start_time', '10:00:00')
+            ->assertJsonPath('reservation.window_slot_number', 1);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservationA->id,
+            'window_start_time' => '09:00:00',
+            'window_slot_number' => 1,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservationC->id,
+            'window_start_time' => '09:00:00',
+            'window_slot_number' => 2,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservationD->id,
+            'window_start_time' => '09:00:00',
+            'window_slot_number' => 3,
+        ]);
+    }
+
+    public function test_available_windows_can_ignore_current_reservation_during_reschedule(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-reschedule-windows');
+        $doctor = $this->makeUser('doctor', 'doctor-reschedule-windows@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate, 60, 2);
+
+        $patient = $this->makeUser('patient', 'patient-reschedule-windows@example.com');
+        $otherPatient = $this->makeUser('patient', 'patient-reschedule-windows-other@example.com');
+
+        $ownReservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $this->createReservation($otherPatient, $schedule, $reservationDate, '09:00:00', 2, Reservation::STATUS_PENDING);
+
+        $this->login($patient, 'Password123!');
+
+        $this->getJson(
+            "/api/reservations/booking/windows?doctor_clinic_schedule_id={$schedule->id}&reservation_date={$reservationDate}&ignore_reservation_id={$ownReservation->id}",
+            $this->spaHeaders()
+        )
+            ->assertOk()
+            ->assertJsonPath('windows.0.available_slots', 1)
+            ->assertJsonPath('windows.0.slot_numbers_available.0', 1);
+    }
+
+    public function test_patient_cannot_reschedule_other_patients_reservation(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-reschedule-forbidden');
+        $doctor = $this->makeUser('doctor', 'doctor-reschedule-forbidden@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+
+        $owner = $this->makeUser('patient', 'patient-reschedule-owner@example.com');
+        $intruder = $this->makeUser('patient', 'patient-reschedule-intruder@example.com');
+        $reservation = $this->createReservation($owner, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($intruder, 'Password123!');
+
+        $this->patchJson("/api/reservations/{$reservation->id}/reschedule", [
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '10:00',
+        ], $this->spaHeaders())
+            ->assertForbidden();
+    }
+
+    public function test_patient_cannot_reschedule_to_full_window(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-reschedule-full-window');
+        $doctor = $this->makeUser('doctor', 'doctor-reschedule-full-window@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate, 60, 2);
+
+        $patientA = $this->makeUser('patient', 'patient-reschedule-full-a@example.com');
+        $patientB = $this->makeUser('patient', 'patient-reschedule-full-b@example.com');
+        $patientC = $this->makeUser('patient', 'patient-reschedule-full-c@example.com');
+
+        $this->createReservation($patientA, $schedule, $reservationDate, '10:00:00', 1, Reservation::STATUS_PENDING);
+        $this->createReservation($patientB, $schedule, $reservationDate, '10:00:00', 2, Reservation::STATUS_PENDING);
+        $reservation = $this->createReservation($patientC, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($patientC, 'Password123!');
+
+        $this->patchJson("/api/reservations/{$reservation->id}/reschedule", [
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '10:00',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['window_start_time']);
     }
 
     public function test_patient_can_list_own_reservations(): void
@@ -193,6 +533,46 @@ class ReservationApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('reservation.status', Reservation::STATUS_APPROVED)
             ->assertJsonPath('reservation.handled_by_admin_id', $admin->id);
+    }
+
+    public function test_rejected_reservation_is_removed_from_active_queue_views(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-rejected-queue');
+        $doctor = $this->makeUser('doctor', 'doctor-rejected-queue@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+
+        $admin = $this->makeUser('admin', 'admin-rejected-queue@example.com', $clinic->id);
+        $patient = $this->makeUser('patient', 'patient-rejected-queue@example.com');
+        $otherPatient = $this->makeUser('patient', 'patient-rejected-other@example.com');
+
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $otherReservation = $this->createReservation($otherPatient, $schedule, $reservationDate, '10:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/api/admin/reservations/{$reservation->id}", [
+            'clinic_id' => $clinic->id,
+            'status' => Reservation::STATUS_REJECTED,
+            'admin_notes' => 'Rejected after validation.',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('reservation.status', Reservation::STATUS_REJECTED)
+            ->assertJsonPath('reservation.queue_summary.number', null)
+            ->assertJsonPath('reservation.queue_summary.status', Reservation::QUEUE_STATUS_CANCELLED);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => Reservation::STATUS_REJECTED,
+            'queue_status' => Reservation::QUEUE_STATUS_CANCELLED,
+            'queue_number' => null,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $otherReservation->id,
+            'queue_number' => 1,
+        ]);
     }
 
     public function test_clinic_admin_can_list_clinic_reservations_from_general_reservations_endpoint(): void
@@ -321,12 +701,20 @@ class ReservationApiTest extends TestCase
 
         return Reservation::create([
             'reservation_number' => 'RSV-'.Str::upper(Str::random(12)),
+            'queue_number' => ((int) Reservation::query()
+                ->where('doctor_clinic_schedule_id', $schedule->id)
+                ->whereDate('reservation_date', $reservationDate)
+                ->max('queue_number')) + 1,
+            'queue_status' => in_array($status, Reservation::ACTIVE_STATUSES, true)
+                ? Reservation::QUEUE_STATUS_WAITING
+                : ($status === Reservation::STATUS_COMPLETED
+                    ? Reservation::QUEUE_STATUS_COMPLETED
+                    : Reservation::QUEUE_STATUS_CANCELLED),
             'patient_id' => $patient->id,
             'clinic_id' => $schedule->clinic_id,
             'doctor_id' => $schedule->doctor_id,
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
-            'reservation_time' => $windowStartTime,
             'window_start_time' => $windowStartTime,
             'window_end_time' => $windowEndTime,
             'window_slot_number' => $slot,

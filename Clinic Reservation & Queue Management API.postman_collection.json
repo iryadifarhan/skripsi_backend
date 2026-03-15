@@ -1,0 +1,1388 @@
+{
+  "info": {
+    "_postman_id": "ecd68e36-3bb9-429f-b0c6-eca857ca40b9",
+    "name": "Clinic Reservation & Queue Management API",
+    "description": "Postman collection for current backend endpoints including auth, clinic management, reservation booking, and single-line queue management for patient, admin, and doctor actors.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "38071995",
+    "_collection_link": "https://go.postman.co/collection/38071995-ecd68e36-3bb9-429f-b0c6-eca857ca40b9?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "01 - Auth",
+      "item": [
+        {
+          "name": "Get CSRF Cookie",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{app_base_url}}/sanctum/csrf-cookie",
+              "host": [
+                "{{app_base_url}}"
+              ],
+              "path": [
+                "sanctum",
+                "csrf-cookie"
+              ]
+            },
+            "description": "Run this first for SPA/session auth flow."
+          },
+          "response": []
+        },
+        {
+          "name": "Register (Patient)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Patient One\",\n  \"username\": \"patient_one\",\n  \"email\": \"patient@example.com\",\n  \"phone_number\": \"+628111111111\",\n  \"password\": \"Password123!\",\n  \"password_confirmation\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/register",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{login_email}}\",\n  \"password\": \"{{login_password}}\",\n  \"remember\": true\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/login",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Current User (/user)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/user",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "user"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{login_email}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/forgot-password",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "forgot-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{reset_token}}\",\n  \"email\": \"{{login_email}}\",\n  \"password\": \"{{new_password}}\",\n  \"password_confirmation\": \"{{new_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/reset-password",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "reset-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/logout",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Profile",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/profile",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"username\": \"updated_username\",\n  \"email\": \"updated@example.com\",\n  \"phone_number\": \"+628111111222\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/profile",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{login_password}}\",\n  \"password\": \"{{new_password}}\",\n  \"password_confirmation\": \"{{new_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/profile/password",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "profile",
+                "password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile Picture Options",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/profile/picture-options",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "profile",
+                "picture-options"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile Picture",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profile_picture\": \"{{profile_picture_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/profile/picture",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "profile",
+                "picture"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Admin User Management",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clinic_id\": {{clinic_id}},\n  \"name\": \"Doctor One\",\n  \"username\": \"doctor_one\",\n  \"email\": \"doctor@example.com\",\n  \"phone_number\": \"+628111111333\",\n  \"password\": \"Password123!\",\n  \"password_confirmation\": \"Password123!\",\n  \"role\": \"doctor\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/admin/user/create",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "user",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by Username/Email",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/admin/user/{{username_or_email}}?clinic_id={{clinic_id}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "user",
+                "{{username_or_email}}"
+              ],
+              "query": [
+                {
+                  "key": "clinic_id",
+                  "value": "{{clinic_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clinic_id\": {{clinic_id}},\n  \"name\": \"Doctor One Updated\",\n  \"username\": \"doctor_one\",\n  \"email\": \"doctor@example.com\",\n  \"phone_number\": \"+628111111333\",\n  \"role\": \"doctor\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/admin/user/{{username_or_email}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "user",
+                "{{username_or_email}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clinic_id\": {{clinic_id}}\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/admin/user/{{username_or_email}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "user",
+                "{{username_or_email}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Admin Clinic Management",
+      "item": [
+        {
+          "name": "Create Clinic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6Ik9NY3EzbHlMdGRyS2xUYUlOcUQ4M3c9PSIsInZhbHVlIjoiZVlGVi93UUZ6VGdPYkoyQzBGZnZXMDZETVh4Y1lZQVBlWVFibkgwQkxobUdoN1BqUXRPdmlqYXpuVm03cHNmcVFuQXpPb0NqalloZEFKYk5TNmpFMDNrOTNoMDlXRzNLWFcyd3Rla2pzNktENlFNS0FSVHFncXRrVm5QQ2s2dUwiLCJtYWMiOiIyZDlhM2RkY2EyNDkzZDFmMWNmMjY2OGNkNWRiOGZmNGNmODhjNTIzZDE5OWYyZTk4YWE4MjhiNTQ3MDdiNmIzIiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"name\": \"Clinic Sibio\",\r\n  \"address\": \"Galaxy City\",\r\n  \"email\": \"admina@sibio.com\",\r\n  \"phone_number\": \"+62 619\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/superadmin/clinic/create",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "superadmin",
+                "clinic",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Clinic",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6Ik9NY3EzbHlMdGRyS2xUYUlOcUQ4M3c9PSIsInZhbHVlIjoiZVlGVi93UUZ6VGdPYkoyQzBGZnZXMDZETVh4Y1lZQVBlWVFibkgwQkxobUdoN1BqUXRPdmlqYXpuVm03cHNmcVFuQXpPb0NqalloZEFKYk5TNmpFMDNrOTNoMDlXRzNLWFcyd3Rla2pzNktENlFNS0FSVHFncXRrVm5QQ2s2dUwiLCJtYWMiOiIyZDlhM2RkY2EyNDkzZDFmMWNmMjY2OGNkNWRiOGZmNGNmODhjNTIzZDE5OWYyZTk4YWE4MjhiNTQ3MDdiNmIzIiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"name\": \"Clinic Sibio\",\r\n  \"address\": \"Galaxy City\",\r\n  \"email\": \"admina@sibio.com\",\r\n  \"phone_number\": \"+62 619\",\r\n  \"operating_hours\": [\r\n    { \"day_of_week\": 0, \"is_closed\": true },\r\n    { \"day_of_week\": 1, \"open_time\": \"08:00:00\", \"close_time\": \"17:00:00\", \"is_closed\": false },\r\n    { \"day_of_week\": 2, \"open_time\": \"08:00:00\", \"close_time\": \"17:00:00\", \"is_closed\": false },\r\n    { \"day_of_week\": 3, \"open_time\": \"08:00:00\", \"close_time\": \"17:00:00\", \"is_closed\": false },\r\n    { \"day_of_week\": 4, \"open_time\": \"08:00:00\", \"close_time\": \"17:00:00\", \"is_closed\": false },\r\n    { \"day_of_week\": 5, \"open_time\": \"08:00:00\", \"close_time\": \"12:00:00\", \"is_closed\": false },\r\n    { \"day_of_week\": 6, \"is_closed\": true }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/superadmin/clinic/update/1",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "superadmin",
+                "clinic",
+                "update",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Clinic",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6Ik9NY3EzbHlMdGRyS2xUYUlOcUQ4M3c9PSIsInZhbHVlIjoiZVlGVi93UUZ6VGdPYkoyQzBGZnZXMDZETVh4Y1lZQVBlWVFibkgwQkxobUdoN1BqUXRPdmlqYXpuVm03cHNmcVFuQXpPb0NqalloZEFKYk5TNmpFMDNrOTNoMDlXRzNLWFcyd3Rla2pzNktENlFNS0FSVHFncXRrVm5QQ2s2dUwiLCJtYWMiOiIyZDlhM2RkY2EyNDkzZDFmMWNmMjY2OGNkNWRiOGZmNGNmODhjNTIzZDE5OWYyZTk4YWE4MjhiNTQ3MDdiNmIzIiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/superadmin/clinic/delete/1",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "superadmin",
+                "clinic",
+                "delete",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Clinic",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6IkNPOThpQjZEY3VRU1BqVStDeDlkaGc9PSIsInZhbHVlIjoiQnZrY2lxZnFocHJEL0N3anZTY1BYdXoveTkyUmtCYU1zMk5iVWtxWkR1WU1MNGViMzZkTWxUU0krbVZtby9LbVVac1EyZWFqYzNGc0tqTnlHcmJSL3pmMlc3eU1OLzFmOTVENzFiRW1FOU1qY1hCT291NXdjWmZRS3dac1IwL1kiLCJtYWMiOiIwNzE4OWQ4MWY0NGFhYzJjNTk2OTI3Yjk5Mzg2ZTQ5NzRkYzVmMDZiOGJmMWNhN2NlYWRmYTI1YjE1NDYyYzY3IiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/clinic/1",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "clinic",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Clinic Doctor Schedules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6IkNPOThpQjZEY3VRU1BqVStDeDlkaGc9PSIsInZhbHVlIjoiQnZrY2lxZnFocHJEL0N3anZTY1BYdXoveTkyUmtCYU1zMk5iVWtxWkR1WU1MNGViMzZkTWxUU0krbVZtby9LbVVac1EyZWFqYzNGc0tqTnlHcmJSL3pmMlc3eU1OLzFmOTVENzFiRW1FOU1qY1hCT291NXdjWmZRS3dac1IwL1kiLCJtYWMiOiIwNzE4OWQ4MWY0NGFhYzJjNTk2OTI3Yjk5Mzg2ZTQ5NzRkYzVmMDZiOGJmMWNhN2NlYWRmYTI1YjE1NDYyYzY3IiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/reservations/schedules?clinic_id={{clinic_id}}&doctor_id={{doctor_id}}&reservation_date={{reservation_date}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "clinic_id",
+                  "value": "{{clinic_id}}"
+                },
+                {
+                  "key": "doctor_id",
+                  "value": "{{doctor_id}}"
+                },
+                {
+                  "key": "reservation_date",
+                  "value": "{{reservation_date}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Doctor Schedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6IkNPOThpQjZEY3VRU1BqVStDeDlkaGc9PSIsInZhbHVlIjoiQnZrY2lxZnFocHJEL0N3anZTY1BYdXoveTkyUmtCYU1zMk5iVWtxWkR1WU1MNGViMzZkTWxUU0krbVZtby9LbVVac1EyZWFqYzNGc0tqTnlHcmJSL3pmMlc3eU1OLzFmOTVENzFiRW1FOU1qY1hCT291NXdjWmZRS3dac1IwL1kiLCJtYWMiOiIwNzE4OWQ4MWY0NGFhYzJjNTk2OTI3Yjk5Mzg2ZTQ5NzRkYzVmMDZiOGJmMWNhN2NlYWRmYTI1YjE1NDYyYzY3IiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"doctor_id\": \"2\",\r\n    \"clinic_id\": \"1\",\r\n    \"day_of_week\": \"1\",\r\n    \"start_time\": \"09:00:00\",\r\n    \"end_time\": \"12:00:00\",\r\n    \"window_minutes\": 30,\r\n    \"max_patients_per_window\": 4\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/clinic/schedules",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "clinic",
+                "schedules"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Doctor Schedule",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6IkNPOThpQjZEY3VRU1BqVStDeDlkaGc9PSIsInZhbHVlIjoiQnZrY2lxZnFocHJEL0N3anZTY1BYdXoveTkyUmtCYU1zMk5iVWtxWkR1WU1MNGViMzZkTWxUU0krbVZtby9LbVVac1EyZWFqYzNGc0tqTnlHcmJSL3pmMlc3eU1OLzFmOTVENzFiRW1FOU1qY1hCT291NXdjWmZRS3dac1IwL1kiLCJtYWMiOiIwNzE4OWQ4MWY0NGFhYzJjNTk2OTI3Yjk5Mzg2ZTQ5NzRkYzVmMDZiOGJmMWNhN2NlYWRmYTI1YjE1NDYyYzY3IiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"clinic_id\": {{clinic_id}},\r\n    \"start_time\": \"09:00:00\",\r\n    \"end_time\": \"12:00:00\",\r\n    \"window_minutes\": 30,\r\n    \"max_patients_per_window\": 4\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/clinic/schedules/3",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "clinic",
+                "schedules",
+                "3"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Doctor",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6IkNPOThpQjZEY3VRU1BqVStDeDlkaGc9PSIsInZhbHVlIjoiQnZrY2lxZnFocHJEL0N3anZTY1BYdXoveTkyUmtCYU1zMk5iVWtxWkR1WU1MNGViMzZkTWxUU0krbVZtby9LbVVac1EyZWFqYzNGc0tqTnlHcmJSL3pmMlc3eU1OLzFmOTVENzFiRW1FOU1qY1hCT291NXdjWmZRS3dac1IwL1kiLCJtYWMiOiIwNzE4OWQ4MWY0NGFhYzJjNTk2OTI3Yjk5Mzg2ZTQ5NzRkYzVmMDZiOGJmMWNhN2NlYWRmYTI1YjE1NDYyYzY3IiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"clinic_id\": {{clinic_id}},\r\n    \"doctor_id\": {{doctor_id}}\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/admin/clinic/doctor/1",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clinic",
+                "doctor",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Doctor",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "eyJpdiI6IkNPOThpQjZEY3VRU1BqVStDeDlkaGc9PSIsInZhbHVlIjoiQnZrY2lxZnFocHJEL0N3anZTY1BYdXoveTkyUmtCYU1zMk5iVWtxWkR1WU1MNGViMzZkTWxUU0krbVZtby9LbVVac1EyZWFqYzNGc0tqTnlHcmJSL3pmMlc3eU1OLzFmOTVENzFiRW1FOU1qY1hCT291NXdjWmZRS3dac1IwL1kiLCJtYWMiOiIwNzE4OWQ4MWY0NGFhYzJjNTk2OTI3Yjk5Mzg2ZTQ5NzRkYzVmMDZiOGJmMWNhN2NlYWRmYTI1YjE1NDYyYzY3IiwidGFnIjoiIn0=",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"clinic_id\": {{clinic_id}},\r\n    \"doctor_id\": {{doctor_id}}\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{api_base_url}}/admin/clinic/doctor/1",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clinic",
+                "doctor",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Patient Reservations (Time-Window)",
+      "item": [
+        {
+          "name": "Booking - Get Available Windows",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/reservations/booking/windows?doctor_clinic_schedule_id={{doctor_clinic_schedule_id}}&reservation_date={{reservation_date}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "booking",
+                "windows"
+              ],
+              "query": [
+                {
+                  "key": "doctor_clinic_schedule_id",
+                  "value": "{{doctor_clinic_schedule_id}}"
+                },
+                {
+                  "key": "reservation_date",
+                  "value": "{{reservation_date}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Reservations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/reservations",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "reservations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Reservations by Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/reservations?status={{reservation_status}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "reservations"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{reservation_status}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Booking - Create Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_clinic_schedule_id\": {{doctor_clinic_schedule_id}},\n  \"reservation_date\": \"{{reservation_date}}\",\n  \"window_start_time\": \"{{window_start_time}}\",\n  \"complaint\": \"Flu symptoms\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/reservations",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "reservations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Reservation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancellation_reason\": \"Recovered\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/reservations/{{reservation_id}}/cancel",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservation_id}}",
+                "cancel"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Admin Reservations",
+      "item": [
+        {
+          "name": "List Clinic Reservations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/admin/reservations?clinic_id={{clinic_id}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "reservations"
+              ],
+              "query": [
+                {
+                  "key": "clinic_id",
+                  "value": "{{clinic_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Clinic Reservations (Filtered)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/admin/reservations?clinic_id={{clinic_id}}&status={{reservation_status}}&reservation_date={{reservation_date}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "reservations"
+              ],
+              "query": [
+                {
+                  "key": "clinic_id",
+                  "value": "{{clinic_id}}"
+                },
+                {
+                  "key": "status",
+                  "value": "{{reservation_status}}"
+                },
+                {
+                  "key": "reservation_date",
+                  "value": "{{reservation_date}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Reservation Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/admin/reservations/{{reservation_id}}?clinic_id={{clinic_id}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "reservations",
+                "{{reservation_id}}"
+              ],
+              "query": [
+                {
+                  "key": "clinic_id",
+                  "value": "{{clinic_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Reservation Status/Notes",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clinic_id\": {{clinic_id}},\n  \"status\": \"approved\",\n  \"admin_notes\": \"Approved by clinic admin\",\n  \"cancellation_reason\": null\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/admin/reservations/{{reservation_id}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "reservations",
+                "{{reservation_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Queue Management",
+      "item": [
+        {
+          "name": "Patient - Get My Queue Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/queues/my?reservation_date={{reservation_date}}&queue_status={{queue_status}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "queues",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "reservation_date",
+                  "value": "{{reservation_date}}"
+                },
+                {
+                  "key": "queue_status",
+                  "value": "{{queue_status}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin - List Clinic Queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/admin/queues?clinic_id={{clinic_id}}&reservation_date={{reservation_date}}&doctor_clinic_schedule_id={{doctor_clinic_schedule_id}}&queue_status={{queue_status}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "queues"
+              ],
+              "query": [
+                {
+                  "key": "clinic_id",
+                  "value": "{{clinic_id}}"
+                },
+                {
+                  "key": "reservation_date",
+                  "value": "{{reservation_date}}"
+                },
+                {
+                  "key": "doctor_clinic_schedule_id",
+                  "value": "{{doctor_clinic_schedule_id}}"
+                },
+                {
+                  "key": "queue_status",
+                  "value": "{{queue_status}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin - Update Queue Number / Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clinic_id\": {{clinic_id}},\n  \"queue_number\": {{queue_number}},\n  \"queue_status\": \"{{queue_status}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/admin/queues/{{reservation_id}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "admin",
+                "queues",
+                "{{reservation_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Doctor - Get Current Queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/doctor/queues?clinic_id={{clinic_id}}&reservation_date={{reservation_date}}&doctor_clinic_schedule_id={{doctor_clinic_schedule_id}}&queue_status={{queue_status}}",
+              "host": [
+                "{{api_base_url}}"
+              ],
+              "path": [
+                "doctor",
+                "queues"
+              ],
+              "query": [
+                {
+                  "key": "clinic_id",
+                  "value": "{{clinic_id}}"
+                },
+                {
+                  "key": "reservation_date",
+                  "value": "{{reservation_date}}"
+                },
+                {
+                  "key": "doctor_clinic_schedule_id",
+                  "value": "{{doctor_clinic_schedule_id}}"
+                },
+                {
+                  "key": "queue_status",
+                  "value": "{{queue_status}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "app_base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "api_base_url",
+      "value": "http://localhost:8000/api"
+    },
+    {
+      "key": "login_email",
+      "value": "patient@example.com"
+    },
+    {
+      "key": "login_password",
+      "value": "Password123!"
+    },
+    {
+      "key": "new_password",
+      "value": "NewPassword123!"
+    },
+    {
+      "key": "reset_token",
+      "value": "paste-reset-token-here"
+    },
+    {
+      "key": "username_or_email",
+      "value": "doctor@example.com"
+    },
+    {
+      "key": "clinic_id",
+      "value": "1"
+    },
+    {
+      "key": "doctor_id",
+      "value": "2"
+    },
+    {
+      "key": "doctor_clinic_schedule_id",
+      "value": "1"
+    },
+    {
+      "key": "reservation_date",
+      "value": "2026-03-10"
+    },
+    {
+      "key": "window_start_time",
+      "value": "09:00"
+    },
+    {
+      "key": "reservation_status",
+      "value": "pending"
+    },
+    {
+      "key": "queue_status",
+      "value": "waiting"
+    },
+    {
+      "key": "queue_number",
+      "value": "1"
+    },
+    {
+      "key": "reservation_id",
+      "value": "1"
+    },
+    {
+      "key": "profile_picture_id",
+      "value": "patient_1"
+    }
+  ]
+}
