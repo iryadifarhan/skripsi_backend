@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminReservationController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\QueueController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\ClinicController;
@@ -39,6 +40,8 @@ Route::middleware('web')->group(function (): void {
         Route::get('/admin/reservations', [AdminReservationController::class, 'index']);
         Route::get('/admin/reservations/{reservation}', [AdminReservationController::class, 'show']);
         Route::patch('/admin/reservations/{reservation}', [AdminReservationController::class, 'update']);
+        Route::get('/admin/medical-records', [MedicalRecordController::class, 'adminIndex']);
+        Route::get('/admin/medical-records/{medicalRecord}', [MedicalRecordController::class, 'adminShow']);
        
         Route::get('/admin/queues', [QueueController::class, 'adminIndex']);
         Route::patch('/admin/queues/{reservation}', [QueueController::class, 'adminUpdate']);
@@ -52,6 +55,9 @@ Route::middleware('web')->group(function (): void {
 
     Route::middleware(['auth:sanctum', 'authorize:doctor,clinic-scoped'])->group(function (): void {
         Route::get('/doctor/queues', [QueueController::class, 'doctorIndex']);
+        Route::get('/doctor/medical-records', [MedicalRecordController::class, 'doctorIndex']);
+        Route::get('/doctor/medical-records/{medicalRecord}', [MedicalRecordController::class, 'doctorShow']);
+        Route::post('/doctor/reservations/{reservation}/medical-records', [MedicalRecordController::class, 'store']);
     });
 
     // Patient reservation routes
@@ -64,6 +70,8 @@ Route::middleware('web')->group(function (): void {
 
     Route::middleware(['auth:sanctum', 'authorize:patient'])->group(function (): void {
         Route::get('/queues/my', [QueueController::class, 'patientIndex']);
+        Route::get('/medical-records', [MedicalRecordController::class, 'patientIndex']);
+        Route::get('/medical-records/{medicalRecord}', [MedicalRecordController::class, 'patientShow']);
     });
 
     // Authenticated user routes

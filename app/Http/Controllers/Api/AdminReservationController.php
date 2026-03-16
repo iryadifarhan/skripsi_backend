@@ -14,6 +14,13 @@ use Illuminate\Validation\ValidationException;
 
 class AdminReservationController extends Controller
 {
+    private const ADMIN_MUTABLE_STATUSES = [
+        Reservation::STATUS_PENDING,
+        Reservation::STATUS_APPROVED,
+        Reservation::STATUS_REJECTED,
+        Reservation::STATUS_CANCELLED,
+    ];
+
     public function __construct(
         private readonly ReservationQueueService $queueService,
     ) {
@@ -71,7 +78,7 @@ class AdminReservationController extends Controller
         $this->assertReservationBelongsToRequestedClinic($request, $reservation);
 
         $payload = $request->validate([
-            'status' => ['sometimes', 'string', Rule::in(Reservation::STATUSES)],
+            'status' => ['sometimes', 'string', Rule::in(self::ADMIN_MUTABLE_STATUSES)],
             'admin_notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'cancellation_reason' => ['sometimes', 'nullable', 'string', 'max:1000'],
         ]);
@@ -123,10 +130,6 @@ class AdminReservationController extends Controller
                 if ($payload['status'] === Reservation::STATUS_CANCELLED) {
                     $payload['cancelled_at'] = now();
                     $queueStatusToApply = Reservation::QUEUE_STATUS_CANCELLED;
-                }
-
-                if ($payload['status'] === Reservation::STATUS_COMPLETED) {
-                    $queueStatusToApply = Reservation::QUEUE_STATUS_COMPLETED;
                 }
 
                 if ($payload['status'] === Reservation::STATUS_REJECTED) {

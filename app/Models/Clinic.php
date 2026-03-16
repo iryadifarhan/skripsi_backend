@@ -35,6 +35,11 @@ class Clinic extends Model
         return $this->hasMany(Reservation::class);
     }
 
+    public function medicalRecords(): HasMany
+    {
+        return $this->hasMany(MedicalRecord::class);
+    }
+
     public function operatingHours(): HasMany
     {
         return $this->hasMany(ClinicOperatingHour::class)->orderBy('day_of_week');

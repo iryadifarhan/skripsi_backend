@@ -173,7 +173,9 @@ class QueueController extends Controller
         $payload = $request->validate([
             'clinic_id' => ['required', 'integer', 'exists:clinics,id'],
             'queue_number' => ['sometimes', 'integer', 'min:1'],
-            'queue_status' => ['sometimes', 'string', Rule::in(Reservation::QUEUE_STATUSES)],
+            'queue_status' => ['sometimes', 'string', Rule::in(Reservation::QUEUE_STATUSES), Rule::notIn([Reservation::QUEUE_STATUS_COMPLETED])],   // completed status can only be set by doctors
+        ], [
+            'queue_status.not_in' => 'Only doctors can marks queue entries as completed.',
         ]);
 
         if (!isset($payload['queue_number']) && !isset($payload['queue_status'])) {
@@ -227,12 +229,6 @@ class QueueController extends Controller
         }
 
         $attributes = [];
-
-        if ($queueStatus === Reservation::QUEUE_STATUS_COMPLETED) {
-            $attributes['status'] = Reservation::STATUS_COMPLETED;
-            $attributes['handled_by_admin_id'] = $request->user()->id;
-            $attributes['handled_at'] = now();
-        }
 
         if ($queueStatus === Reservation::QUEUE_STATUS_CANCELLED) {
             $attributes['status'] = Reservation::STATUS_CANCELLED;

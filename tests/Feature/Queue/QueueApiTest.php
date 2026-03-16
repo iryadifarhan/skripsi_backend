@@ -149,7 +149,7 @@ class QueueApiTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_complete_queue_entry_and_reservation_is_completed(): void
+    public function test_admin_cannot_complete_queue_entry_directly(): void
     {
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-queue-complete');
@@ -167,16 +167,8 @@ class QueueApiTest extends TestCase
             'clinic_id' => $clinic->id,
             'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
         ], $this->spaHeaders())
-            ->assertOk()
-            ->assertJsonPath('queue.queue.status', Reservation::QUEUE_STATUS_COMPLETED)
-            ->assertJsonPath('queue.queue.number', null);
-
-        $this->assertDatabaseHas('reservations', [
-            'id' => $reservation->id,
-            'status' => Reservation::STATUS_COMPLETED,
-            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
-            'queue_number' => null,
-        ]);
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['queue_status']);
     }
 
     public function test_doctor_can_check_current_queue_for_owned_schedule(): void

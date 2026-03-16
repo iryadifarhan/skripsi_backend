@@ -104,6 +104,16 @@ class User extends Authenticatable
         return $this->hasMany(Reservation::class, 'handled_by_admin_id');
     }
 
+    public function patientMedicalRecords(): HasMany
+    {
+        return $this->hasMany(MedicalRecord::class, 'patient_id');
+    }
+
+    public function issuedMedicalRecords(): HasMany
+    {
+        return $this->hasMany(MedicalRecord::class, 'doctor_id');
+    }
+
     public function doctorClinicSchedules(): HasMany
     {
         return $this->hasMany(DoctorClinicSchedule::class, 'doctor_id');

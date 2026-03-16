@@ -5,11 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Reservation extends Model
 {
     use HasFactory;
 
+    /**
+     * Reservation statuses
+     * pending: Reservation has been made but not yet approved or rejected by admin
+     * approved: Reservation has been approved by admin and is scheduled for the specified date and time
+     * rejected: Reservation has been rejected by admin and will not be scheduled
+     * cancelled: Reservation has been cancelled by the patient or admin and will not be scheduled
+     * completed: Reservation has been completed and the patient has been seen by the doctor
+     */
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
@@ -123,5 +132,10 @@ class Reservation extends Model
     public function handledByAdmin(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by_admin_id');
+    }
+
+    public function medicalRecord(): HasOne
+    {
+        return $this->hasOne(MedicalRecord::class);
     }
 }
