@@ -17,7 +17,7 @@ class ReservationStatusNotification extends Notification
     ) {
     }
 
-    /**
+    /*
      * @return array<int, string>
      */
     public function via(object $notifiable): array
@@ -32,6 +32,7 @@ class ReservationStatusNotification extends Notification
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
         $windowEnd = (string) $this->reservation->window_end_time;
+        $reservationUrl = $this->reservationPageUrl();
 
         $mail = (new MailMessage())
             ->subject($this->subject())
@@ -41,17 +42,78 @@ class ReservationStatusNotification extends Notification
             ->line("Reservation date: {$reservationDate}")
             ->line("Reservation window: {$windowStart} - {$windowEnd}");
 
-        if ($this->eventType === 'rejected' && !empty($this->reservation->admin_notes)) {
+        if (!empty($this->reservation->admin_notes)) {
             $mail->line('Admin note: '.$this->reservation->admin_notes);
         }
 
-        return $mail->line('Please check your reservation page for the latest details.');
+        if ($this->eventType === 'rejected' && !empty($this->reservation->admin_notes)) {
+            $mail->line('Rejection note: '.$this->reservation->admin_notes);
+        }
+
+        if ($this->eventType === 'cancelled' && !empty($this->reservation->cancellation_reason)) {
+            $mail->line('Cancellation reason: '.$this->reservation->cancellation_reason);
+        }
+
+        return $mail
+            ->line('Please click the button below to check your reservation details.')
+            ->action('Check Reservation', $reservationUrl)
+            ->line('If the button does not work, copy and open this link:')
+            ->line($reservationUrl);
+    }
+
+    public function toWhatsAppText(?string $recipientName = null): string
+    {
+        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
+        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
+        $windowStart = (string) $this->reservation->window_start_time;
+        $windowEnd = (string) $this->reservation->window_end_time;
+        $lines = [
+            trim('Hello '.($recipientName ?? 'Patient').','),
+            $this->introLine($clinicName),
+            "",
+            "*Doctor*: {$doctorName}",
+            "*Reservation date*: {$reservationDate}",
+            "*Reservation window*: {$windowStart} - {$windowEnd}",
+            "",
+        ];
+
+        if (!empty($this->reservation->admin_notes)) {
+           $lines[] = '*Admin note*: '.$this->reservation->admin_notes;
+        }
+
+        if ($this->eventType === 'rejected' && !empty($this->reservation->admin_notes)) {
+            $lines[] = '*Rejection note*: '.$this->reservation->admin_notes;
+        }
+
+        if ($this->eventType === 'cancelled' && !empty($this->reservation->cancellation_reason)) {
+            $lines[] = '*Cancellation reason*: '.$this->reservation->cancellation_reason;
+        }
+
+        $lines[] = "\n".'Please click the link below to check your reservation details:';
+        $lines[] = $this->reservationPageUrl();
+
+        return implode("\n", $lines);
+    }
+
+    private function reservationPageUrl(): string
+    {
+        $baseUrl = rtrim((string) config('app.frontend_url'), '/');
+        $path = config('app.frontend_reservations_path', '/reservation');
+
+        return $baseUrl.'/'.$this->normalizePath((string) $path);
+    }
+
+    private function normalizePath(string $path): string
+    {
+        return ltrim($path, '/');
     }
 
     private function subject(): string
     {
         return match ($this->eventType) {
             'approved' => 'Your reservation has been approved',
+            'cancelled' => 'Your reservation has been cancelled',
             'rejected' => 'Your reservation has been rejected',
             'rescheduled' => 'Your reservation has been rescheduled',
             default => 'Reservation update',
@@ -62,6 +124,7 @@ class ReservationStatusNotification extends Notification
     {
         return match ($this->eventType) {
             'approved' => "Your reservation at {$clinicName} has been approved.",
+            'cancelled' => "Your reservation at {$clinicName} has been cancelled.",
             'rejected' => "Your reservation at {$clinicName} has been rejected.",
             'rescheduled' => "Your reservation at {$clinicName} has been rescheduled.",
             default => "There is an update for your reservation at {$clinicName}.",

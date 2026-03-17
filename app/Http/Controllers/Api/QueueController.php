@@ -193,8 +193,9 @@ class QueueController extends Controller
         }
 
         $queueNotificationStatus = null;
+        $reservationNotificationEvent = null;
 
-        DB::transaction(function () use ($payload, $request, $reservation, &$queueNotificationStatus): void {
+        DB::transaction(function () use ($payload, $request, $reservation, &$queueNotificationStatus, &$reservationNotificationEvent): void {
             $reservation->refresh();
 
             if (isset($payload['queue_number'])) {
@@ -220,6 +221,13 @@ class QueueController extends Controller
                     $queueNotificationStatus = $payload['queue_status'];
                 }
 
+                if (
+                    $payload['queue_status'] !== $reservation->queue_status
+                    && $payload['queue_status'] === Reservation::QUEUE_STATUS_CANCELLED
+                ) {
+                    $reservationNotificationEvent = Reservation::STATUS_CANCELLED;
+                }
+
                 $this->applyQueueStateChange($request, $reservation, (string) $payload['queue_status']);
             }
         });
@@ -228,6 +236,10 @@ class QueueController extends Controller
 
         if ($queueNotificationStatus !== null) {
             $this->patientNotificationService->sendQueueProgressNotification($reservation->loadMissing('patient'), $queueNotificationStatus);
+        }
+
+        if ($reservationNotificationEvent !== null) {
+            $this->patientNotificationService->sendReservationStatusNotification($reservation->loadMissing('patient'), $reservationNotificationEvent);
         }
 
         return response()->json([

@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -259,6 +260,8 @@ class ReservationApiTest extends TestCase
     public function test_patient_can_reschedule_own_active_reservation_and_queue_lines_are_updated(): void
     {
         Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
 
         $currentDate = now()->addDay();
         $reservationDate = $currentDate->toDateString();
@@ -270,7 +273,7 @@ class ReservationApiTest extends TestCase
         $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate, 60, 4);
 
         $patientA = $this->makeUser('patient', 'patient-reschedule-a@example.com');
-        $patientB = $this->makeUser('patient', 'patient-reschedule-b@example.com');
+        $patientB = $this->makeUser('patient', 'patient-reschedule-b@example.com', null, '+628123450001');
         $patientC = $this->makeUser('patient', 'patient-reschedule-c@example.com');
         $patientD = $this->makeUser('patient', 'patient-reschedule-d@example.com');
 
@@ -327,6 +330,13 @@ class ReservationApiTest extends TestCase
             $patientB,
             ReservationStatusNotification::class,
             fn (ReservationStatusNotification $notification): bool => $notification->eventType === 'rescheduled'
+        );
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://api.fonnte.com/send'
+            && $request['target'] === '628123450001'
+            && $request['countryCode'] === '0'
+            && str_contains((string) $request['message'], 'rescheduled')
         );
     }
 
@@ -516,6 +526,8 @@ class ReservationApiTest extends TestCase
     public function test_clinic_admin_can_manage_reservations_in_own_clinic(): void
     {
         Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-admin-manage');
@@ -524,7 +536,7 @@ class ReservationApiTest extends TestCase
         $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
 
         $admin = $this->makeUser('admin', 'admin-manage@example.com', $clinic->id);
-        $patient = $this->makeUser('patient', 'patient-manage@example.com');
+        $patient = $this->makeUser('patient', 'patient-manage@example.com', null, '081234500002');
         $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
 
         $this->login($admin, 'Password123!');
@@ -551,11 +563,63 @@ class ReservationApiTest extends TestCase
             ReservationStatusNotification::class,
             fn (ReservationStatusNotification $notification): bool => $notification->eventType === Reservation::STATUS_APPROVED
         );
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://api.fonnte.com/send'
+            && $request['target'] === '081234500002'
+            && $request['countryCode'] === '62'
+            && str_contains((string) $request['message'], 'approved')
+        );
+    }
+
+    public function test_clinic_admin_cancel_sends_cancellation_notifications(): void
+    {
+        Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
+
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-admin-cancel-notify');
+        $doctor = $this->makeUser('doctor', 'doctor-admin-cancel-notify@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+
+        $admin = $this->makeUser('admin', 'admin-cancel-notify@example.com', $clinic->id);
+        $patient = $this->makeUser('patient', 'patient-cancel-notify@example.com', null, '081234500006');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/api/admin/reservations/{$reservation->id}", [
+            'clinic_id' => $clinic->id,
+            'status' => Reservation::STATUS_CANCELLED,
+            'cancellation_reason' => 'Doctor unavailable.',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('reservation.status', Reservation::STATUS_CANCELLED)
+            ->assertJsonPath('reservation.queue_summary.number', null)
+            ->assertJsonPath('reservation.cancellation_reason', 'Doctor unavailable.');
+
+        Notification::assertSentTo(
+            $patient,
+            ReservationStatusNotification::class,
+            fn (ReservationStatusNotification $notification): bool => $notification->eventType === Reservation::STATUS_CANCELLED
+        );
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://api.fonnte.com/send'
+            && $request['target'] === '081234500006'
+            && $request['countryCode'] === '62'
+            && str_contains((string) $request['message'], 'cancelled')
+            && str_contains((string) $request['message'], 'Doctor unavailable.')
+        );
     }
 
     public function test_rejected_reservation_is_removed_from_active_queue_views(): void
     {
         Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-rejected-queue');
@@ -564,7 +628,7 @@ class ReservationApiTest extends TestCase
         $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
 
         $admin = $this->makeUser('admin', 'admin-rejected-queue@example.com', $clinic->id);
-        $patient = $this->makeUser('patient', 'patient-rejected-queue@example.com');
+        $patient = $this->makeUser('patient', 'patient-rejected-queue@example.com', null, '+628123450003');
         $otherPatient = $this->makeUser('patient', 'patient-rejected-other@example.com');
 
         $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
@@ -598,6 +662,13 @@ class ReservationApiTest extends TestCase
             $patient,
             ReservationStatusNotification::class,
             fn (ReservationStatusNotification $notification): bool => $notification->eventType === Reservation::STATUS_REJECTED
+        );
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://api.fonnte.com/send'
+            && $request['target'] === '628123450003'
+            && $request['countryCode'] === '0'
+            && str_contains((string) $request['message'], 'rejected')
         );
     }
 
@@ -682,14 +753,23 @@ class ReservationApiTest extends TestCase
         ]);
     }
 
-    private function makeUser(string $role, string $email, ?int $clinicId = null): User
+    private function makeUser(string $role, string $email, ?int $clinicId = null, ?string $phoneNumber = null): User
     {
         return User::factory()->create([
             'role' => $role,
             'email' => $email,
+            'phone_number' => $phoneNumber ?? ('+628'.random_int(100000000, 999999999)),
             'password' => Hash::make('Password123!'),
             'clinic_id' => $clinicId,
         ]);
+    }
+
+    private function enableFonnte(): void
+    {
+        config()->set('services.fonnte.enabled', true);
+        config()->set('services.fonnte.token', 'test-fonnte-token');
+        config()->set('services.fonnte.base_url', 'https://api.fonnte.com');
+        config()->set('services.fonnte.country_code', '62');
     }
 
     private function makeScheduleForDate(

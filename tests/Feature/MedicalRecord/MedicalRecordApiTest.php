@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -31,13 +32,15 @@ class MedicalRecordApiTest extends TestCase
     public function test_doctor_can_create_medical_record_and_complete_reservation(): void
     {
         Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-medical-record');
         $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-medical-record@example.com');
         $doctor->clinics()->attach($clinic->id);
         $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
-        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-medical-record@example.com');
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-medical-record@example.com', null, '081234500006');
         $reservation = $this->createReservation(
             patient: $patient,
             schedule: $schedule,
@@ -88,6 +91,13 @@ class MedicalRecordApiTest extends TestCase
             $patient,
             QueueProgressNotification::class,
             fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_COMPLETED
+        );
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://api.fonnte.com/send'
+            && $request['target'] === '081234500006'
+            && $request['countryCode'] === '62'
+            && str_contains((string) $request['message'], 'completed')
         );
     }
 
@@ -225,15 +235,24 @@ class MedicalRecordApiTest extends TestCase
         ]);
     }
 
-    private function makeUser(string $role, string $email, ?int $clinicId = null): User
+    private function makeUser(string $role, string $email, ?int $clinicId = null, ?string $phoneNumber = null): User
     {
         return User::factory()->create([
             'role' => $role,
             'email' => $email,
+            'phone_number' => $phoneNumber ?? ('+628'.random_int(100000000, 999999999)),
             'password' => Hash::make('Password123!'),
             'clinic_id' => $clinicId,
             'profile_picture' => User::defaultProfilePictureForRole($role),
         ]);
+    }
+
+    private function enableFonnte(): void
+    {
+        config()->set('services.fonnte.enabled', true);
+        config()->set('services.fonnte.token', 'test-fonnte-token');
+        config()->set('services.fonnte.base_url', 'https://api.fonnte.com');
+        config()->set('services.fonnte.country_code', '62');
     }
 
     private function makeScheduleForDate(

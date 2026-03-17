@@ -55,6 +55,8 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+    'frontend_reservations_path' => env('FRONTEND_RESERVATIONS_PATH', '/reservation'),
+    'frontend_queue_path' => env('FRONTEND_QUEUE_PATH', '/queue'),
 
     /*
     |--------------------------------------------------------------------------
