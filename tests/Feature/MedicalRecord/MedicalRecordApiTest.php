@@ -217,6 +217,68 @@ class MedicalRecordApiTest extends TestCase
             ->assertJsonValidationErrors(['status']);
     }
 
+    public function test_admin_can_link_completed_walk_in_reservation_and_medical_record_to_patient(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-medical-record-link-patient');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-medical-record-link-patient@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-medical-record-link-patient@example.com', $clinic->id);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-medical-record-link-patient@example.com');
+
+        $reservation = Reservation::create([
+            'reservation_number' => 'RSV-'.Str::upper(Str::random(12)),
+            'queue_number' => null,
+            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
+            'queue_completed_at' => now(),
+            'patient_id' => null,
+            'guest_name' => 'Walk In Linked Later',
+            'guest_phone_number' => '081234500009',
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '09:00:00',
+            'window_end_time' => '10:00:00',
+            'window_slot_number' => 1,
+            'status' => Reservation::STATUS_COMPLETED,
+        ]);
+
+        $medicalRecord = $this->createMedicalRecord($reservation, $doctor, [
+            'patient_id' => null,
+            'guest_name' => 'Walk In Linked Later',
+            'guest_phone_number' => '081234500009',
+            'doctor_notes' => 'Walk-in completed before account registration.',
+        ]);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/api/admin/reservations/{$reservation->id}/details", [
+            'clinic_id' => $clinic->id,
+            'patient_id' => $patient->id,
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('reservation.patient_id', $patient->id)
+            ->assertJsonPath('reservation.guest_name', null)
+            ->assertJsonPath('reservation.guest_phone_number', null);
+
+        $this->assertDatabaseHas('medical_records', [
+            'id' => $medicalRecord->id,
+            'patient_id' => $patient->id,
+            'guest_name' => null,
+            'guest_phone_number' => null,
+        ]);
+
+        $this->postJson('/api/logout', [], $this->spaHeaders())->assertOk();
+        $this->login($patient, 'Password123!');
+
+        $this->getJson("/api/medical-records/{$medicalRecord->id}", $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('medical_record.id', $medicalRecord->id)
+            ->assertJsonPath('medical_record.patient_id', $patient->id);
+    }
+
     private function login(User $user, string $password): void
     {
         $this->postJson('/api/login', [

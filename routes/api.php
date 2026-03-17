@@ -39,7 +39,8 @@ Route::middleware('web')->group(function (): void {
 
         Route::get('/admin/reservations', [AdminReservationController::class, 'index']);
         Route::get('/admin/reservations/{reservation}', [AdminReservationController::class, 'show']);
-        Route::patch('/admin/reservations/{reservation}', [AdminReservationController::class, 'update']);
+        Route::patch('/admin/reservations/{reservation}', [AdminReservationController::class, 'processReservation']);
+        Route::patch('/admin/reservations/{reservation}/details', [AdminReservationController::class, 'update']);
         Route::get('/admin/medical-records', [MedicalRecordController::class, 'adminIndex']);
         Route::get('/admin/medical-records/{medicalRecord}', [MedicalRecordController::class, 'adminShow']);
        

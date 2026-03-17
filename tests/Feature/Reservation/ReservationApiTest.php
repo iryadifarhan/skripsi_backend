@@ -572,6 +572,127 @@ class ReservationApiTest extends TestCase
         );
     }
 
+    public function test_clinic_admin_can_update_reservation_details_and_reschedule_it(): void
+    {
+        Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
+
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-admin-detail-update');
+        $doctorA = $this->makeUser('doctor', 'doctor-admin-detail-update-a@example.com');
+        $doctorB = $this->makeUser('doctor', 'doctor-admin-detail-update-b@example.com');
+        $doctorA->clinics()->attach($clinic->id);
+        $doctorB->clinics()->attach($clinic->id);
+        $scheduleA = $this->makeScheduleForDate($clinic, $doctorA, $reservationDate);
+        $scheduleB = $this->makeScheduleForDate($clinic, $doctorB, $reservationDate);
+
+        $admin = $this->makeUser('admin', 'admin-detail-update@example.com', $clinic->id);
+        $linkedPatient = $this->makeUser('patient', 'patient-detail-update@example.com', null, '081234500007');
+        $otherPatientOldLine = $this->makeUser('patient', 'patient-detail-update-old-line@example.com');
+        $otherPatientNewLine = $this->makeUser('patient', 'patient-detail-update-new-line@example.com');
+
+        $this->login($admin, 'Password123!');
+
+        $createResponse = $this->postJson('/api/reservations', [
+            'clinic_id' => $clinic->id,
+            'doctor_clinic_schedule_id' => $scheduleA->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '09:00',
+            'guest_name' => 'Walk In One',
+            'guest_phone_number' => '081234500008',
+            'complaint' => 'Initial walk-in complaint',
+        ], $this->spaHeaders())
+            ->assertCreated()
+            ->assertJsonPath('reservation.patient_id', null);
+
+        $reservationId = (int) $createResponse->json('reservation.id');
+        $walkInReservation = Reservation::findOrFail($reservationId);
+
+        $oldLineReservation = $this->createReservation($otherPatientOldLine, $scheduleA, $reservationDate, '09:00:00', 2, Reservation::STATUS_PENDING);
+        $existingTargetReservation = $this->createReservation($otherPatientNewLine, $scheduleB, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->patchJson("/api/admin/reservations/{$walkInReservation->id}/details", [
+            'clinic_id' => $clinic->id,
+            'patient_id' => $linkedPatient->id,
+            'doctor_id' => $doctorB->id,
+            'doctor_clinic_schedule_id' => $scheduleB->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '10:00',
+            'complaint' => 'Updated complaint by admin',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('reservation.patient_id', $linkedPatient->id)
+            ->assertJsonPath('reservation.guest_name', null)
+            ->assertJsonPath('reservation.guest_phone_number', null)
+            ->assertJsonPath('reservation.doctor_id', $doctorB->id)
+            ->assertJsonPath('reservation.doctor_clinic_schedule_id', $scheduleB->id)
+            ->assertJsonPath('reservation.window_start_time', '10:00:00')
+            ->assertJsonPath('reservation.window_slot_number', 1)
+            ->assertJsonPath('reservation.queue_summary.number', 2)
+            ->assertJsonPath('reservation.complaint', 'Updated complaint by admin');
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $walkInReservation->id,
+            'patient_id' => $linkedPatient->id,
+            'guest_name' => null,
+            'guest_phone_number' => null,
+            'doctor_id' => $doctorB->id,
+            'doctor_clinic_schedule_id' => $scheduleB->id,
+            'window_start_time' => '10:00:00',
+            'window_slot_number' => 1,
+            'queue_number' => 2,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $oldLineReservation->id,
+            'queue_number' => 1,
+            'window_slot_number' => 1,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $existingTargetReservation->id,
+            'queue_number' => 1,
+        ]);
+
+        Notification::assertSentTo(
+            $linkedPatient,
+            ReservationStatusNotification::class,
+            fn (ReservationStatusNotification $notification): bool => $notification->eventType === 'rescheduled'
+        );
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://api.fonnte.com/send'
+            && $request['target'] === '081234500007'
+            && $request['countryCode'] === '62'
+            && str_contains((string) $request['message'], 'rescheduled')
+        );
+    }
+
+    public function test_clinic_admin_must_select_matching_schedule_when_changing_doctor(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-admin-doctor-change-validation');
+        $doctorA = $this->makeUser('doctor', 'doctor-admin-doctor-change-a@example.com');
+        $doctorB = $this->makeUser('doctor', 'doctor-admin-doctor-change-b@example.com');
+        $doctorA->clinics()->attach($clinic->id);
+        $doctorB->clinics()->attach($clinic->id);
+        $scheduleA = $this->makeScheduleForDate($clinic, $doctorA, $reservationDate);
+
+        $admin = $this->makeUser('admin', 'admin-doctor-change-validation@example.com', $clinic->id);
+        $patient = $this->makeUser('patient', 'patient-doctor-change-validation@example.com');
+        $reservation = $this->createReservation($patient, $scheduleA, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/api/admin/reservations/{$reservation->id}/details", [
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctorB->id,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['doctor_clinic_schedule_id']);
+    }
+
     public function test_clinic_admin_cancel_sends_cancellation_notifications(): void
     {
         Notification::fake();
