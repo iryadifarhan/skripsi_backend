@@ -7,6 +7,7 @@ use App\Models\DoctorClinicSchedule;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Notifications\MedicalRecordReadyNotification;
 use App\Notifications\QueueProgressNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -89,8 +90,10 @@ class MedicalRecordApiTest extends TestCase
 
         Notification::assertSentTo(
             $patient,
-            QueueProgressNotification::class,
-            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_COMPLETED
+            MedicalRecordReadyNotification::class,
+            fn (MedicalRecordReadyNotification $notification): bool =>
+                $notification->medicalRecord->doctor_notes === 'Patient should rest for three days.'
+                && $notification->medicalRecord->diagnosis === 'Common cold'
         );
 
         Http::assertSent(fn ($request): bool =>
@@ -98,6 +101,53 @@ class MedicalRecordApiTest extends TestCase
             && $request['target'] === '081234500006'
             && $request['countryCode'] === '62'
             && str_contains((string) $request['message'], 'completed')
+            && str_contains((string) $request['message'], 'Patient should rest for three days.')
+            && str_contains((string) $request['message'], '/medical_record')
+        );
+    }
+
+    public function test_completion_notifies_next_active_queue_entry_when_queue_advances(): void
+    {
+        Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
+
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-medical-record-queue-advance');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-medical-record-queue-advance@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $currentPatient = $this->makeUser(User::ROLE_PATIENT, 'patient-medical-record-queue-current@example.com', null, '081234500010');
+        $nextPatient = $this->makeUser(User::ROLE_PATIENT, 'patient-medical-record-queue-next@example.com', null, '081234500011');
+
+        $currentReservation = $this->createReservation($currentPatient, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_IN_PROGRESS);
+        $nextReservation = $this->createReservation($nextPatient, $schedule, $reservationDate, '10:00:00', 1, 2, Reservation::QUEUE_STATUS_WAITING);
+
+        $this->login($doctor, 'Password123!');
+
+        $this->postJson("/api/doctor/reservations/{$currentReservation->id}/medical-records", [
+            'clinic_id' => $clinic->id,
+            'doctor_notes' => 'Current patient completed consultation.',
+        ], $this->spaHeaders())->assertCreated();
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $nextReservation->id,
+            'queue_number' => 1,
+            'queue_status' => Reservation::QUEUE_STATUS_WAITING,
+        ]);
+
+        Notification::assertSentTo(
+            $nextPatient,
+            QueueProgressNotification::class,
+            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_WAITING
+        );
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://api.fonnte.com/send'
+            && $request['target'] === '081234500011'
+            && $request['countryCode'] === '62'
+            && str_contains((string) $request['message'], 'Queue number')
+            && str_contains((string) $request['message'], 'http://localhost:3000/queue')
         );
     }
 

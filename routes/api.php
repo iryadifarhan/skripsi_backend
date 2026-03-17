@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AdminReservationController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\QueueController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\ClinicController;
 use App\Http\Controllers\UserController;
@@ -52,6 +53,11 @@ Route::middleware('web')->group(function (): void {
     Route::middleware(['auth:sanctum', 'authorize:admin,doctor,clinic-scoped'])->group(function (): void {
         Route::post('/clinic/schedules', [ClinicController::class, 'createDoctorClinicSchedule']);
         Route::patch('/clinic/schedules/{schedule}', [ClinicController::class, 'updateDoctorClinicSchedule']);
+        
+        Route::get('/reports/reservations', [ReportController::class, 'reservations']);
+        Route::get('/reports/reservations/export', [ReportController::class, 'exportReservations']);
+        Route::get('/reports/medical-records', [ReportController::class, 'medicalRecords']);
+        Route::get('/reports/medical-records/export', [ReportController::class, 'exportMedicalRecords']);
     });
 
     Route::middleware(['auth:sanctum', 'authorize:doctor,clinic-scoped'])->group(function (): void {

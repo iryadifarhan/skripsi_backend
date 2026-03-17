@@ -129,6 +129,36 @@ class ReservationQueueService
         return $this->serializeQueueEntries(collect([$reservation]), $includePatient)[0];
     }
 
+    /**
+     * @return array<int, array{reservation: Reservation, snapshot: array<string, int|string|bool|null>}>
+     */
+    public function activeQueueSnapshotsForLine(int $scheduleId, string $reservationDate): array
+    {
+        $queueLine = Reservation::query()
+            ->with([
+                'patient:id,name,username,email,phone_number',
+                'doctor:id,name,username,email,phone_number',
+                'clinic:id,name,address,phone_number,email',
+                'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
+            ])
+            ->where('doctor_clinic_schedule_id', $scheduleId)
+            ->whereDate('reservation_date', $reservationDate)
+            ->whereIn('status', Reservation::ACTIVE_STATUSES)
+            ->whereIn('queue_status', Reservation::ACTIVE_QUEUE_STATUSES)
+            ->orderBy('queue_number')
+            ->orderBy('id')
+            ->get();
+
+        return $queueLine->mapWithKeys(function (Reservation $reservation) use ($queueLine): array {
+            return [
+                (int) $reservation->id => [
+                    'reservation' => $reservation,
+                    'snapshot' => $this->buildQueueSnapshot($reservation, $queueLine),
+                ],
+            ];
+        })->all();
+    }
+
     public function moveReservationToQueueNumber(Reservation $reservation, int $targetQueueNumber): void
     {
         $queueLine = $this->editableQueueLine($reservation);

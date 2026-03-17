@@ -154,6 +154,14 @@ class MedicalRecordController extends Controller
         ]);
 
         $this->assertDoctorCanIssueMedicalRecord($doctor, $reservation, (int) $payload['clinic_id']);
+        $queueLineSnapshotsBefore = [];
+
+        if ($reservation->doctor_clinic_schedule_id !== null) {
+            $queueLineSnapshotsBefore = $this->queueService->activeQueueSnapshotsForLine(
+                (int) $reservation->doctor_clinic_schedule_id,
+                $this->normalizeDateValue($reservation->reservation_date),
+            );
+        }
 
         $medicalRecord = DB::transaction(function () use ($doctor, $reservation, $payload): MedicalRecord {
             $lockedReservation = Reservation::query()
@@ -196,7 +204,20 @@ class MedicalRecordController extends Controller
 
         $medicalRecord = $medicalRecord->load($this->medicalRecordRelations());
         $reservation = $reservation->fresh()->load($this->reservationRelations());
-        $this->patientNotificationService->sendQueueProgressNotification($reservation->loadMissing('patient'), Reservation::QUEUE_STATUS_COMPLETED);
+        $this->patientNotificationService->sendMedicalRecordReadyNotification($reservation->loadMissing('patient'), $medicalRecord);
+
+        if ($reservation->doctor_clinic_schedule_id !== null) {
+            $queueLineSnapshotsAfter = $this->queueService->activeQueueSnapshotsForLine(
+                (int) $reservation->doctor_clinic_schedule_id,
+                $this->normalizeDateValue($reservation->reservation_date),
+            );
+
+            $this->patientNotificationService->sendQueueSnapshotChangeNotifications(
+                $queueLineSnapshotsBefore,
+                $queueLineSnapshotsAfter,
+                $reservation->id,
+            );
+        }
 
         return response()->json([
             'message' => 'Medical record creation successful.',
@@ -331,5 +352,14 @@ class MedicalRecordController extends Controller
         }
 
         abort(403, 'Forbidden, you are not authorized.');
+    }
+
+    private function normalizeDateValue(mixed $value): string
+    {
+        if ($value instanceof \Carbon\CarbonInterface) {
+            return $value->toDateString();
+        }
+
+        return substr((string) $value, 0, 10);
     }
 }
