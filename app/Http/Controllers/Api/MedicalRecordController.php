@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\PatientNotificationService;
 use App\Services\ReservationQueueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ class MedicalRecordController extends Controller
 {
     public function __construct(
         private readonly ReservationQueueService $queueService,
+        private readonly PatientNotificationService $patientNotificationService,
     ) {
     }
 
@@ -194,6 +196,7 @@ class MedicalRecordController extends Controller
 
         $medicalRecord = $medicalRecord->load($this->medicalRecordRelations());
         $reservation = $reservation->fresh()->load($this->reservationRelations());
+        $this->patientNotificationService->sendQueueProgressNotification($reservation->loadMissing('patient'), Reservation::QUEUE_STATUS_COMPLETED);
 
         return response()->json([
             'message' => 'Medical record creation successful.',

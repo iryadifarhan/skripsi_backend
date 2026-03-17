@@ -6,10 +6,12 @@ use App\Models\Clinic;
 use App\Models\DoctorClinicSchedule;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Notifications\QueueProgressNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -52,6 +54,8 @@ class QueueApiTest extends TestCase
 
     public function test_admin_can_view_and_reorder_clinic_queue(): void
     {
+        Notification::fake();
+
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-queue-admin');
         $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-queue-admin@example.com');
@@ -92,6 +96,12 @@ class QueueApiTest extends TestCase
             'id' => $firstReservation->id,
             'queue_number' => 2,
         ]);
+
+        Notification::assertSentTo(
+            $patientTwo,
+            QueueProgressNotification::class,
+            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_CALLED
+        );
     }
 
     public function test_manual_queue_override_persists_when_new_reservation_is_created(): void
@@ -198,6 +208,46 @@ class QueueApiTest extends TestCase
             ->assertJsonPath('queues.0.reservation_id', $currentReservation->id)
             ->assertJsonPath('queues.0.queue.status', Reservation::QUEUE_STATUS_IN_PROGRESS)
             ->assertJsonPath('queues.0.queue.is_current', true);
+    }
+
+    public function test_admin_sends_queue_progress_notifications_for_in_progress_and_skipped(): void
+    {
+        Notification::fake();
+
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-queue-progress-notifications');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-queue-progress-notifications@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-queue-progress-notifications@example.com', $clinic->id);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-progress-notifications@example.com');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_WAITING);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/api/admin/queues/{$reservation->id}", [
+            'clinic_id' => $clinic->id,
+            'queue_status' => Reservation::QUEUE_STATUS_IN_PROGRESS,
+        ], $this->spaHeaders())
+            ->assertOk();
+
+        $this->patchJson("/api/admin/queues/{$reservation->id}", [
+            'clinic_id' => $clinic->id,
+            'queue_status' => Reservation::QUEUE_STATUS_SKIPPED,
+        ], $this->spaHeaders())
+            ->assertOk();
+
+        Notification::assertSentTo(
+            $patient,
+            QueueProgressNotification::class,
+            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_IN_PROGRESS
+        );
+
+        Notification::assertSentTo(
+            $patient,
+            QueueProgressNotification::class,
+            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_SKIPPED
+        );
     }
 
     private function login(User $user, string $password): void

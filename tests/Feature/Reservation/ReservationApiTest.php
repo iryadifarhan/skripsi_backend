@@ -6,10 +6,12 @@ use App\Models\Clinic;
 use App\Models\DoctorClinicSchedule;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Notifications\ReservationStatusNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -256,6 +258,8 @@ class ReservationApiTest extends TestCase
 
     public function test_patient_can_reschedule_own_active_reservation_and_queue_lines_are_updated(): void
     {
+        Notification::fake();
+
         $currentDate = now()->addDay();
         $reservationDate = $currentDate->toDateString();
         $nextReservationDate = $currentDate->copy()->addWeek()->toDateString();
@@ -318,6 +322,12 @@ class ReservationApiTest extends TestCase
             'id' => $existingTargetReservation->id,
             'queue_number' => 1,
         ]);
+
+        Notification::assertSentTo(
+            $patientB,
+            ReservationStatusNotification::class,
+            fn (ReservationStatusNotification $notification): bool => $notification->eventType === 'rescheduled'
+        );
     }
 
     public function test_patient_reschedule_within_same_queue_line_resequences_queue_by_window_order(): void
@@ -505,6 +515,8 @@ class ReservationApiTest extends TestCase
 
     public function test_clinic_admin_can_manage_reservations_in_own_clinic(): void
     {
+        Notification::fake();
+
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-admin-manage');
         $doctor = $this->makeUser('doctor', 'doctor-admin-manage@example.com');
@@ -533,10 +545,18 @@ class ReservationApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('reservation.status', Reservation::STATUS_APPROVED)
             ->assertJsonPath('reservation.handled_by_admin_id', $admin->id);
+
+        Notification::assertSentTo(
+            $patient,
+            ReservationStatusNotification::class,
+            fn (ReservationStatusNotification $notification): bool => $notification->eventType === Reservation::STATUS_APPROVED
+        );
     }
 
     public function test_rejected_reservation_is_removed_from_active_queue_views(): void
     {
+        Notification::fake();
+
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-rejected-queue');
         $doctor = $this->makeUser('doctor', 'doctor-rejected-queue@example.com');
@@ -573,6 +593,12 @@ class ReservationApiTest extends TestCase
             'id' => $otherReservation->id,
             'queue_number' => 1,
         ]);
+
+        Notification::assertSentTo(
+            $patient,
+            ReservationStatusNotification::class,
+            fn (ReservationStatusNotification $notification): bool => $notification->eventType === Reservation::STATUS_REJECTED
+        );
     }
 
     public function test_clinic_admin_can_list_clinic_reservations_from_general_reservations_endpoint(): void

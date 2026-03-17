@@ -7,10 +7,12 @@ use App\Models\DoctorClinicSchedule;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Notifications\QueueProgressNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -28,6 +30,8 @@ class MedicalRecordApiTest extends TestCase
 
     public function test_doctor_can_create_medical_record_and_complete_reservation(): void
     {
+        Notification::fake();
+
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-medical-record');
         $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-medical-record@example.com');
@@ -79,6 +83,12 @@ class MedicalRecordApiTest extends TestCase
             'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
             'queue_number' => null,
         ]);
+
+        Notification::assertSentTo(
+            $patient,
+            QueueProgressNotification::class,
+            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_COMPLETED
+        );
     }
 
     public function test_doctor_notes_is_required_when_creating_medical_record(): void

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Reservation;
+use App\Services\PatientNotificationService;
 use App\Models\User;
 use App\Services\ReservationQueueService;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,7 @@ class AdminReservationController extends Controller
 
     public function __construct(
         private readonly ReservationQueueService $queueService,
+        private readonly PatientNotificationService $patientNotificationService,
     ) {
     }
 
@@ -89,7 +91,9 @@ class AdminReservationController extends Controller
             ]);
         }
 
-        $reservation = DB::transaction(function () use ($payload, $request, $reservation): Reservation {
+        $reservationNotificationEvent = null;
+
+        $reservation = DB::transaction(function () use ($payload, $request, $reservation, &$reservationNotificationEvent): Reservation {
             $lockedReservation = Reservation::query()
                 ->lockForUpdate()
                 ->findOrFail($reservation->id);
@@ -125,6 +129,10 @@ class AdminReservationController extends Controller
                 if ($payload['status'] !== $lockedReservation->status) {
                     $payload['handled_by_admin_id'] = $request->user()->id;
                     $payload['handled_at'] = now();
+
+                    if (in_array($payload['status'], [Reservation::STATUS_APPROVED, Reservation::STATUS_REJECTED], true)) {
+                        $reservationNotificationEvent = $payload['status'];
+                    }
                 }
 
                 if ($payload['status'] === Reservation::STATUS_CANCELLED) {
@@ -147,6 +155,10 @@ class AdminReservationController extends Controller
 
             return $lockedReservation->fresh();
         });
+
+        if ($reservationNotificationEvent !== null) {
+            $this->patientNotificationService->sendReservationStatusNotification($reservation->loadMissing('patient'), $reservationNotificationEvent);
+        }
 
         return response()->json([
             'message' => 'Reservation update successful.',

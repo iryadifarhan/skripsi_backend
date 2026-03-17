@@ -7,6 +7,7 @@ use App\Models\Clinic;
 use App\Models\DoctorClinicSchedule;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\PatientNotificationService;
 use App\Services\ReservationQueueService;
 use App\Services\TimeWindowScheduler;
 use Carbon\Carbon;
@@ -21,6 +22,7 @@ class ReservationController extends Controller
     public function __construct(
         private readonly TimeWindowScheduler $scheduler,
         private readonly ReservationQueueService $queueService,
+        private readonly PatientNotificationService $patientNotificationService,
     ) {
     }
 
@@ -343,6 +345,8 @@ class ReservationController extends Controller
 
             return $lockedReservation->fresh();
         });
+
+        $this->patientNotificationService->sendReservationStatusNotification($reservation->loadMissing('patient'), 'rescheduled');
 
         return response()->json([
             'message' => 'Reservation reschedule successful.',

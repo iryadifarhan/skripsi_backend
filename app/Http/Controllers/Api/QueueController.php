@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DoctorClinicSchedule;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\PatientNotificationService;
 use App\Services\ReservationQueueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ class QueueController extends Controller
 {
     public function __construct(
         private readonly ReservationQueueService $queueService,
+        private readonly PatientNotificationService $patientNotificationService,
     ) {
     }
 
@@ -190,7 +192,9 @@ class QueueController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($payload, $request, $reservation): void {
+        $queueNotificationStatus = null;
+
+        DB::transaction(function () use ($payload, $request, $reservation, &$queueNotificationStatus): void {
             $reservation->refresh();
 
             if (isset($payload['queue_number'])) {
@@ -205,11 +209,26 @@ class QueueController extends Controller
             }
 
             if (isset($payload['queue_status'])) {
+                if (
+                    $payload['queue_status'] !== $reservation->queue_status
+                    && in_array($payload['queue_status'], [
+                        Reservation::QUEUE_STATUS_CALLED,
+                        Reservation::QUEUE_STATUS_IN_PROGRESS,
+                        Reservation::QUEUE_STATUS_SKIPPED,
+                    ], true)
+                ) {
+                    $queueNotificationStatus = $payload['queue_status'];
+                }
+
                 $this->applyQueueStateChange($request, $reservation, (string) $payload['queue_status']);
             }
         });
 
         $reservation = $reservation->fresh()->load($this->reservationRelations());
+
+        if ($queueNotificationStatus !== null) {
+            $this->patientNotificationService->sendQueueProgressNotification($reservation->loadMissing('patient'), $queueNotificationStatus);
+        }
 
         return response()->json([
             'message' => 'Queue update successful.',
