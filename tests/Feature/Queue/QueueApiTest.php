@@ -58,7 +58,6 @@ class QueueApiTest extends TestCase
     {
         Notification::fake();
         Http::fake();
-        $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-queue-admin');
@@ -67,7 +66,7 @@ class QueueApiTest extends TestCase
         $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
 
         $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-queue@example.com', $clinic->id);
-        $patientOne = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-one@example.com');
+        $patientOne = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-one@example.com', null, '081234500003');
         $patientTwo = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-two@example.com', null, '081234500004');
 
         $firstReservation = $this->createReservation($patientOne, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_WAITING);
@@ -82,18 +81,17 @@ class QueueApiTest extends TestCase
         $this->patchJson("/api/admin/queues/{$secondReservation->id}", [
             'clinic_id' => $clinic->id,
             'queue_number' => 1,
-            'queue_status' => Reservation::QUEUE_STATUS_CALLED,
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('queue.reservation_id', $secondReservation->id)
             ->assertJsonPath('queue.queue.number', 1)
-            ->assertJsonPath('queue.queue.status', Reservation::QUEUE_STATUS_CALLED)
-            ->assertJsonPath('queue.queue.current_called_number', 1);
+            ->assertJsonPath('queue.queue.status', Reservation::QUEUE_STATUS_WAITING)
+            ->assertJsonPath('queue.queue.current_called_number', null);
 
         $this->assertDatabaseHas('reservations', [
             'id' => $secondReservation->id,
             'queue_number' => 1,
-            'queue_status' => Reservation::QUEUE_STATUS_CALLED,
+            'queue_status' => Reservation::QUEUE_STATUS_WAITING,
         ]);
 
         $this->assertDatabaseHas('reservations', [
@@ -101,18 +99,8 @@ class QueueApiTest extends TestCase
             'queue_number' => 2,
         ]);
 
-        Notification::assertSentTo(
-            $patientTwo,
-            QueueProgressNotification::class,
-            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_CALLED
-        );
-
-        Http::assertSent(fn ($request): bool =>
-            $request->url() === 'https://api.fonnte.com/send'
-            && $request['target'] === '081234500004'
-            && $request['countryCode'] === '62'
-            && str_contains((string) $request['message'], 'being called')
-        );
+        Notification::assertNothingSent();
+        Http::assertNothingSent();
     }
 
     public function test_manual_queue_override_persists_when_new_reservation_is_created(): void
@@ -221,7 +209,7 @@ class QueueApiTest extends TestCase
             ->assertJsonPath('queues.0.queue.is_current', true);
     }
 
-    public function test_admin_sends_queue_progress_notifications_for_in_progress_and_skipped(): void
+    public function test_admin_sends_queue_progress_notification_for_called_only(): void
     {
         Notification::fake();
         Http::fake();
@@ -240,41 +228,90 @@ class QueueApiTest extends TestCase
 
         $this->patchJson("/api/admin/queues/{$reservation->id}", [
             'clinic_id' => $clinic->id,
-            'queue_status' => Reservation::QUEUE_STATUS_IN_PROGRESS,
+            'queue_status' => Reservation::QUEUE_STATUS_CALLED,
         ], $this->spaHeaders())
             ->assertOk();
+
+        Notification::assertSentTo(
+            $patient,
+            QueueProgressNotification::class,
+            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_CALLED
+        );
+
+        Http::assertSent(fn ($request): bool =>
+            $request->url() === 'https://api.fonnte.com/send'
+            && $request['target'] === '628123450005'
+            && $request['countryCode'] === '0'
+            && str_contains((string) $request['message'], 'being called')
+        );
+    }
+
+    public function test_admin_does_not_send_queue_progress_notification_for_skipped(): void
+    {
+        Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
+
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-queue-no-skipped-notification');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-queue-no-skipped-notification@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-queue-no-skipped-notification@example.com', $clinic->id);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-no-skipped-notification@example.com', null, '+628123450008');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_WAITING);
+
+        $this->login($admin, 'Password123!');
 
         $this->patchJson("/api/admin/queues/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'queue_status' => Reservation::QUEUE_STATUS_SKIPPED,
         ], $this->spaHeaders())
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('queue.reservation_id', $reservation->id)
+            ->assertJsonPath('queue.queue.status', Reservation::QUEUE_STATUS_SKIPPED);
 
-        Notification::assertSentTo(
-            $patient,
-            QueueProgressNotification::class,
-            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_IN_PROGRESS
-        );
-
-        Notification::assertSentTo(
+        Notification::assertNotSentTo(
             $patient,
             QueueProgressNotification::class,
             fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_SKIPPED
         );
 
-        Http::assertSent(fn ($request): bool =>
-            $request->url() === 'https://api.fonnte.com/send'
-            && $request['target'] === '628123450005'
-            && $request['countryCode'] === '0'
-            && str_contains((string) $request['message'], 'in progress')
+        Http::assertNothingSent();
+    }
+
+    public function test_admin_does_not_send_queue_progress_notification_for_in_progress(): void
+    {
+        Notification::fake();
+        Http::fake();
+        $this->enableFonnte();
+
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-queue-no-in-progress-notification');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-queue-no-in-progress-notification@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-queue-no-in-progress-notification@example.com', $clinic->id);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-no-in-progress-notification@example.com', null, '+628123450007');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_WAITING);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/api/admin/queues/{$reservation->id}", [
+            'clinic_id' => $clinic->id,
+            'queue_status' => Reservation::QUEUE_STATUS_IN_PROGRESS,
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('queue.reservation_id', $reservation->id)
+            ->assertJsonPath('queue.queue.status', Reservation::QUEUE_STATUS_IN_PROGRESS);
+
+        Notification::assertNotSentTo(
+            $patient,
+            QueueProgressNotification::class,
+            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_IN_PROGRESS
         );
 
-        Http::assertSent(fn ($request): bool =>
-            $request->url() === 'https://api.fonnte.com/send'
-            && $request['target'] === '628123450005'
-            && $request['countryCode'] === '0'
-            && str_contains((string) $request['message'], 'skipped')
-        );
+        Http::assertNothingSent();
     }
 
     public function test_admin_queue_cancel_sends_cancellation_notification(): void

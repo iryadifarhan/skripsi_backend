@@ -1,0 +1,500 @@
+@startuml
+hide empty members
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+title Clinic Reservation and Queue Management Class Diagram
+
+package "Models" {
+  abstract class Authenticatable
+  abstract class Model
+
+  class User {
+    - id : bigint
+    - name : string
+    - username : string
+    - email : string
+    - phone_number : string?
+    - role : string
+    - profile_picture : string?
+    - email_verified_at : timestamp?
+    - password : string
+    - remember_token : string?
+    - clinic_id : bigint?
+    - created_at : timestamp
+    - updated_at : timestamp
+    --
+    +clinic()
+    +clinics()
+    +reservations()
+    +assignedReservations()
+    +handledReservations()
+    +patientMedicalRecords()
+    +issuedMedicalRecords()
+    +doctorClinicSchedules()
+    +profilePicturesForRole(role)
+    +defaultProfilePictureForRole(role)
+    +isValidProfilePictureForRole(role, profilePicture)
+  }
+
+  class Clinic {
+    - id : bigint
+    - name : string
+    - address : string
+    - phone_number : string
+    - email : string
+    - created_at : timestamp
+    - updated_at : timestamp
+    --
+    +users()
+    +doctors()
+    +reservations()
+    +medicalRecords()
+    +operatingHours()
+    +doctorClinicSchedules()
+  }
+
+  class ClinicOperatingHour {
+    - id : bigint
+    - clinic_id : bigint
+    - day_of_week : tinyint
+    - open_time : time?
+    - close_time : time?
+    - is_closed : boolean
+    - created_at : timestamp
+    - updated_at : timestamp
+    --
+    +clinic()
+  }
+
+  class DoctorClinicSchedule {
+    - id : bigint
+    - clinic_id : bigint
+    - doctor_id : bigint
+    - day_of_week : tinyint
+    - start_time : time
+    - end_time : time
+    - window_minutes : smallint
+    - max_patients_per_window : smallint
+    - is_active : boolean
+    - created_at : timestamp
+    - updated_at : timestamp
+    --
+    +clinic()
+    +doctor()
+  }
+
+  class Reservation {
+    - id : bigint
+    - reservation_number : string
+    - queue_number : int?
+    - queue_status : string
+    - queue_order_source : string
+    - queue_called_at : timestamp?
+    - queue_started_at : timestamp?
+    - queue_completed_at : timestamp?
+    - queue_skipped_at : timestamp?
+    - patient_id : bigint?
+    - guest_name : string?
+    - guest_phone_number : string?
+    - clinic_id : bigint
+    - doctor_id : bigint?
+    - doctor_clinic_schedule_id : bigint?
+    - reservation_date : date
+    - window_start_time : time?
+    - window_end_time : time?
+    - window_slot_number : smallint?
+    - status : string
+    - complaint : text?
+    - admin_notes : text?
+    - cancellation_reason : text?
+    - cancelled_at : timestamp?
+    - handled_by_admin_id : bigint?
+    - handled_at : timestamp?
+    - created_at : timestamp
+    - updated_at : timestamp
+    --
+    +patient()
+    +clinic()
+    +doctor()
+    +doctorClinicSchedule()
+    +handledByAdmin()
+    +medicalRecord()
+  }
+
+  class MedicalRecord {
+    - id : bigint
+    - reservation_id : bigint
+    - patient_id : bigint?
+    - guest_name : string?
+    - guest_phone_number : string?
+    - clinic_id : bigint
+    - doctor_id : bigint
+    - diagnosis : text?
+    - treatment : text?
+    - prescription_notes : text?
+    - doctor_notes : text
+    - issued_at : timestamp
+    - created_at : timestamp
+    - updated_at : timestamp
+    --
+    +reservation()
+    +patient()
+    +clinic()
+    +doctor()
+  }
+}
+
+package "Controllers" {
+  abstract class Controller
+
+  class AuthController {
+    +register(request)
+    +login(request)
+    +me(request)
+    +logout(request)
+    +forgotPassword(request)
+    +resetPassword(request)
+  }
+
+  class AdminController {
+    +getUser(request, usernameOrEmail)
+    +createUser(request)
+    +updateUser(request, usernameOrEmail)
+    +deleteUser(request, usernameOrEmail)
+  }
+
+  class ClinicController {
+    +index()
+    +show(clinicId)
+    +create(request)
+    +update(request, clinicId)
+    +delete(clinicId)
+    +assignDoctor(request, clinicId)
+    +removeDoctor(request, clinicId)
+    +createDoctorClinicSchedule(request)
+    +updateDoctorClinicSchedule(request, schedule)
+  }
+
+  class UserController {
+    +show(request)
+    +update(request)
+    +updatePassword(request)
+    +profilePictureOptions(request)
+    +updateProfilePicture(request)
+  }
+
+  class ReservationController {
+    -scheduler : TimeWindowScheduler
+    -queueService : ReservationQueueService
+    -patientNotificationService : PatientNotificationService
+    --
+    +index(request)
+    +bookingSchedules(request)
+    +availableWindows(request)
+    +store(request)
+    +reschedule(request, reservation)
+    +cancel(request, reservation)
+  }
+
+  class AdminReservationController {
+    -queueService : ReservationQueueService
+    -patientNotificationService : PatientNotificationService
+    -scheduler : TimeWindowScheduler
+    --
+    +index(request)
+    +show(request, reservation)
+    +update(request, reservation)
+    +processReservation(request, reservation)
+  }
+
+  class QueueController {
+    -queueService : ReservationQueueService
+    -patientNotificationService : PatientNotificationService
+    --
+    +patientIndex(request)
+    +adminIndex(request)
+    +doctorIndex(request)
+    +adminUpdate(request, reservation)
+  }
+
+  class MedicalRecordController {
+    -queueService : ReservationQueueService
+    -patientNotificationService : PatientNotificationService
+    --
+    +patientIndex(request)
+    +patientShow(request, medicalRecord)
+    +adminIndex(request)
+    +adminShow(request, medicalRecord)
+    +doctorIndex(request)
+    +doctorShow(request, medicalRecord)
+    +store(request, reservation)
+  }
+
+  class ReportController {
+    -reportService : ReportService
+    -queueService : ReservationQueueService
+    --
+    +reservations(request)
+    +exportReservations(request)
+    +medicalRecords(request)
+    +exportMedicalRecords(request)
+  }
+}
+
+package "Services" {
+  class TimeWindowScheduler {
+    +generateWindows(schedule)
+    +findWindowByStart(schedule, windowStartTime)
+  }
+
+  class ReservationQueueService {
+    +lineUsesManualOrdering(scheduleId, reservationDate)
+    +nextQueueNumber(scheduleId, reservationDate)
+    +syncQueueLine(scheduleId, reservationDate)
+    +resequenceQueueLineByWindowOrder(scheduleId, reservationDate)
+    +serializeReservations(reservations)
+    +serializeReservation(reservation)
+    +serializeQueueEntries(reservations, includePatient = false)
+    +serializeQueueEntry(reservation, includePatient = false)
+    +activeQueueSnapshotsForLine(scheduleId, reservationDate)
+    +moveReservationToQueueNumber(reservation, targetQueueNumber)
+    +compactQueueLine(scheduleId, reservationDate)
+    +syncWindowSlots(scheduleId, reservationDate, windowStartTime)
+    +applyQueueStatus(reservation, queueStatus)
+    +isActiveQueueReservation(reservation)
+  }
+
+  class PatientNotificationService {
+    -fonnteService : FonnteService
+    --
+    +sendReservationStatusNotification(reservation, eventType)
+    +sendQueueProgressNotification(reservation, queueStatus)
+    +sendMedicalRecordReadyNotification(reservation, medicalRecord)
+    +sendQueueSnapshotChangeNotifications(beforeSnapshots, afterSnapshots, excludeReservationId = null)
+  }
+
+  class ReportService {
+    +reservations(actor, filters)
+    +medicalRecords(actor, filters)
+  }
+
+  class FonnteService {
+    +isEnabled()
+    +sendMessage(phoneNumber, message)
+  }
+}
+
+package "Notifications" {
+  abstract class Notification
+
+  class ReservationStatusNotification {
+    +reservation : Reservation
+    +eventType : string
+    --
+    +via(notifiable)
+    +toMail(notifiable)
+    +toWhatsAppText(recipientName = null)
+  }
+
+  class QueueProgressNotification {
+    +reservation : Reservation
+    +queueStatus : string
+    --
+    +via(notifiable)
+    +toMail(notifiable)
+    +toWhatsAppText(recipientName = null)
+  }
+
+  class MedicalRecordReadyNotification {
+    +reservation : Reservation
+    +medicalRecord : MedicalRecord
+    --
+    +via(notifiable)
+    +toMail(notifiable)
+    +toWhatsAppText(recipientName = null)
+  }
+}
+
+package "Exports" {
+  interface WithMultipleSheets
+  interface FromArray
+  interface ShouldAutoSize
+  interface WithTitle
+
+  class ReservationsReportExport {
+    -filters : array
+    -summary : array
+    -rows : array
+    --
+    +sheets()
+  }
+
+  class MedicalRecordsReportExport {
+    -filters : array
+    -summary : array
+    -rows : array
+    --
+    +sheets()
+  }
+
+  package "Support" {
+    class SummarySheetExport {
+      -title : string
+      -rows : array
+      --
+      +array()
+      +title()
+    }
+
+    class DataSheetExport {
+      -title : string
+      -headings : array
+      -rows : array
+      --
+      +array()
+      +title()
+    }
+  }
+}
+
+package "Middleware" {
+  class AuthorizeRole {
+    +handle(request, next, roles...)
+  }
+}
+
+User --|> Authenticatable
+Clinic --|> Model
+ClinicOperatingHour --|> Model
+DoctorClinicSchedule --|> Model
+Reservation --|> Model
+MedicalRecord --|> Model
+
+AuthController --|> Controller
+AdminController --|> Controller
+ClinicController --|> Controller
+UserController --|> Controller
+ReservationController --|> Controller
+AdminReservationController --|> Controller
+QueueController --|> Controller
+MedicalRecordController --|> Controller
+ReportController --|> Controller
+
+ReservationStatusNotification --|> Notification
+QueueProgressNotification --|> Notification
+MedicalRecordReadyNotification --|> Notification
+
+ReservationsReportExport ..|> WithMultipleSheets
+MedicalRecordsReportExport ..|> WithMultipleSheets
+SummarySheetExport ..|> FromArray
+SummarySheetExport ..|> ShouldAutoSize
+SummarySheetExport ..|> WithTitle
+DataSheetExport ..|> FromArray
+DataSheetExport ..|> ShouldAutoSize
+DataSheetExport ..|> WithTitle
+
+Clinic "1" --> "0..*" User : primary clinic
+Clinic "1" --> "0..*" ClinicOperatingHour
+Clinic "1" --> "0..*" DoctorClinicSchedule
+Clinic "1" --> "0..*" Reservation
+Clinic "1" --> "0..*" MedicalRecord
+
+User "1" --> "0..*" Reservation : patient
+User "1" --> "0..*" Reservation : doctor
+User "1" --> "0..*" Reservation : handledByAdmin
+DoctorClinicSchedule "1" --> "0..*" Reservation
+Reservation "1" --> "0..1" MedicalRecord
+User "1" --> "0..*" MedicalRecord : patient
+User "1" --> "0..*" MedicalRecord : doctor
+
+Clinic "0..*" -- "0..*" User : clinic_user
+
+ReservationController ..> Clinic
+ReservationController ..> DoctorClinicSchedule
+ReservationController ..> Reservation
+ReservationController ..> User
+ReservationController ..> TimeWindowScheduler
+ReservationController ..> ReservationQueueService
+ReservationController ..> PatientNotificationService
+
+AdminReservationController ..> DoctorClinicSchedule
+AdminReservationController ..> Reservation
+AdminReservationController ..> User
+AdminReservationController ..> TimeWindowScheduler
+AdminReservationController ..> ReservationQueueService
+AdminReservationController ..> PatientNotificationService
+
+QueueController ..> DoctorClinicSchedule
+QueueController ..> Reservation
+QueueController ..> User
+QueueController ..> ReservationQueueService
+QueueController ..> PatientNotificationService
+
+MedicalRecordController ..> MedicalRecord
+MedicalRecordController ..> Reservation
+MedicalRecordController ..> User
+MedicalRecordController ..> ReservationQueueService
+MedicalRecordController ..> PatientNotificationService
+
+ReportController ..> ReportService
+ReportController ..> ReservationQueueService
+ReportController ..> Reservation
+ReportController ..> MedicalRecord
+ReportController ..> ReservationsReportExport
+ReportController ..> MedicalRecordsReportExport
+
+ClinicController ..> Clinic
+ClinicController ..> User
+ClinicController ..> DoctorClinicSchedule
+ClinicController ..> ClinicOperatingHour
+
+UserController ..> User
+AuthController ..> User
+AdminController ..> User
+AuthorizeRole ..> User
+AuthorizeRole ..> Clinic
+
+TimeWindowScheduler ..> DoctorClinicSchedule
+ReservationQueueService ..> Reservation
+PatientNotificationService ..> FonnteService
+PatientNotificationService ..> Reservation
+PatientNotificationService ..> MedicalRecord
+PatientNotificationService ..> ReservationStatusNotification
+PatientNotificationService ..> QueueProgressNotification
+PatientNotificationService ..> MedicalRecordReadyNotification
+ReportService ..> Reservation
+ReportService ..> MedicalRecord
+ReportService ..> User
+MedicalRecordReadyNotification ..> Reservation
+MedicalRecordReadyNotification ..> MedicalRecord
+ReservationStatusNotification ..> Reservation
+QueueProgressNotification ..> Reservation
+
+ReservationsReportExport *-- SummarySheetExport
+ReservationsReportExport *-- DataSheetExport
+MedicalRecordsReportExport *-- SummarySheetExport
+MedicalRecordsReportExport *-- DataSheetExport
+
+note right of Reservation
+Key domain state:
+- status
+- queue_status
+- queue_order_source
+- walk-in support via patient_id NULL
+end note
+
+note right of PatientNotificationService
+Coordinates email notification classes
+and WhatsApp delivery through FonnteService.
+end note
+
+note bottom of ReportController
+Shared by both admin and doctor routes.
+Actor-based scoping is delegated to ReportService.
+end note
+
+@enduml

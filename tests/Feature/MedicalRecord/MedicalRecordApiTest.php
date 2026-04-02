@@ -8,7 +8,6 @@ use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Notifications\MedicalRecordReadyNotification;
-use App\Notifications\QueueProgressNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -106,7 +105,7 @@ class MedicalRecordApiTest extends TestCase
         );
     }
 
-    public function test_completion_notifies_next_active_queue_entry_when_queue_advances(): void
+    public function test_completion_does_not_notify_next_active_queue_entry_when_queue_advances(): void
     {
         Notification::fake();
         Http::fake();
@@ -136,18 +135,11 @@ class MedicalRecordApiTest extends TestCase
             'queue_status' => Reservation::QUEUE_STATUS_WAITING,
         ]);
 
-        Notification::assertSentTo(
-            $nextPatient,
-            QueueProgressNotification::class,
-            fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_WAITING
-        );
+        Notification::assertNotSentTo($nextPatient, MedicalRecordReadyNotification::class);
 
-        Http::assertSent(fn ($request): bool =>
+        Http::assertNotSent(fn ($request): bool =>
             $request->url() === 'https://api.fonnte.com/send'
             && $request['target'] === '081234500011'
-            && $request['countryCode'] === '62'
-            && str_contains((string) $request['message'], 'Queue number')
-            && str_contains((string) $request['message'], 'http://localhost:3000/queue')
         );
     }
 

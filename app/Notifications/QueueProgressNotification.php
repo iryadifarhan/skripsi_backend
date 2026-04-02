@@ -85,8 +85,6 @@ class QueueProgressNotification extends Notification
     {
         return match ($this->queueStatus) {
             Reservation::QUEUE_STATUS_CALLED => 'Your queue is being called',
-            Reservation::QUEUE_STATUS_IN_PROGRESS => 'Your consultation is now in progress',
-            Reservation::QUEUE_STATUS_SKIPPED => 'Your queue was marked as skipped',
             Reservation::QUEUE_STATUS_COMPLETED => 'Your queue has been completed',
             default => 'Queue update',
         };
@@ -96,8 +94,6 @@ class QueueProgressNotification extends Notification
     {
         return match ($this->queueStatus) {
             Reservation::QUEUE_STATUS_CALLED => "Your queue at {$clinicName} is now being called.",
-            Reservation::QUEUE_STATUS_IN_PROGRESS => "Your reservation at {$clinicName} is now in progress.",
-            Reservation::QUEUE_STATUS_SKIPPED => "Your queue at {$clinicName} was marked as skipped.",
             Reservation::QUEUE_STATUS_COMPLETED => "Your reservation at {$clinicName} has been completed.",
             default => "There is an update for your queue at {$clinicName}.",
         };

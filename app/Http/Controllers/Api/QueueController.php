@@ -195,7 +195,13 @@ class QueueController extends Controller
         $queueNotificationStatus = null;
         $reservationNotificationEvent = null;
 
-        DB::transaction(function () use ($payload, $request, $reservation, &$queueNotificationStatus, &$reservationNotificationEvent): void {
+        DB::transaction(function () use (
+            $payload,
+            $request,
+            $reservation,
+            &$queueNotificationStatus,
+            &$reservationNotificationEvent
+        ): void {
             $reservation->refresh();
 
             if (isset($payload['queue_number'])) {
@@ -214,8 +220,6 @@ class QueueController extends Controller
                     $payload['queue_status'] !== $reservation->queue_status
                     && in_array($payload['queue_status'], [
                         Reservation::QUEUE_STATUS_CALLED,
-                        Reservation::QUEUE_STATUS_IN_PROGRESS,
-                        Reservation::QUEUE_STATUS_SKIPPED,
                     ], true)
                 ) {
                     $queueNotificationStatus = $payload['queue_status'];

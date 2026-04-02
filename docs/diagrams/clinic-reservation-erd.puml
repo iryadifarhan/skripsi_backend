@@ -1,0 +1,192 @@
+@startuml
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam entity {
+  BackgroundColor #F9FBFC
+  BorderColor #2F4858
+  ArrowColor #2F4858
+}
+
+title Clinic Reservation and Queue Management ERD
+
+entity "users" as users {
+  * id : bigint <<PK>>
+  --
+  name : string
+  username : string <<UQ>>
+  email : string <<UQ>>
+  phone_number : string(30) <<UQ, NULL>>
+  role : string
+  profile_picture : string(50) <<NULL>>
+  email_verified_at : timestamp <<NULL>>
+  password : string
+  remember_token : string <<NULL>>
+  clinic_id : bigint <<FK, NULL>>
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "clinics" as clinics {
+  * id : bigint <<PK>>
+  --
+  name : string <<UQ>>
+  address : string
+  phone_number : string
+  email : string <<UQ>>
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "clinic_user" as clinic_user {
+  * id : bigint <<PK>>
+  --
+  clinic_id : bigint <<FK>>
+  user_id : bigint <<FK>>
+  created_at : timestamp
+  updated_at : timestamp
+  --
+  UNIQUE(clinic_id, user_id)
+}
+
+entity "clinic_operating_hours" as clinic_operating_hours {
+  * id : bigint <<PK>>
+  --
+  clinic_id : bigint <<FK>>
+  day_of_week : tinyint
+  open_time : time <<NULL>>
+  close_time : time <<NULL>>
+  is_closed : boolean
+  created_at : timestamp
+  updated_at : timestamp
+  --
+  UNIQUE(clinic_id, day_of_week)
+}
+
+entity "doctor_clinic_schedules" as doctor_clinic_schedules {
+  * id : bigint <<PK>>
+  --
+  clinic_id : bigint <<FK>>
+  doctor_id : bigint <<FK>>
+  day_of_week : tinyint
+  start_time : time
+  end_time : time
+  window_minutes : smallint
+  max_patients_per_window : smallint
+  is_active : boolean
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "reservations" as reservations {
+  * id : bigint <<PK>>
+  --
+  reservation_number : string <<UQ>>
+  queue_number : int <<NULL>>
+  queue_status : string
+  queue_order_source : string
+  queue_called_at : timestamp <<NULL>>
+  queue_started_at : timestamp <<NULL>>
+  queue_completed_at : timestamp <<NULL>>
+  queue_skipped_at : timestamp <<NULL>>
+  patient_id : bigint <<FK, NULL>>
+  guest_name : string <<NULL>>
+  guest_phone_number : string(30) <<NULL>>
+  clinic_id : bigint <<FK>>
+  doctor_id : bigint <<FK, NULL>>
+  doctor_clinic_schedule_id : bigint <<FK, NULL>>
+  reservation_date : date
+  window_start_time : time <<NULL>>
+  window_end_time : time <<NULL>>
+  window_slot_number : smallint <<NULL>>
+  status : string
+  complaint : text <<NULL>>
+  admin_notes : text <<NULL>>
+  cancellation_reason : text <<NULL>>
+  cancelled_at : timestamp <<NULL>>
+  handled_by_admin_id : bigint <<FK, NULL>>
+  handled_at : timestamp <<NULL>>
+  created_at : timestamp
+  updated_at : timestamp
+  --
+  UNIQUE(doctor_clinic_schedule_id, reservation_date, queue_number)
+}
+
+entity "medical_records" as medical_records {
+  * id : bigint <<PK>>
+  --
+  reservation_id : bigint <<FK, UQ>>
+  patient_id : bigint <<FK, NULL>>
+  guest_name : string <<NULL>>
+  guest_phone_number : string(30) <<NULL>>
+  clinic_id : bigint <<FK>>
+  doctor_id : bigint <<FK>>
+  diagnosis : text <<NULL>>
+  treatment : text <<NULL>>
+  prescription_notes : text <<NULL>>
+  doctor_notes : text
+  issued_at : timestamp
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+clinics ||--o{ users : "primary clinic\nusers.clinic_id"
+clinics ||--o{ clinic_operating_hours
+clinics ||--o{ doctor_clinic_schedules
+clinics ||--o{ reservations
+clinics ||--o{ medical_records
+
+users ||--o{ clinic_user
+clinics ||--o{ clinic_user
+
+users ||--o{ reservations : "patient_id"
+users ||--o{ reservations : "doctor_id"
+users ||--o{ reservations : "handled_by_admin_id"
+doctor_clinic_schedules ||--o{ reservations
+
+reservations ||--o| medical_records
+users ||--o{ medical_records : "patient_id"
+users ||--o{ medical_records : "doctor_id"
+
+note bottom of users
+Roles used by the application:
+- patient
+- doctor
+- admin
+- superadmin
+
+Doctors are affiliated to clinics through clinic_user.
+Clinic admins use users.clinic_id as their primary clinic scope.
+end note
+
+note bottom of reservations
+Walk-in reservation:
+- patient_id = NULL
+- guest_name / guest_phone_number used
+
+Queue line:
+- one queue per doctor_clinic_schedule_id + reservation_date
+- queue_order_source = derived or manual
+end note
+
+note bottom of medical_records
+Medical record creation is the completion action
+for a reservation.
+
+One reservation can have at most one medical record.
+end note
+
+legend right
+Excluded from the main ERD:
+- password_reset_tokens
+- sessions
+- cache
+- cache_locks
+- jobs
+- job_batches
+- failed_jobs
+- personal_access_tokens
+endlegend
+
+@enduml

@@ -109,48 +109,6 @@ class PatientNotificationService
         );
     }
 
-    /**
-     * @param  array<int, array{reservation: Reservation, snapshot: array<string, int|string|bool|null>}>  $beforeSnapshots
-     * @param  array<int, array{reservation: Reservation, snapshot: array<string, int|string|bool|null>}>  $afterSnapshots
-     */
-    public function sendQueueSnapshotChangeNotifications(
-        array $beforeSnapshots,
-        array $afterSnapshots,
-        ?int $excludeReservationId = null,
-    ): void {
-        foreach ($afterSnapshots as $reservationId => $snapshotPayload) {
-            if ($excludeReservationId !== null && (int) $reservationId === $excludeReservationId) {
-                continue;
-            }
-
-            $beforeSnapshot = $beforeSnapshots[$reservationId]['snapshot'] ?? null;
-
-            if ($beforeSnapshot === null) {
-                continue;
-            }
-
-            if (!$this->queueSnapshotChanged($beforeSnapshot, $snapshotPayload['snapshot'])) {
-                continue;
-            }
-
-            $this->sendQueueProgressNotification($snapshotPayload['reservation'], Reservation::QUEUE_STATUS_WAITING);
-        }
-    }
-
-    /**
-     * @param  array<string, int|string|bool|null>  $beforeSnapshot
-     * @param  array<string, int|string|bool|null>  $afterSnapshot
-     */
-    private function queueSnapshotChanged(array $beforeSnapshot, array $afterSnapshot): bool
-    {
-        foreach (['number', 'status', 'size', 'current_called_number', 'position', 'waiting_ahead', 'is_current'] as $field) {
-            if (($beforeSnapshot[$field] ?? null) !== ($afterSnapshot[$field] ?? null)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     private function sendWhatsAppNotification(Reservation $reservation, string $message): void
     {
