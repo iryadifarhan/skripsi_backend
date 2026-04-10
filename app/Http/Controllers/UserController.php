@@ -30,6 +30,7 @@ class UserController extends Controller
             'email' => ['sometimes', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone_number' => ['sometimes', 'nullable', 'string', 'max:30', Rule::unique('users', 'phone_number')->ignore($user->id)],
             'date_of_birth' => ['sometimes', 'nullable', 'date', 'before_or_equal:today'],
+            'gender' => ['sometimes', 'nullable', 'string', Rule::in(User::GENDERS)],
         ]);
 
         if ($payload === []) {

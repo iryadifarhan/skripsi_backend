@@ -17,6 +17,8 @@ class User extends Authenticatable
     public const ROLE_DOCTOR = 'doctor';
     public const ROLE_ADMIN = 'admin';
     public const ROLE_SUPERADMIN = 'superadmin';
+    public const GENDER_LAKI = 'Laki';
+    public const GENDER_PEREMPUAN = 'Perempuan';
 
     public const ROLES = [
         self::ROLE_PATIENT,
@@ -27,6 +29,11 @@ class User extends Authenticatable
     public const CLINIC_SCOPED_ROLES = [
         self::ROLE_DOCTOR,
         self::ROLE_ADMIN
+    ];
+
+    public const GENDERS = [
+        self::GENDER_LAKI,
+        self::GENDER_PEREMPUAN,
     ];
 
     public const PROFILE_PICTURES = [
@@ -50,6 +57,7 @@ class User extends Authenticatable
         'email',
         'phone_number',
         'date_of_birth',
+        'gender',
         'role',
         'profile_picture',
         'password',

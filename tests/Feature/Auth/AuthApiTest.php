@@ -33,6 +33,7 @@ class AuthApiTest extends TestCase
             'email' => 'patient@example.com',
             'phone_number' => '+628111111111',
             'date_of_birth' => '2000-05-12',
+            'gender' => User::GENDER_LAKI,
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
         ], $this->spaHeaders());
@@ -41,18 +42,21 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.username', 'patient_one')
             ->assertJsonPath('user.phone_number', '+628111111111')
             ->assertJsonPath('user.date_of_birth', '2000-05-12T00:00:00.000000Z')
+            ->assertJsonPath('user.gender', User::GENDER_LAKI)
             ->assertJsonPath('user.role', 'patient');
 
         $this->assertDatabaseHas('users', [
             'username' => 'patient_one',
             'phone_number' => '+628111111111',
             'date_of_birth' => '2000-05-12 00:00:00',
+            'gender' => User::GENDER_LAKI,
             'role' => 'patient',
         ]);
 
         $this->getJson('/api/user', $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('user.username', 'patient_one');
+            ->assertJsonPath('user.username', 'patient_one')
+            ->assertJsonPath('user.gender', User::GENDER_LAKI);
     }
 
     public function test_doctor_can_login_with_email_and_logout(): void
@@ -115,6 +119,7 @@ class AuthApiTest extends TestCase
 
         $this->getJson('/api/profile', $this->spaHeaders())
             ->assertOk()
+            ->assertJsonPath('user.gender', $doctor->gender)
             ->assertJsonPath('user.clinic_specialities.0.clinic_id', $clinic->id)
             ->assertJsonPath('user.clinic_specialities.0.specialities.0', 'Pediatrics')
             ->assertJsonPath('user.clinic_specialities.0.specialities.1', 'Immunology');
@@ -204,6 +209,7 @@ class AuthApiTest extends TestCase
             'email' => 'patient-before@example.com',
             'phone_number' => '+628111111112',
             'date_of_birth' => '1999-01-01',
+            'gender' => User::GENDER_LAKI,
             'role' => 'patient',
             'password' => Hash::make('Password123!'),
         ]);
@@ -219,6 +225,7 @@ class AuthApiTest extends TestCase
             'email' => 'patient-after@example.com',
             'phone_number' => '+628111111113',
             'date_of_birth' => '1999-02-02',
+            'gender' => User::GENDER_PEREMPUAN,
             'role' => 'admin',
         ], $this->spaHeaders())
             ->assertOk()
@@ -227,6 +234,7 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.email', 'patient-after@example.com')
             ->assertJsonPath('user.phone_number', '+628111111113')
             ->assertJsonPath('user.date_of_birth', '1999-02-02T00:00:00.000000Z')
+            ->assertJsonPath('user.gender', User::GENDER_PEREMPUAN)
             ->assertJsonPath('user.role', 'patient');
 
         $this->assertDatabaseHas('users', [
@@ -236,11 +244,12 @@ class AuthApiTest extends TestCase
             'email' => 'patient-after@example.com',
             'phone_number' => '+628111111113',
             'date_of_birth' => '1999-02-02 00:00:00',
+            'gender' => User::GENDER_PEREMPUAN,
             'role' => 'patient',
         ]);
     }
 
-    public function test_register_and_profile_update_reject_future_date_of_birth(): void
+    public function test_register_and_profile_update_reject_future_date_of_birth_and_invalid_gender(): void
     {
         $futureDate = now()->addDay()->toDateString();
 
@@ -249,11 +258,12 @@ class AuthApiTest extends TestCase
             'username' => 'patient_invalid_birthdate',
             'email' => 'patient-invalid-birthdate@example.com',
             'date_of_birth' => $futureDate,
+            'gender' => 'Invalid',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
         ], $this->spaHeaders())
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['date_of_birth']);
+            ->assertJsonValidationErrors(['date_of_birth', 'gender']);
 
         $user = User::factory()->create([
             'email' => 'profile-birthdate-validation@example.com',
@@ -267,9 +277,10 @@ class AuthApiTest extends TestCase
 
         $this->patchJson('/api/profile', [
             'date_of_birth' => $futureDate,
+            'gender' => 'Invalid',
         ], $this->spaHeaders())
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['date_of_birth']);
+            ->assertJsonValidationErrors(['date_of_birth', 'gender']);
     }
 
     public function test_profile_update_validates_unique_username_and_email(): void

@@ -270,7 +270,7 @@ class MedicalRecordController extends Controller
     private function medicalRecordRelations(): array
     {
         return [
-            'patient:id,name,username,email,phone_number',
+            'patient:id,name,username,email,phone_number,gender',
             'doctor:id,name,username,email,phone_number',
             'clinic:id,name,address,phone_number,email',
             'reservation:id,reservation_number,reservation_date,window_start_time,window_end_time,status',

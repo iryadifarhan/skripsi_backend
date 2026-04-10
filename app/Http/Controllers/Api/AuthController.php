@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +24,7 @@ class AuthController extends Controller
             'email'    => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'phone_number' => ['nullable', 'string', 'max:30', 'unique:users,phone_number'],
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
         ]);
 
@@ -32,6 +34,7 @@ class AuthController extends Controller
             'email'    => $payload['email'],
             'phone_number' => $payload['phone_number'] ?? null,
             'date_of_birth' => $payload['date_of_birth'] ?? null,
+            'gender' => $payload['gender'] ?? null,
             'role'     => User::ROLE_PATIENT,
             'profile_picture' => User::defaultProfilePictureForRole(User::ROLE_PATIENT),
             'password' => $payload['password'],

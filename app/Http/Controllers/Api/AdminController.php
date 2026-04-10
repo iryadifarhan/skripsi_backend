@@ -42,6 +42,7 @@ class AdminController extends Controller
             'email'    => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'phone_number' => ['nullable', 'string', 'max:30', 'unique:users,phone_number'],
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
             'role'     => ['required', 'string', 'in:' . implode(',', User::ROLES)],
         ]);
@@ -52,6 +53,7 @@ class AdminController extends Controller
             'email'    => $payload['email'],
             'phone_number' => $payload['phone_number'] ?? null,
             'date_of_birth' => $payload['date_of_birth'] ?? null,
+            'gender' => $payload['gender'] ?? null,
             'role'     => $payload['role'],
             'profile_picture' => User::defaultProfilePictureForRole($payload['role']),
             'password' => $payload['password'],
@@ -81,6 +83,7 @@ class AdminController extends Controller
             'email'    => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone_number' => ['nullable', 'string', 'max:30', Rule::unique('users', 'phone_number')->ignore($user->id)],
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'role'     => ['required', 'string', 'in:' . implode(',', User::ROLES)],
         ]);
 

@@ -537,17 +537,20 @@ class ReservationApiTest extends TestCase
 
         $admin = $this->makeUser('admin', 'admin-manage@example.com', $clinic->id);
         $patient = $this->makeUser('patient', 'patient-manage@example.com', null, '081234500002');
+        $patient->update(['gender' => User::GENDER_LAKI]);
         $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
 
         $this->login($admin, 'Password123!');
 
         $this->getJson('/api/admin/reservations?clinic_id='.$clinic->id, $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('reservations.0.id', $reservation->id);
+            ->assertJsonPath('reservations.0.id', $reservation->id)
+            ->assertJsonPath('reservations.0.patient.gender', User::GENDER_LAKI);
 
         $this->getJson("/api/admin/reservations/{$reservation->id}?clinic_id={$clinic->id}", $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('reservation.id', $reservation->id);
+            ->assertJsonPath('reservation.id', $reservation->id)
+            ->assertJsonPath('reservation.patient.gender', User::GENDER_LAKI);
 
         $this->patchJson("/api/admin/reservations/{$reservation->id}", [
             'status' => Reservation::STATUS_APPROVED,

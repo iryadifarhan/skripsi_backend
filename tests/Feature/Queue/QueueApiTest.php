@@ -68,6 +68,8 @@ class QueueApiTest extends TestCase
         $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-queue@example.com', $clinic->id);
         $patientOne = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-one@example.com', null, '081234500003');
         $patientTwo = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-two@example.com', null, '081234500004');
+        $patientOne->update(['gender' => User::GENDER_LAKI]);
+        $patientTwo->update(['gender' => User::GENDER_PEREMPUAN]);
 
         $firstReservation = $this->createReservation($patientOne, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_WAITING);
         $secondReservation = $this->createReservation($patientTwo, $schedule, $reservationDate, '10:00:00', 1, 2, Reservation::QUEUE_STATUS_WAITING);
@@ -76,7 +78,9 @@ class QueueApiTest extends TestCase
 
         $this->getJson('/api/admin/queues?clinic_id='.$clinic->id.'&reservation_date='.$reservationDate, $this->spaHeaders())
             ->assertOk()
-            ->assertJsonCount(2, 'queues');
+            ->assertJsonCount(2, 'queues')
+            ->assertJsonPath('queues.0.patient.gender', User::GENDER_LAKI)
+            ->assertJsonPath('queues.1.patient.gender', User::GENDER_PEREMPUAN);
 
         $this->patchJson("/api/admin/queues/{$secondReservation->id}", [
             'clinic_id' => $clinic->id,

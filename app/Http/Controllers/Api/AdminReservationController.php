@@ -401,7 +401,7 @@ class AdminReservationController extends Controller
     private function reservationRelations(): array
     {
         return [
-            'patient:id,name,username,email,phone_number',
+            'patient:id,name,username,email,phone_number,gender',
             'doctor:id,name,username,email,phone_number',
             'clinic:id,name,address,phone_number,email',
             'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',

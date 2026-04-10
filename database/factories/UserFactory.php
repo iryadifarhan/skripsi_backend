@@ -31,6 +31,7 @@ class UserFactory extends Factory
             'username' => fake()->unique()->userName(),
             'email' => fake()->unique()->safeEmail(),
             'role' => $role,
+            'gender' => fake()->randomElement(User::GENDERS),
             'profile_picture' => User::defaultProfilePictureForRole($role),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
