@@ -27,6 +27,7 @@ class UserController extends Controller
             'username' => ['sometimes', 'string', 'max:50', 'alpha_dash', Rule::unique('users', 'username')->ignore($user->id)],
             'email' => ['sometimes', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone_number' => ['sometimes', 'nullable', 'string', 'max:30', Rule::unique('users', 'phone_number')->ignore($user->id)],
+            'date_of_birth' => ['sometimes', 'nullable', 'date', 'before_or_equal:today'],
         ]);
 
         if ($payload === []) {

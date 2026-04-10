@@ -204,6 +204,48 @@ class ClinicApiTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_create_bulk_doctor_clinic_schedules(): void
+    {
+        $clinic = $this->makeClinic('clinic-schedule-admin-bulk');
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-schedule-bulk@example.com', $clinic->id);
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-schedule-bulk@example.com');
+        $doctor->clinics()->attach($clinic->id);
+
+        $this->seedOperatingHour($clinic, 1, '08:00:00', '17:00:00');
+        $this->seedOperatingHour($clinic, 2, '08:00:00', '17:00:00');
+
+        $this->login($admin, 'Password123!');
+
+        $this->postJson('/api/clinic/schedules', [
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => [1, 2],
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+        ], $this->spaHeaders())
+            ->assertCreated()
+            ->assertJsonPath('message', 'Doctor clinic schedules created successfully.')
+            ->assertJsonCount(2, 'schedules');
+
+        $this->assertDatabaseHas('doctor_clinic_schedules', [
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 1,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+        ]);
+
+        $this->assertDatabaseHas('doctor_clinic_schedules', [
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 2,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+        ]);
+    }
+
     public function test_doctor_can_create_and_update_clinic_schedule_for_owned_clinic(): void
     {
         $clinic = $this->makeClinic('clinic-schedule-doctor');

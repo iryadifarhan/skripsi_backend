@@ -6,6 +6,7 @@ use App\Models\Clinic;
 use App\Models\ClinicOperatingHour;
 use App\Models\DoctorClinicSchedule;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -161,17 +162,30 @@ class ClinicController extends Controller
      * For both admin and doctors
      */
     public function createDoctorClinicSchedule(Request $request) {
+        $dayOfWeekInput = $request->input('day_of_week');
+
+        if ($dayOfWeekInput !== null && !is_array($dayOfWeekInput)) {
+            $request->merge([
+                'day_of_week' => [$dayOfWeekInput],
+            ]);
+        }
+
         $request->validate([
             'doctor_id' => 'required|integer|exists:users,id',
             'clinic_id' => 'required|integer|exists:clinics,id',
-            'day_of_week' => 'required|integer|min:0|max:6',
+            'day_of_week' => 'required|array|min:1',
+            'day_of_week.*' => 'required|integer|min:0|max:6|distinct',
             'start_time' => 'required|date_format:H:i:s',
             'end_time' => 'required|date_format:H:i:s|after:start_time',
             'window_minutes' => 'required|integer|min:1',
             'max_patients_per_window' => 'required|integer|min:1',
-        ]);    
+        ]);
 
         $user = User::find($request->doctor_id);
+        $clinic = Clinic::find($request->clinic_id);
+        $dayOfWeeks = collect($request->input('day_of_week'))
+            ->map(fn ($day): int => (int) $day)
+            ->values();
 
         if ($user->role !== User::ROLE_DOCTOR) {
             return response()->json([
@@ -185,36 +199,67 @@ class ClinicController extends Controller
             ], 400);
         }
 
-        if (DoctorClinicSchedule::where('doctor_id', $request->doctor_id)
+        $existingScheduleDays = DoctorClinicSchedule::query()
+            ->where('doctor_id', $request->doctor_id)
             ->where('clinic_id', $request->clinic_id)
-            ->where('day_of_week', $request->day_of_week)
-            ->exists()) {
-            return response()->json([
-                'message' => 'A schedule for this doctor, clinic, and day of week already exists.',
-            ], 400);
+            ->whereIn('day_of_week', $dayOfWeeks->all())
+            ->pluck('day_of_week')
+            ->map(fn ($day): int => (int) $day)
+            ->all();
+
+        if ($existingScheduleDays !== []) {
+            throw ValidationException::withMessages([
+                'day_of_week' => [
+                    'A schedule for this doctor, clinic, and day of week already exists for: '.implode(', ', $existingScheduleDays).'.',
+                ],
+            ]);
         }
 
-        $clinicSchedule = Clinic::find($request->clinic_id)->operatingHours()->where('day_of_week', $request->day_of_week)->first();
+        $operatingHours = $clinic->operatingHours()
+            ->whereIn('day_of_week', $dayOfWeeks->all())
+            ->get()
+            ->keyBy(fn (ClinicOperatingHour $operatingHour): int => (int) $operatingHour->day_of_week);
 
-        if ($request->start_time < $clinicSchedule->open_time || $request->end_time > $clinicSchedule->close_time) {
-            return response()->json([
-                'message' => 'The schedule is outside the clinic\'s operating hours.',
-            ], 400);
+        foreach ($dayOfWeeks as $dayOfWeek) {
+            $clinicSchedule = $operatingHours->get($dayOfWeek);
+
+            if ($clinicSchedule === null || (bool) $clinicSchedule->is_closed) {
+                throw ValidationException::withMessages([
+                    'day_of_week' => [
+                        "The clinic does not have an available operating hour on day_of_week {$dayOfWeek}.",
+                    ],
+                ]);
+            }
+
+            if ($request->start_time < $clinicSchedule->open_time || $request->end_time > $clinicSchedule->close_time) {
+                throw ValidationException::withMessages([
+                    'day_of_week' => [
+                        "The schedule is outside the clinic's operating hours for day_of_week {$dayOfWeek}.",
+                    ],
+                ]);
+            }
         }
 
-        DoctorClinicSchedule::create([
-            'clinic_id' => $request->clinic_id,
-            'doctor_id' => $request->doctor_id,
-            'day_of_week' => $request->day_of_week,
-            'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
-            'window_minutes' => $request->window_minutes,
-            'max_patients_per_window' => $request->max_patients_per_window,
-            'is_active' => true,
-        ]);
+        $createdSchedules = DB::transaction(function () use ($request, $dayOfWeeks) {
+            return $dayOfWeeks->map(function (int $dayOfWeek) use ($request) {
+                return DoctorClinicSchedule::create([
+                    'clinic_id' => $request->clinic_id,
+                    'doctor_id' => $request->doctor_id,
+                    'day_of_week' => $dayOfWeek,
+                    'start_time' => $request->start_time,
+                    'end_time' => $request->end_time,
+                    'window_minutes' => $request->window_minutes,
+                    'max_patients_per_window' => $request->max_patients_per_window,
+                    'is_active' => true,
+                ]);
+            });
+        });
 
         return response()->json([
-            'message' => 'Doctor clinic schedule created successfully.',
+            'message' => $createdSchedules->count() === 1
+                ? 'Doctor clinic schedule created successfully.'
+                : 'Doctor clinic schedules created successfully.',
+            'schedules' => $createdSchedules->values(),
         ], 201);
     }
 

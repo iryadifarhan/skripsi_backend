@@ -32,6 +32,7 @@ class AuthApiTest extends TestCase
             'username' => 'patient_one',
             'email' => 'patient@example.com',
             'phone_number' => '+628111111111',
+            'date_of_birth' => '2000-05-12',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
         ], $this->spaHeaders());
@@ -39,11 +40,13 @@ class AuthApiTest extends TestCase
         $response->assertCreated()
             ->assertJsonPath('user.username', 'patient_one')
             ->assertJsonPath('user.phone_number', '+628111111111')
+            ->assertJsonPath('user.date_of_birth', '2000-05-12T00:00:00.000000Z')
             ->assertJsonPath('user.role', 'patient');
 
         $this->assertDatabaseHas('users', [
             'username' => 'patient_one',
             'phone_number' => '+628111111111',
+            'date_of_birth' => '2000-05-12 00:00:00',
             'role' => 'patient',
         ]);
 
@@ -104,6 +107,7 @@ class AuthApiTest extends TestCase
             'username' => 'explicit_role_user',
             'email' => 'explicit-role@example.com',
             'role' => 'admin',  // attempt to set role during registration
+            'date_of_birth' => '1998-07-21',
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
         ], $this->spaHeaders())
@@ -162,6 +166,7 @@ class AuthApiTest extends TestCase
             'username' => 'patient_before',
             'email' => 'patient-before@example.com',
             'phone_number' => '+628111111112',
+            'date_of_birth' => '1999-01-01',
             'role' => 'patient',
             'password' => Hash::make('Password123!'),
         ]);
@@ -176,6 +181,7 @@ class AuthApiTest extends TestCase
             'username' => 'patient_after',
             'email' => 'patient-after@example.com',
             'phone_number' => '+628111111113',
+            'date_of_birth' => '1999-02-02',
             'role' => 'admin',
         ], $this->spaHeaders())
             ->assertOk()
@@ -183,6 +189,7 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.username', 'patient_after')
             ->assertJsonPath('user.email', 'patient-after@example.com')
             ->assertJsonPath('user.phone_number', '+628111111113')
+            ->assertJsonPath('user.date_of_birth', '1999-02-02T00:00:00.000000Z')
             ->assertJsonPath('user.role', 'patient');
 
         $this->assertDatabaseHas('users', [
@@ -191,8 +198,41 @@ class AuthApiTest extends TestCase
             'username' => 'patient_after',
             'email' => 'patient-after@example.com',
             'phone_number' => '+628111111113',
+            'date_of_birth' => '1999-02-02 00:00:00',
             'role' => 'patient',
         ]);
+    }
+
+    public function test_register_and_profile_update_reject_future_date_of_birth(): void
+    {
+        $futureDate = now()->addDay()->toDateString();
+
+        $this->postJson('/api/register', [
+            'name' => 'Patient Invalid Birthdate',
+            'username' => 'patient_invalid_birthdate',
+            'email' => 'patient-invalid-birthdate@example.com',
+            'date_of_birth' => $futureDate,
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['date_of_birth']);
+
+        $user = User::factory()->create([
+            'email' => 'profile-birthdate-validation@example.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->patchJson('/api/profile', [
+            'date_of_birth' => $futureDate,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['date_of_birth']);
     }
 
     public function test_profile_update_validates_unique_username_and_email(): void
