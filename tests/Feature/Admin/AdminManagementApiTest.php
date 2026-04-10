@@ -94,6 +94,25 @@ class AdminManagementApiTest extends TestCase
             ->assertJsonPath('message', 'You cannot delete your own account.');
     }
 
+    public function test_admin_can_get_doctor_user_with_scoped_speciality(): void
+    {
+        $clinic = $this->makeClinic('clinic-admin-user-speciality');
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-user-speciality@example.com', $clinic->id);
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-user-speciality@example.com');
+        $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['Dermatology', 'Aesthetics'])]);
+
+        $this->login($admin, 'Password123!');
+
+        $this->getJson("/api/admin/user/{$doctor->username}?clinic_id={$clinic->id}", $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.role', User::ROLE_DOCTOR)
+            ->assertJsonPath('user.specialities.0', 'Dermatology')
+            ->assertJsonPath('user.specialities.1', 'Aesthetics')
+            ->assertJsonPath('user.clinic_specialities.0.clinic_id', $clinic->id)
+            ->assertJsonPath('user.clinic_specialities.0.specialities.0', 'Dermatology')
+            ->assertJsonPath('user.clinic_specialities.0.specialities.1', 'Aesthetics');
+    }
+
     private function login(User $user, string $password): void
     {
         $this->postJson('/api/login', [

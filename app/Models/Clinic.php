@@ -26,7 +26,9 @@ class Clinic extends Model
     public function doctors(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
+            ->using(ClinicUser::class)
             ->where('users.role', User::ROLE_DOCTOR)
+            ->withPivot('speciality')
             ->withTimestamps();
     }
 

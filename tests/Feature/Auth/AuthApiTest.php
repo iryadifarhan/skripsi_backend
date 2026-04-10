@@ -83,6 +83,43 @@ class AuthApiTest extends TestCase
             ->assertUnauthorized();
     }
 
+    public function test_doctor_me_and_profile_include_clinic_specialities(): void
+    {
+        $clinic = \App\Models\Clinic::create([
+            'name' => 'clinic-auth-doctor-speciality',
+            'address' => 'Auth doctor speciality address',
+            'phone_number' => '089999999991',
+            'email' => 'clinic-auth-doctor-speciality@example.test',
+        ]);
+
+        $doctor = User::factory()->create([
+            'username' => 'doctor_speciality',
+            'email' => 'doctor-speciality@example.com',
+            'role' => 'doctor',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['Pediatrics', 'Immunology'])]);
+
+        $this->postJson('/api/login', [
+            'email' => 'doctor-speciality@example.com',
+            'password' => 'Password123!',
+        ], $this->spaHeaders())
+            ->assertOk();
+
+        $this->getJson('/api/user', $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.clinic_specialities.0.clinic_id', $clinic->id)
+            ->assertJsonPath('user.clinic_specialities.0.specialities.0', 'Pediatrics')
+            ->assertJsonPath('user.clinic_specialities.0.specialities.1', 'Immunology');
+
+        $this->getJson('/api/profile', $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.clinic_specialities.0.clinic_id', $clinic->id)
+            ->assertJsonPath('user.clinic_specialities.0.specialities.0', 'Pediatrics')
+            ->assertJsonPath('user.clinic_specialities.0.specialities.1', 'Immunology');
+    }
+
     public function test_login_fails_with_invalid_credentials(): void
     {
         User::factory()->create([

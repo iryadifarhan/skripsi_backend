@@ -110,10 +110,16 @@ class ClinicApiTest extends TestCase
         $this->patchJson("/api/admin/clinic/doctor/{$clinic->id}", [
             'clinic_id' => $clinic->id,
             'doctor_id' => $doctor->id,
+            'speciality' => ['Cardiology', 'Orthology'],
         ], $this->spaHeaders())
             ->assertOk();
 
         $this->assertTrue($doctor->fresh()->clinics()->whereKey($clinic->id)->exists());
+        $this->assertDatabaseHas('clinic_user', [
+            'clinic_id' => $clinic->id,
+            'user_id' => $doctor->id,
+            'speciality' => json_encode(['Cardiology', 'Orthology']),
+        ]);
 
         $this->deleteJson("/api/admin/clinic/doctor/{$clinic->id}", [
             'clinic_id' => $clinic->id,
@@ -122,6 +128,35 @@ class ClinicApiTest extends TestCase
             ->assertOk();
 
         $this->assertFalse($doctor->fresh()->clinics()->whereKey($clinic->id)->exists());
+    }
+
+    public function test_authenticated_user_can_get_clinic_specialities_and_doctor_speciality(): void
+    {
+        $clinic = $this->makeClinic('clinic-specialities');
+        $doctorA = $this->makeUser(User::ROLE_DOCTOR, 'doctor-speciality-a@example.com');
+        $doctorB = $this->makeUser(User::ROLE_DOCTOR, 'doctor-speciality-b@example.com');
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-speciality@example.com');
+
+        $doctorA->clinics()->attach($clinic->id, ['speciality' => json_encode(['Cardiology', 'Orthology'])]);
+        $doctorB->clinics()->attach($clinic->id, ['speciality' => json_encode(['Neurology'])]);
+
+        $this->login($patient, 'Password123!');
+
+        $this->getJson('/api/clinics', $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('clinics.0.id', $clinic->id)
+            ->assertJsonPath('clinics.0.specialities.0', 'Cardiology')
+            ->assertJsonPath('clinics.0.specialities.1', 'Orthology')
+            ->assertJsonPath('clinics.0.specialities.2', 'Neurology');
+
+        $this->getJson("/api/clinic/{$clinic->id}", $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('specialities.0', 'Cardiology')
+            ->assertJsonPath('specialities.1', 'Orthology')
+            ->assertJsonPath('specialities.2', 'Neurology')
+            ->assertJsonPath('doctors.0.specialities.0', 'Cardiology')
+            ->assertJsonPath('doctors.0.specialities.1', 'Orthology')
+            ->assertJsonPath('doctors.1.specialities.0', 'Neurology');
     }
 
     public function test_admin_can_update_and_delete_own_clinic_via_admin_routes(): void

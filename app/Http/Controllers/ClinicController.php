@@ -16,13 +16,16 @@ class ClinicController extends Controller
     {
         $clinics = Clinic::query()
             ->select(['id', 'name', 'address', 'phone_number', 'email'])
-            ->with(['operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed'])
+            ->with([
+                'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
+                'doctors:id,name,username,email,phone_number',
+            ])
             ->orderBy('name')
             ->get();
 
         return response()->json([
             'message' => 'Clinic retrieval successful.',
-            'clinics' => $clinics,
+            'clinics' => $clinics->map(fn (Clinic $clinic): array => $this->serializeClinicSummary($clinic))->all(),
         ]);
     }
 
@@ -35,10 +38,10 @@ class ClinicController extends Controller
         }
 
         return response()->json(
-            $clinic->load([
+            $this->serializeClinicDetail($clinic->load([
                 'doctors:id,name,username,email,phone_number',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
-            ])
+            ]))
         );
     }
 
@@ -117,8 +120,18 @@ class ClinicController extends Controller
             ], 404);
         }
 
+        $specialityInput = $request->input('speciality');
+
+        if ($specialityInput !== null && !is_array($specialityInput)) {
+            $request->merge([
+                'speciality' => [$specialityInput],
+            ]);
+        }
+
         $request->validate([
             'doctor_id' => 'required|integer|exists:users,id',
+            'speciality' => 'sometimes|nullable|array',
+            'speciality.*' => 'required|string|max:255|distinct',
         ]);
 
         if (User::where('id', $request->doctor_id)->where('role', User::ROLE_DOCTOR)->doesntExist()) {
@@ -127,7 +140,23 @@ class ClinicController extends Controller
             ], 400);
         }
 
-        $clinic->doctors()->attach($request->doctor_id);
+        $pivotAttributes = [];
+
+        if ($request->has('speciality')) {
+            $specialities = collect($request->input('speciality', []))
+                ->filter(fn ($speciality): bool => filled($speciality))
+                ->map(fn ($speciality): string => (string) $speciality)
+                ->values()
+                ->all();
+
+            $pivotAttributes['speciality'] = $specialities === []
+                ? null
+                : $specialities;
+        }
+
+        $clinic->doctors()->syncWithoutDetaching([
+            $request->doctor_id => $pivotAttributes,
+        ]);
 
         return response()->json([
             'message' => 'Doctor assigned to clinic successfully.',
@@ -384,5 +413,89 @@ class ClinicController extends Controller
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeClinicSummary(Clinic $clinic): array
+    {
+        return [
+            'id' => $clinic->id,
+            'name' => $clinic->name,
+            'address' => $clinic->address,
+            'phone_number' => $clinic->phone_number,
+            'email' => $clinic->email,
+            'operating_hours' => $clinic->operatingHours,
+            'specialities' => $this->collectClinicSpecialities($clinic),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeClinicDetail(Clinic $clinic): array
+    {
+        return [
+            'id' => $clinic->id,
+            'name' => $clinic->name,
+            'address' => $clinic->address,
+            'phone_number' => $clinic->phone_number,
+            'email' => $clinic->email,
+            'operating_hours' => $clinic->operatingHours,
+            'specialities' => $this->collectClinicSpecialities($clinic),
+            'doctors' => $clinic->doctors->map(function (User $doctor): array {
+                return [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                    'username' => $doctor->username,
+                    'email' => $doctor->email,
+                    'phone_number' => $doctor->phone_number,
+                    'specialities' => $this->pivotSpecialities($doctor->pivot?->speciality),
+                ];
+            })->all(),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function collectClinicSpecialities(Clinic $clinic): array
+    {
+        return $clinic->doctors
+            ->flatMap(fn (User $doctor): array => $this->pivotSpecialities($doctor->pivot?->speciality))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function pivotSpecialities(mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        if (is_array($value)) {
+            return collect($value)
+                ->filter(fn ($speciality): bool => filled($speciality))
+                ->map(fn ($speciality): string => (string) $speciality)
+                ->values()
+                ->all();
+        }
+
+        $decoded = json_decode((string) $value, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return collect($decoded)
+                ->filter(fn ($speciality): bool => filled($speciality))
+                ->map(fn ($speciality): string => (string) $speciality)
+                ->values()
+                ->all();
+        }
+
+        return [(string) $value];
     }
 }

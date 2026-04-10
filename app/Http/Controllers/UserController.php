@@ -12,9 +12,11 @@ class UserController extends Controller
 {
     public function show(Request $request): JsonResponse
     {
+        $user = $request->user()->loadMissing('clinics:id,name');
+
         return response()->json([
             'message' => 'Profile retrieval successful.',
-            'user' => $request->user(),
+            'user' => $this->serializeProfileUser($user),
         ]);
     }
 
@@ -93,5 +95,57 @@ class UserController extends Controller
             'message' => 'Profile picture update successful.',
             'user' => $user->fresh(),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeProfileUser(User $user): array
+    {
+        $payload = $user->toArray();
+
+        if ($user->role !== User::ROLE_DOCTOR) {
+            return $payload;
+        }
+
+        $payload['clinic_specialities'] = $user->clinics->map(function ($clinic): array {
+            return [
+                'clinic_id' => $clinic->id,
+                'clinic_name' => $clinic->name,
+                'specialities' => $this->pivotSpecialities($clinic->pivot?->speciality),
+            ];
+        })->values()->all();
+
+        return $payload;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function pivotSpecialities(mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        if (is_array($value)) {
+            return collect($value)
+                ->filter(fn ($speciality): bool => filled($speciality))
+                ->map(fn ($speciality): string => (string) $speciality)
+                ->values()
+                ->all();
+        }
+
+        $decoded = json_decode((string) $value, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return collect($decoded)
+                ->filter(fn ($speciality): bool => filled($speciality))
+                ->map(fn ($speciality): string => (string) $speciality)
+                ->values()
+                ->all();
+        }
+
+        return [(string) $value];
     }
 }

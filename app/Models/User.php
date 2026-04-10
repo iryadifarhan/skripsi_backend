@@ -88,7 +88,10 @@ class User extends Authenticatable
 
     public function clinics(): BelongsToMany
     {
-        return $this->belongsToMany(Clinic::class)->withTimestamps();
+        return $this->belongsToMany(Clinic::class)
+            ->using(ClinicUser::class)
+            ->withPivot('speciality')
+            ->withTimestamps();
     }
 
     public function reservations(): HasMany
