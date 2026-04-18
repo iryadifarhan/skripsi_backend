@@ -288,6 +288,7 @@ class ReservationApiTest extends TestCase
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $nextReservationDate,
             'window_start_time' => '10:00',
+            'reschedule_reason' => 'Ada keperluan mendadak di jadwal sebelumnya.',
             'complaint' => 'Updated complaint after reschedule',
         ], $this->spaHeaders())
             ->assertOk()
@@ -297,6 +298,7 @@ class ReservationApiTest extends TestCase
             ->assertJsonPath('reservation.window_slot_number', 1)
             ->assertJsonPath('reservation.status', Reservation::STATUS_PENDING)
             ->assertJsonPath('reservation.complaint', 'Updated complaint after reschedule')
+            ->assertJsonPath('reservation.reschedule_reason', 'Ada keperluan mendadak di jadwal sebelumnya.')
             ->assertJsonPath('reservation.queue_summary.number', 2)
             ->assertJsonPath('reservation.queue_summary.status', Reservation::QUEUE_STATUS_WAITING);
 
@@ -309,6 +311,7 @@ class ReservationApiTest extends TestCase
             'queue_number' => 2,
             'queue_status' => Reservation::QUEUE_STATUS_WAITING,
             'status' => Reservation::STATUS_PENDING,
+            'reschedule_reason' => 'Ada keperluan mendadak di jadwal sebelumnya.',
         ]);
 
         $this->assertDatabaseHas('reservations', [
@@ -337,6 +340,7 @@ class ReservationApiTest extends TestCase
             && $request['target'] === '628123450001'
             && $request['countryCode'] === '0'
             && str_contains((string) $request['message'], 'rescheduled')
+            && str_contains((string) $request['message'], 'Ada keperluan mendadak di jadwal sebelumnya.')
         );
     }
 
@@ -362,11 +366,13 @@ class ReservationApiTest extends TestCase
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '11:00',
+            'reschedule_reason' => 'Ingin pindah ke slot paling akhir.',
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservation.queue_summary.number', 3)
             ->assertJsonPath('reservation.window_start_time', '11:00:00')
-            ->assertJsonPath('reservation.window_slot_number', 2);
+            ->assertJsonPath('reservation.window_slot_number', 2)
+            ->assertJsonPath('reservation.reschedule_reason', 'Ingin pindah ke slot paling akhir.');
 
         $this->assertDatabaseHas('reservations', [
             'id' => $reservationC->id,
@@ -403,10 +409,12 @@ class ReservationApiTest extends TestCase
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '10:00',
+            'reschedule_reason' => 'Slot awal bentrok dengan agenda lain.',
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservation.window_start_time', '10:00:00')
-            ->assertJsonPath('reservation.window_slot_number', 1);
+            ->assertJsonPath('reservation.window_slot_number', 1)
+            ->assertJsonPath('reservation.reschedule_reason', 'Slot awal bentrok dengan agenda lain.');
 
         $this->assertDatabaseHas('reservations', [
             'id' => $reservationA->id,
@@ -470,8 +478,31 @@ class ReservationApiTest extends TestCase
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '10:00',
+            'reschedule_reason' => 'Mencoba mengubah reservasi orang lain.',
         ], $this->spaHeaders())
             ->assertForbidden();
+    }
+
+    public function test_patient_reschedule_requires_reason(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-reschedule-reason-required');
+        $doctor = $this->makeUser('doctor', 'doctor-reschedule-reason-required@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+
+        $patient = $this->makeUser('patient', 'patient-reschedule-reason-required@example.com');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($patient, 'Password123!');
+
+        $this->patchJson("/api/reservations/{$reservation->id}/reschedule", [
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => $reservationDate,
+            'window_start_time' => '10:00',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['reschedule_reason']);
     }
 
     public function test_patient_cannot_reschedule_to_full_window(): void
@@ -496,6 +527,7 @@ class ReservationApiTest extends TestCase
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '10:00',
+            'reschedule_reason' => 'Ingin pindah, tetapi slot tujuan sudah penuh.',
         ], $this->spaHeaders())
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['window_start_time']);
@@ -513,6 +545,9 @@ class ReservationApiTest extends TestCase
         $otherPatient = $this->makeUser('patient', 'other-patient-index@example.com');
 
         $ownReservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $ownReservation->update([
+            'reschedule_reason' => 'Butuh pindah ke jam lain.',
+        ]);
         $this->createReservation($otherPatient, $schedule, $reservationDate, '10:00:00', 1, Reservation::STATUS_PENDING);
 
         $this->login($patient, 'Password123!');
@@ -520,7 +555,8 @@ class ReservationApiTest extends TestCase
         $this->getJson('/api/reservations', $this->spaHeaders())
             ->assertOk()
             ->assertJsonCount(1, 'reservations')
-            ->assertJsonPath('reservations.0.id', $ownReservation->id);
+            ->assertJsonPath('reservations.0.id', $ownReservation->id)
+            ->assertJsonPath('reservations.0.reschedule_reason', 'Butuh pindah ke jam lain.');
     }
 
     public function test_clinic_admin_can_manage_reservations_in_own_clinic(): void
@@ -633,6 +669,7 @@ class ReservationApiTest extends TestCase
             ->assertJsonPath('reservation.window_start_time', '10:00:00')
             ->assertJsonPath('reservation.window_slot_number', 1)
             ->assertJsonPath('reservation.queue_summary.number', 2)
+            ->assertJsonPath('reservation.reschedule_reason', null)
             ->assertJsonPath('reservation.complaint', 'Updated complaint by admin');
 
         $this->assertDatabaseHas('reservations', [

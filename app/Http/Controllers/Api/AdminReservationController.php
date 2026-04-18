@@ -255,6 +255,7 @@ class AdminReservationController extends Controller
                     'window_start_time' => $newWindowStartTime,
                     'window_end_time' => $newWindowEndTime,
                     'window_slot_number' => $newWindowSlotNumber,
+                    'reschedule_reason' => null,
                 ]);
             }
 

@@ -136,6 +136,7 @@ class ReportService
                 (string) ($reservation->complaint ?? ''),
                 (string) ($reservation->admin_notes ?? ''),
                 (string) ($reservation->cancellation_reason ?? ''),
+                (string) ($reservation->reschedule_reason ?? ''),
                 optional($reservation->created_at)->toDateTimeString() ?? '',
                 optional($reservation->updated_at)->toDateTimeString() ?? '',
             ];

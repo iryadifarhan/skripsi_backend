@@ -39,7 +39,10 @@ class ReportApiTest extends TestCase
         $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-report-admin-reservations@example.com', $clinic->id);
         $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-report-admin-reservations@example.com');
 
-        $this->createReservation($patient, $scheduleA, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $registeredReservation = $this->createReservation($patient, $scheduleA, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+        $registeredReservation->update([
+            'reschedule_reason' => 'Pasien meminta pindah karena bentrok jadwal kerja.',
+        ]);
         $this->createWalkInReservation($scheduleB, $reservationDate, '10:00:00', 1, Reservation::STATUS_APPROVED);
 
         $this->login($admin, 'Password123!');
@@ -52,6 +55,7 @@ class ReportApiTest extends TestCase
             ->assertJsonPath('summary.total_reservations', 2)
             ->assertJsonPath('summary.registered_reservations', 1)
             ->assertJsonPath('summary.walk_in_reservations', 1)
+            ->assertJsonPath('reservations.0.reschedule_reason', 'Pasien meminta pindah karena bentrok jadwal kerja.')
             ->assertJsonPath('reservations.0.clinic.id', $clinic->id);
 
         $response = $this->get(

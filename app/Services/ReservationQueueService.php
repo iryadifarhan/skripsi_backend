@@ -454,6 +454,7 @@ class ReservationQueueService
             'complaint' => $reservation->complaint,
             'admin_notes' => $reservation->admin_notes,
             'cancellation_reason' => $reservation->cancellation_reason,
+            'reschedule_reason' => $reservation->reschedule_reason,
             'cancelled_at' => $reservation->cancelled_at,
             'handled_by_admin_id' => $reservation->handled_by_admin_id,
             'handled_at' => $reservation->handled_at,
@@ -496,6 +497,7 @@ class ReservationQueueService
             'reservation_date' => $reservation->reservation_date,
             'reservation_status' => $reservation->status,
             'complaint' => $reservation->complaint,
+            'reschedule_reason' => $reservation->reschedule_reason,
             'window' => [
                 'start_time' => $reservation->window_start_time,
                 'end_time' => $reservation->window_end_time,

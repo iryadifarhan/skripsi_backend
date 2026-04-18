@@ -49,6 +49,7 @@
                 <th>Patient Phone</th>
                 <th>Doctor</th>
                 <th>Complaint</th>
+                <th>Reschedule Reason</th>
             </tr>
         </thead>
         <tbody>
@@ -66,10 +67,11 @@
                     <td>{{ $reservation['patient']['phone_number'] ?? $reservation['guest_phone_number'] ?? '-' }}</td>
                     <td>{{ $reservation['doctor']['name'] ?? '-' }}</td>
                     <td>{{ $reservation['complaint'] ?? '-' }}</td>
+                    <td>{{ $reservation['reschedule_reason'] ?? '-' }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9">No reservations found for the selected filters.</td>
+                    <td colspan="10">No reservations found for the selected filters.</td>
                 </tr>
             @endforelse
         </tbody>

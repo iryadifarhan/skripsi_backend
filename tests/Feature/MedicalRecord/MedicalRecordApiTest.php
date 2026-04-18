@@ -195,6 +195,9 @@ class MedicalRecordApiTest extends TestCase
         $patient->update(['gender' => User::GENDER_PEREMPUAN]);
         $otherPatient = $this->makeUser(User::ROLE_PATIENT, 'patient-medical-record-other@example.com');
         $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, null, Reservation::QUEUE_STATUS_COMPLETED);
+        $reservation->update([
+            'reschedule_reason' => 'Riwayat reschedule tetap perlu terlihat.',
+        ]);
         $otherReservation = $this->createReservation($otherPatient, $schedule, $reservationDate, '10:00:00', 1, null, Reservation::QUEUE_STATUS_COMPLETED);
 
         $medicalRecord = $this->createMedicalRecord($reservation, $doctor, [
@@ -218,6 +221,7 @@ class MedicalRecordApiTest extends TestCase
             ->assertJsonPath('medical_record.id', $medicalRecord->id)
             ->assertJsonPath('medical_record.patient.gender', User::GENDER_PEREMPUAN)
             ->assertJsonPath('medical_record.doctor.id', $doctor->id)
+            ->assertJsonPath('medical_record.reservation.reschedule_reason', 'Riwayat reschedule tetap perlu terlihat.')
             ->assertJsonPath('medical_record.reservation.id', $reservation->id);
     }
 

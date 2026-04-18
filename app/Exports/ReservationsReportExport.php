@@ -80,6 +80,7 @@ class ReservationsReportExport implements WithMultipleSheets
             'Complaint',
             'Admin Notes',
             'Cancellation Reason',
+            'Reschedule Reason',
             'Created At',
             'Updated At',
         ];

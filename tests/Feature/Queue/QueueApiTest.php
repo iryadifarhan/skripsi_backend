@@ -41,6 +41,9 @@ class QueueApiTest extends TestCase
         $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-owner@example.com');
         $this->createReservation($patientAhead, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_CALLED);
         $ownReservation = $this->createReservation($patient, $schedule, $reservationDate, '10:00:00', 1, 2, Reservation::QUEUE_STATUS_WAITING);
+        $ownReservation->update([
+            'reschedule_reason' => 'Pasien sebelumnya meminta pindah antrean.',
+        ]);
         $this->createReservation($patient, $schedule, $reservationDate, '11:00:00', 1, 3, Reservation::QUEUE_STATUS_CANCELLED);
 
         $this->login($patient, 'Password123!');
@@ -51,6 +54,7 @@ class QueueApiTest extends TestCase
             ->assertJsonPath('queues.0.reservation_id', $ownReservation->id)
             ->assertJsonPath('queues.0.queue.number', 2)
             ->assertJsonPath('queues.0.queue.current_called_number', 1)
+            ->assertJsonPath('queues.0.reschedule_reason', 'Pasien sebelumnya meminta pindah antrean.')
             ->assertJsonPath('queues.0.queue.waiting_ahead', 1);
     }
 

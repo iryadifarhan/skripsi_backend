@@ -54,6 +54,10 @@ class ReservationStatusNotification extends Notification
             $mail->line('Cancellation reason: '.$this->reservation->cancellation_reason);
         }
 
+        if ($this->eventType === 'rescheduled' && !empty($this->reservation->reschedule_reason)) {
+            $mail->line('Reschedule reason: '.$this->reservation->reschedule_reason);
+        }
+
         return $mail
             ->line('Please click the button below to check your reservation details.')
             ->action('Check Reservation', $reservationUrl)
@@ -88,6 +92,10 @@ class ReservationStatusNotification extends Notification
 
         if ($this->eventType === 'cancelled' && !empty($this->reservation->cancellation_reason)) {
             $lines[] = '*Cancellation reason*: '.$this->reservation->cancellation_reason;
+        }
+
+        if ($this->eventType === 'rescheduled' && !empty($this->reservation->reschedule_reason)) {
+            $lines[] = '*Reschedule reason*: '.$this->reservation->reschedule_reason;
         }
 
         $lines[] = "\n".'Please click the link below to check your reservation details:';

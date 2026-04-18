@@ -87,6 +87,7 @@ class Reservation extends Model
         'complaint',
         'admin_notes',
         'cancellation_reason',
+        'reschedule_reason',
         'cancelled_at',
         'handled_by_admin_id',
         'handled_at',

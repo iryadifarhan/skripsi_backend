@@ -228,14 +228,20 @@ class ReservationController extends Controller
             ]);
         }
 
-        $payload = $request->validate([
+        $rules = [
             'doctor_clinic_schedule_id' => ['required', 'integer', 'exists:doctor_clinic_schedules,id'],
             'reservation_date' => ['required', 'date', 'after_or_equal:today'],
             'window_start_time' => ['required', 'date_format:H:i'],
             'guest_name' => ['nullable', 'string', 'max:255'],
             'guest_phone_number' => ['nullable', 'string', 'max:30'],
             'complaint' => ['nullable', 'string', 'max:1000'],
-        ]);
+        ];
+
+        if ($actor->role === User::ROLE_PATIENT) {
+            $rules['reschedule_reason'] = ['required', 'string', 'max:1000'];
+        }
+
+        $payload = $request->validate($rules);
 
         $schedule = $this->resolveScheduleForDate(
             (int) $payload['doctor_clinic_schedule_id'],
@@ -323,6 +329,9 @@ class ReservationController extends Controller
                 'complaint' => array_key_exists('complaint', $payload)
                     ? $payload['complaint']
                     : $lockedReservation->complaint,
+                'reschedule_reason' => $actor->role === User::ROLE_PATIENT
+                    ? $payload['reschedule_reason']
+                    : null,
                 'admin_notes' => null,
                 'handled_by_admin_id' => null,
                 'handled_at' => null,

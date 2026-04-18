@@ -155,6 +155,7 @@ class ReportController extends Controller
                     'window_start_time' => $medicalRecord->reservation->window_start_time,
                     'window_end_time' => $medicalRecord->reservation->window_end_time,
                     'status' => $medicalRecord->reservation->status,
+                    'reschedule_reason' => $medicalRecord->reservation->reschedule_reason,
                 ],
             ];
         })->all();
