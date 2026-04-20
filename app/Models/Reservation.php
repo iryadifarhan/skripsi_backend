@@ -88,6 +88,7 @@ class Reservation extends Model
         'admin_notes',
         'cancellation_reason',
         'reschedule_reason',
+        'reminder_sent_at',
         'cancelled_at',
         'handled_by_admin_id',
         'handled_at',
@@ -105,6 +106,7 @@ class Reservation extends Model
             'queue_started_at' => 'datetime',
             'queue_completed_at' => 'datetime',
             'queue_skipped_at' => 'datetime',
+            'reminder_sent_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'handled_at' => 'datetime',
         ];

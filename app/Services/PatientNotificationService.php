@@ -7,6 +7,7 @@ use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Notifications\MedicalRecordReadyNotification;
 use App\Notifications\QueueProgressNotification;
+use App\Notifications\ReservationReminderNotification;
 use App\Notifications\ReservationStatusNotification;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -110,13 +111,47 @@ class PatientNotificationService
         );
     }
 
+    public function sendReservationReminderNotification(Reservation $reservation): bool
+    {
+        $reservation->loadMissing([
+            'patient:id,name,email,phone_number',
+            'clinic:id,name,address,phone_number,email',
+            'doctor:id,name,username,email,phone_number',
+        ]);
 
-    private function sendWhatsAppNotification(Reservation $reservation, string $message): void
+        $notification = new ReservationReminderNotification($reservation);
+        $patient = $reservation->patient;
+        $notificationDispatched = false;
+
+        if ($patient !== null && !empty($patient->email)) {
+            try {
+                $patient->notify($notification);
+                $notificationDispatched = true;
+            } catch (Throwable $exception) {
+                Log::warning('Patient reservation reminder email notification failed.', [
+                    'reservation_id' => $reservation->id,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        if ($this->sendWhatsAppNotification(
+            reservation: $reservation,
+            message: $notification->toWhatsAppText($patient?->name ?? $reservation->guest_name),
+        )) {
+            $notificationDispatched = true;
+        }
+
+        return $notificationDispatched;
+    }
+
+
+    private function sendWhatsAppNotification(Reservation $reservation, string $message): bool
     {
         $phoneNumber = $reservation->patient?->phone_number ?: $reservation->guest_phone_number;
 
         if (empty($phoneNumber) || empty($message) || !$this->fonnteService->isEnabled()) {
-            return;
+            return false;
         }
 
         try {
@@ -125,11 +160,15 @@ class PatientNotificationService
                 message: $message,
                 reservationId: $reservation->id,
             );
+
+            return true;
         } catch (Throwable $exception) {
             Log::warning('Patient WhatsApp notification dispatch failed.', [
                 'reservation_id' => $reservation->id,
                 'message' => $exception->getMessage(),
             ]);
+
+            return false;
         }
     }
 }
