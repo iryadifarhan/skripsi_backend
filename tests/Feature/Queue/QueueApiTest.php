@@ -6,14 +6,15 @@ use App\Models\Clinic;
 use App\Models\DoctorClinicSchedule;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Jobs\SendWhatsAppNotificationJob;
 use App\Notifications\QueueProgressNotification;
 use App\Notifications\ReservationStatusNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -61,7 +62,7 @@ class QueueApiTest extends TestCase
     public function test_admin_can_view_and_reorder_clinic_queue(): void
     {
         Notification::fake();
-        Http::fake();
+        Queue::fake();
 
         $reservationDate = now()->addDay()->toDateString();
         $clinic = $this->makeClinic('clinic-queue-admin');
@@ -108,7 +109,7 @@ class QueueApiTest extends TestCase
         ]);
 
         Notification::assertNothingSent();
-        Http::assertNothingSent();
+        Queue::assertNothingPushed();
     }
 
     public function test_manual_queue_override_persists_when_new_reservation_is_created(): void
@@ -220,7 +221,7 @@ class QueueApiTest extends TestCase
     public function test_admin_sends_queue_progress_notification_for_called_only(): void
     {
         Notification::fake();
-        Http::fake();
+        Queue::fake();
         $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
@@ -246,18 +247,16 @@ class QueueApiTest extends TestCase
             fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_CALLED
         );
 
-        Http::assertSent(fn ($request): bool =>
-            $request->url() === 'https://api.fonnte.com/send'
-            && $request['target'] === '628123450005'
-            && $request['countryCode'] === '0'
-            && str_contains((string) $request['message'], 'being called')
+        Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
+            $job->phoneNumber === '+628123450005'
+            && str_contains($job->message, 'being called')
         );
     }
 
     public function test_admin_does_not_send_queue_progress_notification_for_skipped(): void
     {
         Notification::fake();
-        Http::fake();
+        Queue::fake();
         $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
@@ -285,13 +284,15 @@ class QueueApiTest extends TestCase
             fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_SKIPPED
         );
 
-        Http::assertNothingSent();
+        Queue::assertNotPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
+            $job->phoneNumber === '+628123450008'
+        );
     }
 
     public function test_admin_does_not_send_queue_progress_notification_for_in_progress(): void
     {
         Notification::fake();
-        Http::fake();
+        Queue::fake();
         $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
@@ -319,13 +320,15 @@ class QueueApiTest extends TestCase
             fn (QueueProgressNotification $notification): bool => $notification->queueStatus === Reservation::QUEUE_STATUS_IN_PROGRESS
         );
 
-        Http::assertNothingSent();
+        Queue::assertNotPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
+            $job->phoneNumber === '+628123450007'
+        );
     }
 
     public function test_admin_queue_cancel_sends_cancellation_notification(): void
     {
         Notification::fake();
-        Http::fake();
+        Queue::fake();
         $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
@@ -355,11 +358,9 @@ class QueueApiTest extends TestCase
             fn (ReservationStatusNotification $notification): bool => $notification->eventType === Reservation::STATUS_CANCELLED
         );
 
-        Http::assertSent(fn ($request): bool =>
-            $request->url() === 'https://api.fonnte.com/send'
-            && $request['target'] === '628123450006'
-            && $request['countryCode'] === '0'
-            && str_contains((string) $request['message'], 'cancelled')
+        Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
+            $job->phoneNumber === '+628123450006'
+            && str_contains($job->message, 'cancelled')
         );
     }
 

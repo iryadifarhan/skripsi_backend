@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendWhatsAppNotificationJob;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Notifications\MedicalRecordReadyNotification;
@@ -114,10 +115,21 @@ class PatientNotificationService
     {
         $phoneNumber = $reservation->patient?->phone_number ?: $reservation->guest_phone_number;
 
-        if (empty($phoneNumber)) {
+        if (empty($phoneNumber) || empty($message) || !$this->fonnteService->isEnabled()) {
             return;
         }
 
-        $this->fonnteService->sendMessage((string) $phoneNumber, $message);
+        try {
+            SendWhatsAppNotificationJob::dispatch(
+                phoneNumber: (string) $phoneNumber,
+                message: $message,
+                reservationId: $reservation->id,
+            );
+        } catch (Throwable $exception) {
+            Log::warning('Patient WhatsApp notification dispatch failed.', [
+                'reservation_id' => $reservation->id,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 }

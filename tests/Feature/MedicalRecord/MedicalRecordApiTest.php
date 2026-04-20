@@ -7,13 +7,14 @@ use App\Models\DoctorClinicSchedule;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Jobs\SendWhatsAppNotificationJob;
 use App\Notifications\MedicalRecordReadyNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -32,7 +33,7 @@ class MedicalRecordApiTest extends TestCase
     public function test_doctor_can_create_medical_record_and_complete_reservation(): void
     {
         Notification::fake();
-        Http::fake();
+        Queue::fake();
         $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
@@ -95,20 +96,18 @@ class MedicalRecordApiTest extends TestCase
                 && $notification->medicalRecord->diagnosis === 'Common cold'
         );
 
-        Http::assertSent(fn ($request): bool =>
-            $request->url() === 'https://api.fonnte.com/send'
-            && $request['target'] === '081234500006'
-            && $request['countryCode'] === '62'
-            && str_contains((string) $request['message'], 'completed')
-            && str_contains((string) $request['message'], 'Patient should rest for three days.')
-            && str_contains((string) $request['message'], '/medical_record')
+        Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
+            $job->phoneNumber === '081234500006'
+            && str_contains($job->message, 'completed')
+            && str_contains($job->message, 'Patient should rest for three days.')
+            && str_contains($job->message, '/medical_record')
         );
     }
 
     public function test_completion_does_not_notify_next_active_queue_entry_when_queue_advances(): void
     {
         Notification::fake();
-        Http::fake();
+        Queue::fake();
         $this->enableFonnte();
 
         $reservationDate = now()->addDay()->toDateString();
@@ -137,9 +136,8 @@ class MedicalRecordApiTest extends TestCase
 
         Notification::assertNotSentTo($nextPatient, MedicalRecordReadyNotification::class);
 
-        Http::assertNotSent(fn ($request): bool =>
-            $request->url() === 'https://api.fonnte.com/send'
-            && $request['target'] === '081234500011'
+        Queue::assertNotPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
+            $job->phoneNumber === '081234500011'
         );
     }
 

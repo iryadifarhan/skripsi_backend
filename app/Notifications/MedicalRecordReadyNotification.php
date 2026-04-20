@@ -5,17 +5,20 @@ namespace App\Notifications;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Queue\SerializesModels;
 
-class MedicalRecordReadyNotification extends Notification
+class MedicalRecordReadyNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, SerializesModels;
 
     public function __construct(
         public readonly Reservation $reservation,
         public readonly MedicalRecord $medicalRecord,
     ) {
+        $this->afterCommit();
     }
 
     /**
@@ -28,6 +31,8 @@ class MedicalRecordReadyNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $this->loadContext();
+
         $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
         $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
@@ -53,6 +58,8 @@ class MedicalRecordReadyNotification extends Notification
 
     public function toWhatsAppText(?string $recipientName = null): string
     {
+        $this->loadContext();
+
         $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
         $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
@@ -111,6 +118,20 @@ class MedicalRecordReadyNotification extends Notification
         $path = config('app.frontend_medical_records_path', '/medical_record');
 
         return $baseUrl.'/'.$this->normalizePath((string) $path);
+    }
+
+    private function loadContext(): void
+    {
+        $this->reservation->loadMissing([
+            'clinic:id,name,address,phone_number,email',
+            'doctor:id,name,username,email,phone_number',
+        ]);
+
+        $this->medicalRecord->loadMissing([
+            'doctor:id,name,username,email,phone_number',
+            'clinic:id,name,address,phone_number,email',
+            'reservation:id,reservation_number,reservation_date,window_start_time,window_end_time,status',
+        ]);
     }
 
     private function normalizePath(string $path): string

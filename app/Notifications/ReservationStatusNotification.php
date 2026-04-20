@@ -4,17 +4,20 @@ namespace App\Notifications;
 
 use App\Models\Reservation;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Queue\SerializesModels;
 
-class ReservationStatusNotification extends Notification
+class ReservationStatusNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, SerializesModels;
 
     public function __construct(
         public readonly Reservation $reservation,
         public readonly string $eventType,
     ) {
+        $this->afterCommit();
     }
 
     /*
@@ -27,6 +30,8 @@ class ReservationStatusNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $this->loadContext();
+
         $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
         $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
@@ -67,6 +72,8 @@ class ReservationStatusNotification extends Notification
 
     public function toWhatsAppText(?string $recipientName = null): string
     {
+        $this->loadContext();
+
         $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
         $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
@@ -110,6 +117,14 @@ class ReservationStatusNotification extends Notification
         $path = config('app.frontend_reservations_path', '/reservation');
 
         return $baseUrl.'/'.$this->normalizePath((string) $path);
+    }
+
+    private function loadContext(): void
+    {
+        $this->reservation->loadMissing([
+            'clinic:id,name,address,phone_number,email',
+            'doctor:id,name,username,email,phone_number',
+        ]);
     }
 
     private function normalizePath(string $path): string
