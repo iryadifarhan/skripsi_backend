@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -60,8 +61,16 @@ class User extends Authenticatable
         'gender',
         'role',
         'profile_picture',
+        'image_path',
         'password',
         'clinic_id',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'image_url',
     ];
 
     /**
@@ -84,7 +93,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'date_of_birth' => 'date',
+            'date_of_birth' => 'date:Y-m-d',
             'password' => 'hashed',
         ];
     }
@@ -153,5 +162,23 @@ class User extends Authenticatable
     public static function isValidProfilePictureForRole(string $role, string $profilePicture): bool
     {
         return in_array($profilePicture, self::profilePicturesForRole($role), true);
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        $path = $this->attributes['image_path'] ?? null;
+
+        if (!filled($path)) {
+            return null;
+        }
+
+        return Storage::disk($this->mediaDisk())->url($path);
+    }
+
+    private function mediaDisk(): string
+    {
+        $defaultDisk = (string) config('filesystems.default', 'local');
+
+        return $defaultDisk === 'local' ? 'public' : $defaultDisk;
     }
 }

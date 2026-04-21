@@ -43,15 +43,15 @@ class AdminManagementApiTest extends TestCase
         ], $this->spaHeaders())
             ->assertCreated()
             ->assertJsonPath('user.username', 'managed_user')
-            ->assertJsonPath('user.date_of_birth', '1995-09-14T00:00:00.000000Z')
+            ->assertJsonPath('user.date_of_birth', '1995-09-14')
             ->assertJsonPath('user.gender', User::GENDER_LAKI)
             ->assertJsonPath('user.role', User::ROLE_DOCTOR);
 
         $this->getJson("/api/admin/user/managed_user?clinic_id={$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.email', 'managed-user@example.com')
-            ->assertJsonPath('user.gender', User::GENDER_LAKI)
-            ->assertJsonPath('user.date_of_birth', '1995-09-14T00:00:00.000000Z');
+            ->assertJsonPath('user.date_of_birth', '1995-09-14')
+            ->assertJsonPath('user.gender', User::GENDER_LAKI);
 
         $this->patchJson('/api/admin/user/managed_user', [
             'clinic_id' => $clinic->id,
@@ -65,13 +65,13 @@ class AdminManagementApiTest extends TestCase
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.name', 'Managed User Updated')
-            ->assertJsonPath('user.date_of_birth', '1995-10-15T00:00:00.000000Z')
+            ->assertJsonPath('user.date_of_birth', '1995-10-15')
             ->assertJsonPath('user.gender', User::GENDER_PEREMPUAN)
             ->assertJsonPath('user.role', User::ROLE_PATIENT);
 
         $this->assertDatabaseHas('users', [
             'username' => 'managed_user',
-            'date_of_birth' => '1995-10-15 00:00:00',
+            'date_of_birth' => '1995-10-15',
             'gender' => User::GENDER_PEREMPUAN,
             'role' => User::ROLE_PATIENT,
         ]);

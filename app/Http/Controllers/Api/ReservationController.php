@@ -33,8 +33,8 @@ class ReservationController extends Controller
         ]);
 
         $query = Reservation::with([
-            'clinic:id,name,address,phone_number,email',
-            'doctor:id,name,username,email,phone_number',
+            'clinic:id,name,address,phone_number,email,image_path',
+            'doctor:id,name,username,email,phone_number,image_path',
             'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active']);
 
         if ($request->user()->role === User::ROLE_PATIENT) {
@@ -210,8 +210,8 @@ class ReservationController extends Controller
         return response()->json([
             'message' => 'Reservation creation successful.',
             'reservation' => $this->queueService->serializeReservation($reservation->load([
-                'clinic:id,name,address,phone_number,email',
-                'doctor:id,name,username,email,phone_number',
+                'clinic:id,name,address,phone_number,email,image_path',
+                'doctor:id,name,username,email,phone_number,image_path',
                 'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
             ])),
         ], 201);
@@ -360,8 +360,8 @@ class ReservationController extends Controller
         return response()->json([
             'message' => 'Reservation reschedule successful.',
             'reservation' => $this->queueService->serializeReservation($reservation->fresh()->load([
-                'clinic:id,name,address,phone_number,email',
-                'doctor:id,name,username,email,phone_number',
+                'clinic:id,name,address,phone_number,email,image_path',
+                'doctor:id,name,username,email,phone_number,image_path',
                 'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
             ])),
         ]);
@@ -401,8 +401,8 @@ class ReservationController extends Controller
         return response()->json([
             'message' => 'Reservation cancellation successful.',
             'reservation' => $this->queueService->serializeReservation($reservation->fresh()->load([
-                'clinic:id,name,address,phone_number,email',
-                'doctor:id,name,username,email,phone_number',
+                'clinic:id,name,address,phone_number,email,image_path',
+                'doctor:id,name,username,email,phone_number,image_path',
                 'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
             ])),
         ]);

@@ -41,14 +41,14 @@ class AuthApiTest extends TestCase
         $response->assertCreated()
             ->assertJsonPath('user.username', 'patient_one')
             ->assertJsonPath('user.phone_number', '+628111111111')
-            ->assertJsonPath('user.date_of_birth', '2000-05-12T00:00:00.000000Z')
+            ->assertJsonPath('user.date_of_birth', '2000-05-12')
             ->assertJsonPath('user.gender', User::GENDER_LAKI)
             ->assertJsonPath('user.role', 'patient');
 
         $this->assertDatabaseHas('users', [
             'username' => 'patient_one',
             'phone_number' => '+628111111111',
-            'date_of_birth' => '2000-05-12 00:00:00',
+            'date_of_birth' => '2000-05-12',
             'gender' => User::GENDER_LAKI,
             'role' => 'patient',
         ]);
@@ -219,7 +219,7 @@ class AuthApiTest extends TestCase
             'password' => 'Password123!',
         ], $this->spaHeaders())->assertOk();
 
-        $this->patchJson('/api/profile', [
+        $response = $this->patchJson('/api/profile', [
             'name' => 'Patient After',
             'username' => 'patient_after',
             'email' => 'patient-after@example.com',
@@ -233,7 +233,7 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.username', 'patient_after')
             ->assertJsonPath('user.email', 'patient-after@example.com')
             ->assertJsonPath('user.phone_number', '+628111111113')
-            ->assertJsonPath('user.date_of_birth', '1999-02-02T00:00:00.000000Z')
+            ->assertJsonPath('user.date_of_birth', '1999-02-02')
             ->assertJsonPath('user.gender', User::GENDER_PEREMPUAN)
             ->assertJsonPath('user.role', 'patient');
 
@@ -243,7 +243,7 @@ class AuthApiTest extends TestCase
             'username' => 'patient_after',
             'email' => 'patient-after@example.com',
             'phone_number' => '+628111111113',
-            'date_of_birth' => '1999-02-02 00:00:00',
+            'date_of_birth' => '1999-02-02',
             'gender' => User::GENDER_PEREMPUAN,
             'role' => 'patient',
         ]);

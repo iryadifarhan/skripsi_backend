@@ -23,6 +23,8 @@ Route::middleware('web')->group(function (): void {
         Route::post('/superadmin/clinic/create', [ClinicController::class, 'create']);
         Route::patch('/superadmin/clinic/update/{clinicId}', [ClinicController::class, 'update']);
         Route::delete('/superadmin/clinic/delete/{clinicId}', [ClinicController::class, 'delete']);
+        Route::post('/superadmin/clinic/{clinicId}/image', [ClinicController::class, 'uploadClinicImage']);
+        Route::post('/superadmin/clinic/{clinicId}/doctor-image', [ClinicController::class, 'uploadDoctorImage']);
     });
 
     // Admin (Clinic Scoped) routes
@@ -34,6 +36,8 @@ Route::middleware('web')->group(function (): void {
 
         Route::patch('/admin/clinic/update/{clinicId}', [ClinicController::class, 'update']);
         Route::delete('/admin/clinic/delete/{clinicId}', [ClinicController::class, 'delete']);
+        Route::post('/admin/clinic/{clinicId}/image', [ClinicController::class, 'uploadClinicImage']);
+        Route::post('/admin/clinic/{clinicId}/doctor-image', [ClinicController::class, 'uploadDoctorImage']);
 
         Route::patch('/admin/clinic/doctor/{clinicId}', [ClinicController::class, 'assignDoctor']);
         Route::delete('/admin/clinic/doctor/{clinicId}', [ClinicController::class, 'removeDoctor']);

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Clinic extends Model
 {
@@ -16,6 +17,14 @@ class Clinic extends Model
         'address',
         'phone_number',
         'email',
+        'image_path',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'image_url',
     ];
 
     public function users(): HasMany
@@ -50,5 +59,23 @@ class Clinic extends Model
     public function doctorClinicSchedules(): HasMany
     {
         return $this->hasMany(DoctorClinicSchedule::class);
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        $path = $this->attributes['image_path'] ?? null;
+
+        if (!filled($path)) {
+            return null;
+        }
+
+        return Storage::disk($this->mediaDisk())->url($path);
+    }
+
+    private function mediaDisk(): string
+    {
+        $defaultDisk = (string) config('filesystems.default', 'local');
+
+        return $defaultDisk === 'local' ? 'public' : $defaultDisk;
     }
 }

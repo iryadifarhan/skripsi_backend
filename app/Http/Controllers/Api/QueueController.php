@@ -287,8 +287,8 @@ class QueueController extends Controller
     {
         return [
             'patient:id,name,username,email,phone_number,gender',
-            'doctor:id,name,username,email,phone_number',
-            'clinic:id,name,address,phone_number,email',
+            'doctor:id,name,username,email,phone_number,image_path',
+            'clinic:id,name,address,phone_number,email,image_path',
             'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
         ];
     }

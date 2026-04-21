@@ -9,7 +9,9 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -237,6 +239,102 @@ class ClinicApiTest extends TestCase
             'max_patients_per_window' => 3,
             'is_active' => true,
         ]);
+    }
+
+    public function test_admin_can_upload_clinic_image_and_it_is_exposed_in_clinic_payloads(): void
+    {
+        Storage::fake('public');
+
+        $clinic = $this->makeClinic('clinic-image-admin');
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-clinic-image@example.com', $clinic->id);
+
+        $this->login($admin, 'Password123!');
+
+        $this->post("/api/admin/clinic/{$clinic->id}/image", [
+            'clinic_id' => $clinic->id,
+            'image' => UploadedFile::fake()->image('clinic-logo.png', 400, 400),
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('message', 'Clinic image uploaded successfully.');
+
+        $clinic = $clinic->fresh();
+
+        $this->assertNotNull($clinic->image_path);
+        Storage::disk('public')->assertExists($clinic->image_path);
+
+        $this->getJson('/api/clinics', $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('clinics.0.image_path', $clinic->image_path)
+            ->assertJsonPath('clinics.0.image_url', Storage::disk('public')->url($clinic->image_path));
+
+        $this->getJson("/api/clinic/{$clinic->id}", $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('image_path', $clinic->image_path)
+            ->assertJsonPath('image_url', Storage::disk('public')->url($clinic->image_path));
+    }
+
+    public function test_admin_can_upload_doctor_image_for_doctor_in_own_clinic(): void
+    {
+        Storage::fake('public');
+
+        $clinic = $this->makeClinic('clinic-doctor-image-admin');
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-doctor-image@example.com', $clinic->id);
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-image@example.com');
+        $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['Cardiology'])]);
+
+        $this->login($admin, 'Password123!');
+
+        $this->post("/api/admin/clinic/{$clinic->id}/doctor-image", [
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'image' => UploadedFile::fake()->image('doctor-photo.webp', 500, 500),
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('message', 'Doctor image uploaded successfully.')
+            ->assertJsonPath('doctor.id', $doctor->id)
+            ->assertJsonPath('doctor.specialities.0', 'Cardiology');
+
+        $doctor = $doctor->fresh();
+
+        $this->assertNotNull($doctor->image_path);
+        Storage::disk('public')->assertExists($doctor->image_path);
+
+        $this->getJson("/api/clinic/{$clinic->id}", $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('doctors.0.id', $doctor->id)
+            ->assertJsonPath('doctors.0.image_path', $doctor->image_path)
+            ->assertJsonPath('doctors.0.image_url', Storage::disk('public')->url($doctor->image_path));
+
+        $this->getJson("/api/admin/user/{$doctor->username}?clinic_id={$clinic->id}", $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.image_path', $doctor->image_path)
+            ->assertJsonPath('user.image_url', Storage::disk('public')->url($doctor->image_path));
+    }
+
+    public function test_superadmin_can_upload_clinic_and_doctor_images(): void
+    {
+        Storage::fake('public');
+
+        $superadmin = $this->makeUser(User::ROLE_SUPERADMIN, 'superadmin-media@example.com');
+        $clinic = $this->makeClinic('clinic-media-superadmin');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-media-superadmin@example.com');
+        $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['Neurology'])]);
+
+        $this->login($superadmin, 'Password123!');
+
+        $this->post("/api/superadmin/clinic/{$clinic->id}/image", [
+            'image' => UploadedFile::fake()->image('superadmin-clinic.png', 320, 320),
+        ], $this->spaHeaders())
+            ->assertOk();
+
+        $this->post("/api/superadmin/clinic/{$clinic->id}/doctor-image", [
+            'doctor_id' => $doctor->id,
+            'image' => UploadedFile::fake()->image('superadmin-doctor.png', 320, 320),
+        ], $this->spaHeaders())
+            ->assertOk();
+
+        Storage::disk('public')->assertExists($clinic->fresh()->image_path);
+        Storage::disk('public')->assertExists($doctor->fresh()->image_path);
     }
 
     public function test_admin_can_create_bulk_doctor_clinic_schedules(): void

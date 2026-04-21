@@ -7,7 +7,9 @@ use App\Models\ClinicOperatingHour;
 use App\Models\DoctorClinicSchedule;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 class ClinicController extends Controller
@@ -15,10 +17,10 @@ class ClinicController extends Controller
     public function index()
     {
         $clinics = Clinic::query()
-            ->select(['id', 'name', 'address', 'phone_number', 'email'])
+            ->select(['id', 'name', 'address', 'phone_number', 'email', 'image_path'])
             ->with([
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
-                'doctors:id,name,username,email,phone_number',
+                'doctors:id,name,username,email,phone_number,image_path',
             ])
             ->orderBy('name')
             ->get();
@@ -39,10 +41,101 @@ class ClinicController extends Controller
 
         return response()->json(
             $this->serializeClinicDetail($clinic->load([
-                'doctors:id,name,username,email,phone_number',
+                'doctors:id,name,username,email,phone_number,image_path',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
             ]))
         );
+    }
+
+    public function uploadClinicImage(Request $request, $clinicId)
+    {
+        $payload = $request->validate([
+            'clinic_id' => 'sometimes|nullable|integer|exists:clinics,id',
+            'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+        ]);
+
+        if (!$clinic = Clinic::find($clinicId)) {
+            return response()->json([
+                'message' => 'Clinic not found.',
+            ], 404);
+        }
+
+        $this->assertClinicRequestMatchesRoute($payload['clinic_id'] ?? null, (int) $clinicId);
+
+        $previousImagePath = $clinic->image_path;
+        $newImagePath = $this->storeImage($request->file('image'), 'clinics/'.$clinic->id);
+
+        $clinic->update([
+            'image_path' => $newImagePath,
+        ]);
+
+        $this->deleteStoredImage($previousImagePath, $newImagePath);
+
+        return response()->json([
+            'message' => 'Clinic image uploaded successfully.',
+            'clinic' => $this->serializeClinicDetail($clinic->fresh()->load([
+                'doctors:id,name,username,email,phone_number,image_path',
+                'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
+            ])),
+        ]);
+    }
+
+    public function uploadDoctorImage(Request $request, $clinicId)
+    {
+        $payload = $request->validate([
+            'clinic_id' => 'sometimes|nullable|integer|exists:clinics,id',
+            'doctor_id' => 'required|integer|exists:users,id',
+            'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+        ]);
+
+        if (!$clinic = Clinic::find($clinicId)) {
+            return response()->json([
+                'message' => 'Clinic not found.',
+            ], 404);
+        }
+
+        $this->assertClinicRequestMatchesRoute($payload['clinic_id'] ?? null, (int) $clinicId);
+
+        $doctor = User::find($payload['doctor_id']);
+
+        if ($doctor === null || $doctor->role !== User::ROLE_DOCTOR) {
+            return response()->json([
+                'message' => 'The selected user is not a doctor.',
+            ], 400);
+        }
+
+        if (!$doctor->clinics()->whereKey($clinic->id)->exists()) {
+            return response()->json([
+                'message' => 'The doctor is not assigned to the specified clinic.',
+            ], 400);
+        }
+
+        $previousImagePath = $doctor->image_path;
+        $newImagePath = $this->storeImage($request->file('image'), 'doctors/'.$doctor->id);
+
+        $doctor->update([
+            'image_path' => $newImagePath,
+        ]);
+
+        $this->deleteStoredImage($previousImagePath, $newImagePath);
+
+        $doctor = $clinic->doctors()
+            ->whereKey($doctor->id)
+            ->first(['users.id', 'users.name', 'users.username', 'users.email', 'users.phone_number', 'users.image_path']);
+
+        return response()->json([
+            'message' => 'Doctor image uploaded successfully.',
+            'doctor' => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'username' => $doctor->username,
+                'email' => $doctor->email,
+                'phone_number' => $doctor->phone_number,
+                'image_path' => $doctor->image_path,
+                'image_url' => $doctor->image_url,
+                'specialities' => $this->pivotSpecialities($doctor->pivot?->speciality),
+            ],
+        ]);
     }
 
     public function create(Request $request) {
@@ -426,6 +519,8 @@ class ClinicController extends Controller
             'address' => $clinic->address,
             'phone_number' => $clinic->phone_number,
             'email' => $clinic->email,
+            'image_path' => $clinic->image_path,
+            'image_url' => $clinic->image_url,
             'operating_hours' => $clinic->operatingHours,
             'specialities' => $this->collectClinicSpecialities($clinic),
         ];
@@ -442,6 +537,8 @@ class ClinicController extends Controller
             'address' => $clinic->address,
             'phone_number' => $clinic->phone_number,
             'email' => $clinic->email,
+            'image_path' => $clinic->image_path,
+            'image_url' => $clinic->image_url,
             'operating_hours' => $clinic->operatingHours,
             'specialities' => $this->collectClinicSpecialities($clinic),
             'doctors' => $clinic->doctors->map(function (User $doctor): array {
@@ -451,6 +548,8 @@ class ClinicController extends Controller
                     'username' => $doctor->username,
                     'email' => $doctor->email,
                     'phone_number' => $doctor->phone_number,
+                    'image_path' => $doctor->image_path,
+                    'image_url' => $doctor->image_url,
                     'specialities' => $this->pivotSpecialities($doctor->pivot?->speciality),
                 ];
             })->all(),
@@ -497,5 +596,41 @@ class ClinicController extends Controller
         }
 
         return [(string) $value];
+    }
+
+    private function assertClinicRequestMatchesRoute(mixed $requestClinicId, int $routeClinicId): void
+    {
+        if ($requestClinicId === null || $requestClinicId === '') {
+            return;
+        }
+
+        if ((int) $requestClinicId === $routeClinicId) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'clinic_id' => ['The provided clinic_id does not match the route clinic id.'],
+        ]);
+    }
+
+    private function storeImage(UploadedFile $image, string $directory): string
+    {
+        return $image->storePublicly($directory, $this->mediaDisk());
+    }
+
+    private function deleteStoredImage(?string $previousImagePath, string $newImagePath): void
+    {
+        if (!filled($previousImagePath) || $previousImagePath === $newImagePath) {
+            return;
+        }
+
+        Storage::disk($this->mediaDisk())->delete($previousImagePath);
+    }
+
+    private function mediaDisk(): string
+    {
+        $defaultDisk = (string) config('filesystems.default', 'local');
+
+        return $defaultDisk === 'local' ? 'public' : $defaultDisk;
     }
 }
