@@ -2,6 +2,39 @@
 
 use Laravel\Sanctum\Sanctum;
 
+$statefulHosts = collect([
+    'localhost',
+    'localhost:3000',
+    '127.0.0.1',
+    '127.0.0.1:8000',
+    '127.0.0.1:3000',
+    '::1',
+    Sanctum::currentApplicationUrlWithPort(),
+    env('APP_URL'),
+    env('FRONTEND_URL'),
+])->filter()
+    ->flatMap(function (string $value): array {
+        $trimmed = trim($value);
+
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $host = parse_url($trimmed, PHP_URL_HOST);
+        $port = parse_url($trimmed, PHP_URL_PORT);
+
+        if ($host === null || $host === false) {
+            return [$trimmed];
+        }
+
+        return $port === null
+            ? [$host]
+            : [$host, $host.':'.$port];
+    })
+    ->unique()
+    ->values()
+    ->all();
+
 return [
 
     /*
@@ -15,12 +48,10 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+    'stateful' => explode(
+        ',',
+        env('SANCTUM_STATEFUL_DOMAINS', implode(',', $statefulHosts))
+    ),
 
     /*
     |--------------------------------------------------------------------------

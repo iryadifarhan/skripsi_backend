@@ -17,4 +17,5 @@ Artisan::command('reservations:send-reminders', function (ReservationReminderSer
 
 Schedule::command('reservations:send-reminders')
     ->everyMinute()
+    ->onOneServer()
     ->withoutOverlapping();

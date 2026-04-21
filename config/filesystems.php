@@ -17,6 +17,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Media Filesystem Disk
+    |--------------------------------------------------------------------------
+    |
+    | Uploaded media for clinics and doctors should live on a persistent disk
+    | in production. When the default disk is "local", we transparently fall
+    | back to the public disk for local development.
+    |
+    */
+
+    'media_disk' => env(
+        'MEDIA_DISK',
+        env('FILESYSTEM_DISK', 'local') === 'local' ? 'public' : env('FILESYSTEM_DISK', 'local')
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

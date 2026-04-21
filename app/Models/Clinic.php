@@ -74,8 +74,6 @@ class Clinic extends Model
 
     private function mediaDisk(): string
     {
-        $defaultDisk = (string) config('filesystems.default', 'local');
-
-        return $defaultDisk === 'local' ? 'public' : $defaultDisk;
+        return (string) config('filesystems.media_disk', 'public');
     }
 }
