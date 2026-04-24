@@ -477,8 +477,9 @@ class ClinicApiTest extends TestCase
     {
         return [
             'Accept' => 'application/json',
-            'Origin' => 'http://localhost:3000',
-            'Referer' => 'http://localhost:3000/login',
+            'Origin' => 'http://localhost:8000',
+            'Referer' => 'http://localhost:8000/login',
         ];
     }
 }
+

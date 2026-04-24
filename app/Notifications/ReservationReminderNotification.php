@@ -76,10 +76,7 @@ class ReservationReminderNotification extends Notification implements ShouldQueu
 
     private function reservationPageUrl(): string
     {
-        $baseUrl = rtrim((string) config('app.frontend_url'), '/');
-        $path = config('app.frontend_reservations_path', '/reservation');
-
-        return $baseUrl.'/'.$this->normalizePath((string) $path);
+        return route('reservations.page');
     }
 
     private function loadContext(): void
@@ -90,8 +87,4 @@ class ReservationReminderNotification extends Notification implements ShouldQueu
         ]);
     }
 
-    private function normalizePath(string $path): string
-    {
-        return ltrim($path, '/');
-    }
 }

@@ -14,11 +14,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->web(append: [
+            \App\Http\Middleware\HandleInertiaRequests::class,
+        ]);
         $middleware->redirectGuestsTo(function (Request $request): ?string {
             return $request->is('api/*') ? null : '/login';
         });
-    })
-    ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'authorize' => \App\Http\Middleware\AuthorizeRole::class,
         ]);

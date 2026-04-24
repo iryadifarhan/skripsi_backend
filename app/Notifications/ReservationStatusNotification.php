@@ -113,10 +113,7 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
 
     private function reservationPageUrl(): string
     {
-        $baseUrl = rtrim((string) config('app.frontend_url'), '/');
-        $path = config('app.frontend_reservations_path', '/reservation');
-
-        return $baseUrl.'/'.$this->normalizePath((string) $path);
+        return route('reservations.page');
     }
 
     private function loadContext(): void
@@ -125,11 +122,6 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
             'clinic:id,name,address,phone_number,email',
             'doctor:id,name,username,email,phone_number',
         ]);
-    }
-
-    private function normalizePath(string $path): string
-    {
-        return ltrim($path, '/');
     }
 
     private function subject(): string

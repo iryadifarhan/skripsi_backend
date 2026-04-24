@@ -1,11 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');
 @import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
+@source '../**/*.ts';
+@source '../**/*.tsx';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+    --color-ink-50: #f7f5ef;
+    --color-ink-100: #ece7da;
+    --color-ink-200: #d8cfba;
+    --color-ink-500: #786f59;
+    --color-ink-700: #3d392f;
+    --color-ink-900: #1e1f1d;
+    --color-clinic-100: #d4efe3;
+    --color-clinic-300: #89c9ab;
+    --color-clinic-500: #2f8f73;
+    --color-clinic-700: #1f5d4b;
+    --color-alert-500: #d16d54;
+    --color-night-700: #1f2b44;
+    --color-night-900: #101827;
+}
+
+@layer base {
+    body {
+        @apply bg-[linear-gradient(135deg,#f6f2e8_0%,#f8fafc_45%,#dff2ea_100%)] text-ink-900 antialiased;
+    }
 }

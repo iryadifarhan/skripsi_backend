@@ -1,10 +1,9 @@
 <?php
 
 $defaultAllowedOrigins = array_values(array_unique(array_filter([
-    env('FRONTEND_URL'),
     env('APP_URL'),
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
 ])));
 
 $configuredAllowedOrigins = env('CORS_ALLOWED_ORIGINS');

@@ -100,7 +100,7 @@ class MedicalRecordApiTest extends TestCase
             $job->phoneNumber === '081234500006'
             && str_contains($job->message, 'completed')
             && str_contains($job->message, 'Patient should rest for three days.')
-            && str_contains($job->message, '/medical_record')
+            && str_contains($job->message, '/medical-records')
         );
     }
 
@@ -450,8 +450,9 @@ class MedicalRecordApiTest extends TestCase
     {
         return [
             'Accept' => 'application/json',
-            'Origin' => 'http://localhost:3000',
-            'Referer' => 'http://localhost:3000/login',
+            'Origin' => 'http://localhost:8000',
+            'Referer' => 'http://localhost:8000/login',
         ];
     }
 }
+

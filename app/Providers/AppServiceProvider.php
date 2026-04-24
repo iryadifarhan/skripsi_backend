@@ -22,9 +22,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         ResetPassword::createUrlUsing(function (User $user, string $token): string {
-            $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
-
-            return $frontendUrl.'/reset-password?token='.$token.'&email='.urlencode($user->email);
+            return route('password.reset', [
+                'token' => $token,
+                'email' => $user->email,
+            ]);
         });
     }
 }

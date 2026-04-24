@@ -114,10 +114,7 @@ class MedicalRecordReadyNotification extends Notification implements ShouldQueue
 
     private function medicalRecordPageUrl(): string
     {
-        $baseUrl = rtrim((string) config('app.frontend_url'), '/');
-        $path = config('app.frontend_medical_records_path', '/medical_record');
-
-        return $baseUrl.'/'.$this->normalizePath((string) $path);
+        return route('medical-records.page');
     }
 
     private function loadContext(): void
@@ -134,8 +131,4 @@ class MedicalRecordReadyNotification extends Notification implements ShouldQueue
         ]);
     }
 
-    private function normalizePath(string $path): string
-    {
-        return ltrim($path, '/');
-    }
 }

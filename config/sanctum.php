@@ -4,14 +4,12 @@ use Laravel\Sanctum\Sanctum;
 
 $statefulHosts = collect([
     'localhost',
-    'localhost:3000',
+    'localhost:8000',
     '127.0.0.1',
     '127.0.0.1:8000',
-    '127.0.0.1:3000',
     '::1',
     Sanctum::currentApplicationUrlWithPort(),
     env('APP_URL'),
-    env('FRONTEND_URL'),
 ])->filter()
     ->flatMap(function (string $value): array {
         $trimmed = trim($value);
@@ -43,8 +41,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Requests from the following domains / hosts will receive stateful API
-    | authentication cookies. Typically, these should include your local
-    | and production domains which access your API via a frontend SPA.
+    | authentication cookies. In this application the web shell and API
+    | share the same origin, so these values should match that deployment.
     |
     */
 
