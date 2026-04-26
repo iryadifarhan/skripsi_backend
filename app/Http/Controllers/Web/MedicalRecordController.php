@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\MedicalRecord;
@@ -8,16 +8,103 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Services\PatientNotificationService;
 use App\Services\ReservationQueueService;
+use App\Services\Web\WorkspaceViewService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class MedicalRecordController extends Controller
 {
     public function __construct(
         private readonly ReservationQueueService $queueService,
         private readonly PatientNotificationService $patientNotificationService,
+        private readonly WorkspaceViewService $workspace,
     ) {
+    }
+
+    public function page(Request $request): JsonResponse|Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $context = $this->workspace->context($request);
+        $payload = $request->validate([
+            'clinic_id' => ['nullable', 'integer', 'exists:clinics,id'],
+            'reservation_date' => ['nullable', 'date'],
+        ]);
+        $selectedClinicId = $this->selectedFilterClinicId($request, $context, $payload);
+        $query = MedicalRecord::query()
+            ->with($this->medicalRecordRelations())
+            ->orderByDesc('issued_at')
+            ->orderByDesc('id');
+
+        if ($user->role === User::ROLE_PATIENT) {
+            $query->where('patient_id', $user->id);
+
+            if ($selectedClinicId !== null) {
+                $query->where('clinic_id', $selectedClinicId);
+            }
+        } elseif (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true) && $selectedClinicId !== null) {
+            $query->where('clinic_id', $selectedClinicId);
+        } elseif ($user->role === User::ROLE_DOCTOR && $selectedClinicId !== null) {
+            $query->where('doctor_id', $user->id)
+                ->where('clinic_id', $selectedClinicId);
+        } else {
+            $query->whereRaw('1 = 0');
+        }
+
+        if (!empty($payload['reservation_date'])) {
+            $query->whereHas('reservation', fn ($reservationQuery) => $reservationQuery->whereDate('reservation_date', $payload['reservation_date']));
+        }
+
+        $medicalRecords = $this->serializeMedicalRecords($query->get());
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Medical record retrieval successful.',
+                'medical_records' => $medicalRecords,
+            ]);
+        }
+
+        return Inertia::render('medical-records/index', [
+            'context' => $context,
+            'medicalRecords' => $medicalRecords,
+            'filters' => [
+                'clinicId' => $selectedClinicId,
+                'reservationDate' => $payload['reservation_date'] ?? '',
+            ],
+        ]);
+    }
+
+    public function redirectLegacy(Request $request): RedirectResponse
+    {
+        return redirect()->route('medical-records.page', $request->query());
+    }
+
+    private function selectedFilterClinicId(Request $request, array $context, array $payload): ?int
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role === User::ROLE_ADMIN) {
+            return $user->clinic_id;
+        }
+
+        if (in_array($user->role, [User::ROLE_DOCTOR, User::ROLE_PATIENT], true)) {
+            return isset($payload['clinic_id'])
+                ? (int) $payload['clinic_id']
+                : ($context['clinics'][0]['id'] ?? null);
+        }
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            return isset($payload['clinic_id'])
+                ? (int) $payload['clinic_id']
+                : ($context['clinics'][0]['id'] ?? null);
+        }
+
+        return isset($payload['clinic_id']) ? (int) $payload['clinic_id'] : null;
     }
 
     public function patientIndex(Request $request): JsonResponse
@@ -334,3 +421,4 @@ class MedicalRecordController extends Controller
         abort(403, 'Forbidden, you are not authorized.');
     }
 }
+

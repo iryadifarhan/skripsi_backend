@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\DoctorClinicSchedule;
@@ -8,18 +8,111 @@ use App\Models\Reservation;
 use App\Models\User;
 use App\Services\PatientNotificationService;
 use App\Services\ReservationQueueService;
+use App\Services\Web\WorkspaceViewService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class QueueController extends Controller
 {
     public function __construct(
         private readonly ReservationQueueService $queueService,
         private readonly PatientNotificationService $patientNotificationService,
+        private readonly WorkspaceViewService $workspace,
     ) {
+    }
+
+    public function page(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $context = $this->workspace->context($request);
+        $payload = $request->validate([
+            'clinic_id' => ['nullable', 'integer', 'exists:clinics,id'],
+            'reservation_date' => ['nullable', 'date'],
+            'queue_status' => ['nullable', 'string', Rule::in(Reservation::QUEUE_STATUSES)],
+            'include_history' => ['nullable', 'boolean'],
+        ]);
+        $reservationDate = $payload['reservation_date'] ?? Carbon::today()->toDateString();
+        $selectedClinicId = $this->selectedFilterClinicId($request, $context, $payload);
+        $query = Reservation::query()
+            ->with($this->reservationRelations());
+
+        if ($user->role === User::ROLE_PATIENT) {
+            $query->where('patient_id', $user->id)
+                ->orderByDesc('reservation_date')
+                ->orderBy('queue_number');
+
+            if (!empty($payload['reservation_date'])) {
+                $query->whereDate('reservation_date', $reservationDate);
+            }
+        } elseif (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true) && $selectedClinicId !== null) {
+            $query->where('clinic_id', $selectedClinicId)
+                ->whereDate('reservation_date', $reservationDate)
+                ->orderBy('queue_number')
+                ->orderBy('window_start_time');
+        } elseif ($user->role === User::ROLE_DOCTOR && $selectedClinicId !== null) {
+            $query->where('doctor_id', $user->id)
+                ->where('clinic_id', $selectedClinicId)
+                ->whereDate('reservation_date', $reservationDate)
+                ->orderBy('queue_number')
+                ->orderBy('window_start_time');
+        } else {
+            $query->whereRaw('1 = 0');
+        }
+
+        if (!empty($payload['queue_status'])) {
+            $query->where('queue_status', $payload['queue_status']);
+        }
+
+        $reservations = $query->get();
+
+        if (empty($payload['include_history']) && empty($payload['queue_status'])) {
+            $reservations = $reservations
+                ->filter(fn (Reservation $reservation): bool => $this->queueService->isActiveQueueReservation($reservation))
+                ->values();
+        }
+
+        return Inertia::render('queue/index', [
+            'context' => $context,
+            'queues' => $this->queueService->serializeQueueEntries($reservations, $user->role !== User::ROLE_PATIENT),
+            'filters' => [
+                'clinicId' => $selectedClinicId,
+                'reservationDate' => $reservationDate,
+                'queueStatus' => $payload['queue_status'] ?? '',
+                'includeHistory' => (bool) ($payload['include_history'] ?? false),
+            ],
+        ]);
+    }
+
+    private function selectedFilterClinicId(Request $request, array $context, array $payload): ?int
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role === User::ROLE_ADMIN) {
+            return $user->clinic_id;
+        }
+
+        if (in_array($user->role, [User::ROLE_DOCTOR, User::ROLE_PATIENT], true)) {
+            return isset($payload['clinic_id'])
+                ? (int) $payload['clinic_id']
+                : ($context['clinics'][0]['id'] ?? null);
+        }
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            return isset($payload['clinic_id'])
+                ? (int) $payload['clinic_id']
+                : ($context['clinics'][0]['id'] ?? null);
+        }
+
+        return isset($payload['clinic_id']) ? (int) $payload['clinic_id'] : null;
     }
 
     public function patientIndex(Request $request): JsonResponse
@@ -168,7 +261,7 @@ class QueueController extends Controller
         ]);
     }
 
-    public function adminUpdate(Request $request, Reservation $reservation): JsonResponse
+    public function adminUpdate(Request $request, Reservation $reservation): JsonResponse|RedirectResponse
     {
         $this->assertReservationBelongsToRequestedClinic($request, $reservation);
 
@@ -246,6 +339,10 @@ class QueueController extends Controller
             $this->patientNotificationService->sendReservationStatusNotification($reservation->loadMissing('patient'), $reservationNotificationEvent);
         }
 
+        if (!$request->expectsJson()) {
+            return back()->with('status', 'Antrean berhasil diperbarui.');
+        }
+
         return response()->json([
             'message' => 'Queue update successful.',
             'queue' => $this->queueService->serializeQueueEntry($reservation, true),
@@ -302,3 +399,4 @@ class QueueController extends Controller
         abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
     }
 }
+

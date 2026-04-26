@@ -1,98 +1,25 @@
-import axios from 'axios';
-import { Head } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { useMemo } from 'react';
 
-import { currentDateInputValue, extractErrorMessage } from '@/lib/http';
 import AppLayout from '@/layouts/app-layout';
-import type { QueueEntry, WorkspaceContext } from '@/types';
+import type { QueueEntry, SharedData, ValidationErrors, WorkspaceContext } from '@/types';
 
 type QueuePageProps = {
     context: WorkspaceContext;
+    queues: QueueEntry[];
+    filters: {
+        clinicId: number | null;
+        reservationDate: string;
+        queueStatus: string;
+        includeHistory: boolean;
+    };
 };
 
 const queueStatuses = ['', 'waiting', 'called', 'in_progress', 'skipped', 'completed', 'cancelled'];
 
-export default function QueuePage({ context }: QueuePageProps) {
-    const [queues, setQueues] = useState<QueueEntry[]>([]);
-    const [reservationDate, setReservationDate] = useState(currentDateInputValue());
-    const [selectedClinicId, setSelectedClinicId] = useState<number | ''>(context.clinicId ?? context.clinics[0]?.id ?? '');
-    const [queueStatus, setQueueStatus] = useState('');
-    const [includeHistory, setIncludeHistory] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
+export default function QueuePage({ context, queues, filters }: QueuePageProps) {
+    const page = usePage<SharedData & { errors?: ValidationErrors }>();
     const canView = context.role === 'patient' || context.role === 'admin' || context.role === 'doctor';
-
-    useEffect(() => {
-        if (!canView) {
-            setLoading(false);
-
-            return;
-        }
-
-        if ((context.role === 'admin' || context.role === 'doctor') && selectedClinicId === '') {
-            setQueues([]);
-            setLoading(false);
-            setError('No clinic is available for this account.');
-
-            return;
-        }
-
-        let active = true;
-
-        const loadQueues = async () => {
-            setLoading(true);
-            setError(null);
-
-            try {
-                const params: Record<string, string | number | boolean> = {};
-                let endpoint = '/api/queues/my';
-
-                if (reservationDate !== '') {
-                    params.reservation_date = reservationDate;
-                }
-
-                if (queueStatus !== '') {
-                    params.queue_status = queueStatus;
-                }
-
-                if (includeHistory) {
-                    params.include_history = true;
-                }
-
-                if (context.role === 'admin') {
-                    endpoint = '/api/admin/queues';
-                    params.clinic_id = selectedClinicId as number;
-                }
-
-                if (context.role === 'doctor') {
-                    endpoint = '/api/doctor/queues';
-                    params.clinic_id = selectedClinicId as number;
-                }
-
-                const response = await axios.get<{ queues: QueueEntry[] }>(endpoint, { params });
-
-                if (active) {
-                    setQueues(response.data.queues);
-                }
-            } catch (requestError) {
-                if (active) {
-                    setQueues([]);
-                    setError(extractErrorMessage(requestError, 'Unable to load queue data.'));
-                }
-            } finally {
-                if (active) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        void loadQueues();
-
-        return () => {
-            active = false;
-        };
-    }, [canView, context.role, includeHistory, queueStatus, reservationDate, selectedClinicId]);
 
     const summary = useMemo(() => {
         return {
@@ -102,6 +29,34 @@ export default function QueuePage({ context }: QueuePageProps) {
             current: queues.find((entry) => entry.queue.is_current)?.queue.number ?? null,
         };
     }, [queues]);
+
+    const updateFilters = (updates: Partial<QueuePageProps['filters']>) => {
+        const nextFilters = { ...filters, ...updates };
+
+        router.get('/queue', cleanQuery({
+            clinic_id: nextFilters.clinicId,
+            reservation_date: nextFilters.reservationDate,
+            queue_status: nextFilters.queueStatus,
+            include_history: nextFilters.includeHistory ? 1 : null,
+        }), {
+            preserveScroll: true,
+        });
+    };
+
+    const updateQueue = (entry: QueueEntry, updates: { queue_status?: string; queue_number?: number }) => {
+        const clinicId = filters.clinicId ?? entry.clinic?.id;
+
+        if (!clinicId) {
+            return;
+        }
+
+        router.patch(`/queue/${entry.reservation_id}`, {
+            clinic_id: clinicId,
+            ...updates,
+        }, {
+            preserveScroll: true,
+        });
+    };
 
     return (
         <AppLayout>
@@ -115,7 +70,7 @@ export default function QueuePage({ context }: QueuePageProps) {
                             {context.role === 'patient' ? 'Track your queue progression' : 'Monitor the active clinic line'}
                         </h2>
                         <p className="mt-5 max-w-2xl text-sm leading-7 text-white/80">
-                            This page keeps the queue logic on the existing API layer while exposing a first-party web view for patient, admin, and doctor roles.
+                            Queue data is now provided by Laravel web controllers through Inertia props and same-origin web actions.
                         </p>
                     </div>
 
@@ -138,12 +93,12 @@ export default function QueuePage({ context }: QueuePageProps) {
 
                 <section className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_48px_rgba(16,24,39,0.08)] backdrop-blur">
                     <div className="grid gap-4 lg:grid-cols-4">
-                        {(context.role === 'admin' || context.role === 'doctor') ? (
+                        {(context.role === 'admin' || context.role === 'superadmin' || context.role === 'doctor') ? (
                             <label className="flex flex-col gap-2 text-sm font-medium text-night-900">
                                 Clinic
                                 <select
-                                    value={selectedClinicId}
-                                    onChange={(event) => setSelectedClinicId(event.target.value === '' ? '' : Number(event.target.value))}
+                                    value={filters.clinicId ?? ''}
+                                    onChange={(event) => updateFilters({ clinicId: event.target.value === '' ? null : Number(event.target.value) })}
                                     className="rounded-2xl border border-night-900/10 bg-white px-4 py-3 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                                 >
                                     {context.clinics.map((clinic) => (
@@ -159,8 +114,8 @@ export default function QueuePage({ context }: QueuePageProps) {
                             Reservation date
                             <input
                                 type="date"
-                                value={reservationDate}
-                                onChange={(event) => setReservationDate(event.target.value)}
+                                value={filters.reservationDate}
+                                onChange={(event) => updateFilters({ reservationDate: event.target.value })}
                                 className="rounded-2xl border border-night-900/10 bg-white px-4 py-3 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                             />
                         </label>
@@ -168,8 +123,8 @@ export default function QueuePage({ context }: QueuePageProps) {
                         <label className="flex flex-col gap-2 text-sm font-medium text-night-900">
                             Queue status
                             <select
-                                value={queueStatus}
-                                onChange={(event) => setQueueStatus(event.target.value)}
+                                value={filters.queueStatus}
+                                onChange={(event) => updateFilters({ queueStatus: event.target.value })}
                                 className="rounded-2xl border border-night-900/10 bg-white px-4 py-3 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                             >
                                 <option value="">All statuses</option>
@@ -184,8 +139,8 @@ export default function QueuePage({ context }: QueuePageProps) {
                         <label className="flex items-end gap-3 rounded-[1.5rem] border border-night-900/10 bg-white px-4 py-3 text-sm font-medium text-night-900">
                             <input
                                 type="checkbox"
-                                checked={includeHistory}
-                                onChange={(event) => setIncludeHistory(event.target.checked)}
+                                checked={filters.includeHistory}
+                                onChange={(event) => updateFilters({ includeHistory: event.target.checked })}
                                 className="h-4 w-4 rounded border-night-900/20 text-clinic-500 focus:ring-clinic-500"
                             />
                             Include completed or cancelled history
@@ -193,17 +148,21 @@ export default function QueuePage({ context }: QueuePageProps) {
                     </div>
                 </section>
 
+                {page.props.flash?.status ? (
+                    <section className="rounded-2xl border border-clinic-500/20 bg-clinic-100 px-5 py-4 text-sm font-semibold text-clinic-700">
+                        {page.props.flash.status}
+                    </section>
+                ) : null}
+
+                {page.props.errors && Object.keys(page.props.errors).length > 0 ? (
+                    <section className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm leading-7 text-red-700">
+                        {Object.values(page.props.errors).flat().join(' ')}
+                    </section>
+                ) : null}
+
                 {!canView ? (
                     <section className="rounded-[2rem] border border-dashed border-night-900/15 bg-white/70 p-8 text-sm leading-7 text-ink-700 shadow-[0_18px_48px_rgba(16,24,39,0.05)]">
                         Queue monitoring is limited to patients, clinic admins, and doctors.
-                    </section>
-                ) : loading ? (
-                    <section className="rounded-[2rem] border border-white/80 bg-white/85 p-8 text-sm text-ink-700 shadow-[0_18px_48px_rgba(16,24,39,0.08)]">
-                        Loading queue entries...
-                    </section>
-                ) : error ? (
-                    <section className="rounded-[2rem] border border-alert-500/20 bg-white/85 p-8 text-sm text-alert-500 shadow-[0_18px_48px_rgba(16,24,39,0.08)]">
-                        {error}
                     </section>
                 ) : queues.length === 0 ? (
                     <section className="rounded-[2rem] border border-dashed border-night-900/15 bg-white/70 p-8 text-sm leading-7 text-ink-700 shadow-[0_18px_48px_rgba(16,24,39,0.05)]">
@@ -234,10 +193,65 @@ export default function QueuePage({ context }: QueuePageProps) {
                                         {entry.complaint ? <p className="text-sm leading-7 text-ink-700">Complaint: {entry.complaint}</p> : null}
                                     </div>
 
-                                    <div className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
-                                        entry.queue.is_current ? 'bg-clinic-500 text-white' : 'bg-clinic-100 text-clinic-700'
-                                    }`}>
-                                        {entry.queue.is_current ? 'Current active queue' : `Current called: ${entry.queue.current_called_number ?? '-'}`}
+                                    <div className="flex flex-col gap-3 lg:min-w-56">
+                                        <div className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
+                                            entry.queue.is_current ? 'bg-clinic-500 text-white' : 'bg-clinic-100 text-clinic-700'
+                                        }`}>
+                                            {entry.queue.is_current ? 'Current active queue' : `Current called: ${entry.queue.current_called_number ?? '-'}`}
+                                        </div>
+
+                                        {(context.role === 'admin' || context.role === 'superadmin') ? (
+                                            <div className="grid gap-2">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateQueue(entry, { queue_status: 'called' })}
+                                                        className="rounded-2xl bg-night-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-night-700"
+                                                    >
+                                                        Call
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateQueue(entry, { queue_status: 'waiting' })}
+                                                        className="rounded-2xl border border-night-900/10 bg-white px-3 py-2 text-xs font-bold text-night-900 transition hover:bg-night-50"
+                                                    >
+                                                        Waiting
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateQueue(entry, { queue_status: 'skipped' })}
+                                                        className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100"
+                                                    >
+                                                        Skip
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateQueue(entry, { queue_status: 'cancelled' })}
+                                                        className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        type="button"
+                                                        disabled={!entry.queue.number || entry.queue.number <= 1}
+                                                        onClick={() => updateQueue(entry, { queue_number: (entry.queue.number ?? 1) - 1 })}
+                                                        className="rounded-2xl bg-[#e2e4e8] px-3 py-2 text-xs font-bold text-[#555] transition hover:bg-[#d8dbe0] disabled:cursor-not-allowed disabled:opacity-45"
+                                                    >
+                                                        Move Up
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={!entry.queue.number}
+                                                        onClick={() => updateQueue(entry, { queue_number: (entry.queue.number ?? 0) + 1 })}
+                                                        className="rounded-2xl bg-[#e2e4e8] px-3 py-2 text-xs font-bold text-[#555] transition hover:bg-[#d8dbe0] disabled:cursor-not-allowed disabled:opacity-45"
+                                                    >
+                                                        Move Down
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 </div>
                             </article>
@@ -247,4 +261,8 @@ export default function QueuePage({ context }: QueuePageProps) {
             </section>
         </AppLayout>
     );
+}
+
+function cleanQuery(query: Record<string, string | number | boolean | null | undefined>) {
+    return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== '' && value !== null && value !== undefined));
 }

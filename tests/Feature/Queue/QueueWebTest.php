@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class QueueApiTest extends TestCase
+class QueueWebTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -49,7 +49,7 @@ class QueueApiTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->getJson('/api/queues/my?reservation_date='.$reservationDate, $this->spaHeaders())
+        $this->getJson('/queues/my?reservation_date='.$reservationDate, $this->spaHeaders())
             ->assertOk()
             ->assertJsonCount(1, 'queues')
             ->assertJsonPath('queues.0.reservation_id', $ownReservation->id)
@@ -81,13 +81,13 @@ class QueueApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->getJson('/api/admin/queues?clinic_id='.$clinic->id.'&reservation_date='.$reservationDate, $this->spaHeaders())
+        $this->getJson('/admin/queues?clinic_id='.$clinic->id.'&reservation_date='.$reservationDate, $this->spaHeaders())
             ->assertOk()
             ->assertJsonCount(2, 'queues')
             ->assertJsonPath('queues.0.patient.gender', User::GENDER_LAKI)
             ->assertJsonPath('queues.1.patient.gender', User::GENDER_PEREMPUAN);
 
-        $this->patchJson("/api/admin/queues/{$secondReservation->id}", [
+        $this->patchJson("/admin/queues/{$secondReservation->id}", [
             'clinic_id' => $clinic->id,
             'queue_number' => 1,
         ], $this->spaHeaders())
@@ -132,13 +132,13 @@ class QueueApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/queues/{$reservationC->id}", [
+        $this->patchJson("/admin/queues/{$reservationC->id}", [
             'clinic_id' => $clinic->id,
             'queue_number' => 1,
         ], $this->spaHeaders())
             ->assertOk();
 
-        $this->postJson('/api/reservations', [
+        $this->postJson('/reservations', [
             'clinic_id' => $clinic->id,
             'patient_id' => $patientD->id,
             'doctor_clinic_schedule_id' => $schedule->id,
@@ -181,7 +181,7 @@ class QueueApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/queues/{$reservation->id}", [
+        $this->patchJson("/admin/queues/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
         ], $this->spaHeaders())
@@ -206,7 +206,7 @@ class QueueApiTest extends TestCase
         $this->login($doctor, 'Password123!');
 
         $this->getJson(
-            '/api/doctor/queues?clinic_id='.$clinic->id
+            '/doctor/queues?clinic_id='.$clinic->id
             .'&reservation_date='.$reservationDate
             .'&doctor_clinic_schedule_id='.$schedule->id,
             $this->spaHeaders()
@@ -235,7 +235,7 @@ class QueueApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/queues/{$reservation->id}", [
+        $this->patchJson("/admin/queues/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'queue_status' => Reservation::QUEUE_STATUS_CALLED,
         ], $this->spaHeaders())
@@ -270,7 +270,7 @@ class QueueApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/queues/{$reservation->id}", [
+        $this->patchJson("/admin/queues/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'queue_status' => Reservation::QUEUE_STATUS_SKIPPED,
         ], $this->spaHeaders())
@@ -306,7 +306,7 @@ class QueueApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/queues/{$reservation->id}", [
+        $this->patchJson("/admin/queues/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'queue_status' => Reservation::QUEUE_STATUS_IN_PROGRESS,
         ], $this->spaHeaders())
@@ -342,7 +342,7 @@ class QueueApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/queues/{$reservation->id}", [
+        $this->patchJson("/admin/queues/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'queue_status' => Reservation::QUEUE_STATUS_CANCELLED,
         ], $this->spaHeaders())
@@ -366,7 +366,7 @@ class QueueApiTest extends TestCase
 
     private function login(User $user, string $password): void
     {
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => $password,
         ], $this->spaHeaders())->assertOk();
@@ -472,4 +472,6 @@ class QueueApiTest extends TestCase
         ];
     }
 }
+
+
 

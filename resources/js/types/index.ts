@@ -9,6 +9,10 @@ export type AuthUser = {
     image_url?: string | null;
     gender?: string | null;
     date_of_birth?: string | null;
+    clinic?: {
+        id: number;
+        name: string;
+    } | null;
 };
 
 export type WorkspaceClinic = {
@@ -25,6 +29,7 @@ export type WorkspaceContext = {
 export type ReservationEntry = {
     id: number;
     reservation_number: string;
+    clinic_id?: number;
     status: string;
     reservation_date: string;
     window_start_time: string;
@@ -40,11 +45,14 @@ export type ReservationEntry = {
         id: number;
         name: string;
     } | null;
-    queue?: {
-        queue_number?: number | null;
-        queue_status?: string | null;
-        position_in_queue?: number | null;
+    queue_summary?: {
+        number?: number | null;
+        status?: string | null;
+        position?: number | null;
         waiting_ahead?: number | null;
+        size?: number | null;
+        current_called_number?: number | null;
+        is_current?: boolean;
     } | null;
 };
 
@@ -111,6 +119,40 @@ export type MedicalRecordEntry = {
         reservation_date: string;
         status: string;
     } | null;
+};
+
+export type DoctorEntry = {
+    id: number;
+    name: string;
+    username: string;
+    email: string;
+    phone_number?: string | null;
+    date_of_birth?: string | null;
+    gender?: string | null;
+    image_path?: string | null;
+    image_url?: string | null;
+    role?: AuthUser['role'];
+    specialities?: string[];
+    speciality?: string[];
+};
+
+export type ClinicDetail = {
+    id: number;
+    name: string;
+    address: string;
+    phone_number: string;
+    email: string;
+    image_url?: string | null;
+    specialities: string[];
+    doctors: DoctorEntry[];
+    operating_hours?: {
+        id: number;
+        clinic_id: number;
+        day_of_week: number;
+        open_time: string | null;
+        close_time: string | null;
+        is_closed: boolean;
+    }[];
 };
 
 export type SharedData = {

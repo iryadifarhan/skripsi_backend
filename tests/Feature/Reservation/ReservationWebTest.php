@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class ReservationApiTest extends TestCase
+class ReservationWebTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -40,24 +40,24 @@ class ReservationApiTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->getJson('/api/clinics', $this->spaHeaders())
+        $this->getJson('/clinics', $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('clinics.0.id', $clinic->id);
 
-        $this->getJson("/api/clinic/{$clinic->id}", $this->spaHeaders())
+        $this->getJson("/clinic/{$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('doctors.0.id', $doctor->id);
 
-        $this->getJson("/api/reservations/schedules?clinic_id={$clinic->id}&doctor_id={$doctor->id}&reservation_date={$reservationDate}", $this->spaHeaders())
+        $this->getJson("/reservations/schedules?clinic_id={$clinic->id}&doctor_id={$doctor->id}&reservation_date={$reservationDate}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('schedules.0.id', $schedule->id);
 
-        $this->getJson("/api/reservations/booking/windows?doctor_clinic_schedule_id={$schedule->id}&reservation_date={$reservationDate}", $this->spaHeaders())
+        $this->getJson("/reservations/booking/windows?doctor_clinic_schedule_id={$schedule->id}&reservation_date={$reservationDate}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('windows.0.window_start_time', '09:00:00')
             ->assertJsonPath('windows.0.available_slots', 4);
 
-        $this->postJson('/api/reservations', [
+        $this->postJson('/reservations', [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '09:00',
@@ -86,7 +86,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->postJson('/api/reservations', [
+        $this->postJson('/reservations', [
             'clinic_id' => $clinic->id,
             'patient_id' => $patient->id,
             'doctor_clinic_schedule_id' => $schedule->id,
@@ -111,7 +111,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->postJson('/api/reservations', [
+        $this->postJson('/reservations', [
             'clinic_id' => $clinic->id,
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
@@ -138,7 +138,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->postJson('/api/reservations', [
+        $this->postJson('/reservations', [
             'clinic_id' => $clinic->id,
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
@@ -165,7 +165,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patientC, 'Password123!');
 
-        $this->postJson('/api/reservations', [
+        $this->postJson('/reservations', [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '09:00',
@@ -191,7 +191,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patientC, 'Password123!');
 
-        $this->postJson('/api/reservations', [
+        $this->postJson('/reservations', [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '09:00',
@@ -215,7 +215,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->patchJson("/api/reservations/{$reservation->id}/cancel", [
+        $this->patchJson("/reservations/{$reservation->id}/cancel", [
             'cancellation_reason' => 'Recovered at home',
         ], $this->spaHeaders())
             ->assertOk()
@@ -251,7 +251,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/reservations/{$reservation->id}/cancel", [
+        $this->patchJson("/reservations/{$reservation->id}/cancel", [
             'clinic_id' => $clinicA->id,
             'cancellation_reason' => 'Invalid scope attempt',
         ], $this->spaHeaders())
@@ -285,7 +285,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patientB, 'Password123!');
 
-        $this->patchJson("/api/reservations/{$reservationToMove->id}/reschedule", [
+        $this->patchJson("/reservations/{$reservationToMove->id}/reschedule", [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $nextReservationDate,
             'window_start_time' => '10:00',
@@ -361,7 +361,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patientB, 'Password123!');
 
-        $this->patchJson("/api/reservations/{$reservation->id}/reschedule", [
+        $this->patchJson("/reservations/{$reservation->id}/reschedule", [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '11:00',
@@ -404,7 +404,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patientB, 'Password123!');
 
-        $this->patchJson("/api/reservations/{$reservationToMove->id}/reschedule", [
+        $this->patchJson("/reservations/{$reservationToMove->id}/reschedule", [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '10:00',
@@ -451,7 +451,7 @@ class ReservationApiTest extends TestCase
         $this->login($patient, 'Password123!');
 
         $this->getJson(
-            "/api/reservations/booking/windows?doctor_clinic_schedule_id={$schedule->id}&reservation_date={$reservationDate}&ignore_reservation_id={$ownReservation->id}",
+            "/reservations/booking/windows?doctor_clinic_schedule_id={$schedule->id}&reservation_date={$reservationDate}&ignore_reservation_id={$ownReservation->id}",
             $this->spaHeaders()
         )
             ->assertOk()
@@ -473,7 +473,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($intruder, 'Password123!');
 
-        $this->patchJson("/api/reservations/{$reservation->id}/reschedule", [
+        $this->patchJson("/reservations/{$reservation->id}/reschedule", [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '10:00',
@@ -495,7 +495,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->patchJson("/api/reservations/{$reservation->id}/reschedule", [
+        $this->patchJson("/reservations/{$reservation->id}/reschedule", [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '10:00',
@@ -522,7 +522,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patientC, 'Password123!');
 
-        $this->patchJson("/api/reservations/{$reservation->id}/reschedule", [
+        $this->patchJson("/reservations/{$reservation->id}/reschedule", [
             'doctor_clinic_schedule_id' => $schedule->id,
             'reservation_date' => $reservationDate,
             'window_start_time' => '10:00',
@@ -551,7 +551,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->getJson('/api/reservations', $this->spaHeaders())
+        $this->getJson('/reservations', $this->spaHeaders())
             ->assertOk()
             ->assertJsonCount(1, 'reservations')
             ->assertJsonPath('reservations.0.id', $ownReservation->id)
@@ -577,17 +577,17 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->getJson('/api/admin/reservations?clinic_id='.$clinic->id, $this->spaHeaders())
+        $this->getJson('/admin/reservations?clinic_id='.$clinic->id, $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservations.0.id', $reservation->id)
             ->assertJsonPath('reservations.0.patient.gender', User::GENDER_LAKI);
 
-        $this->getJson("/api/admin/reservations/{$reservation->id}?clinic_id={$clinic->id}", $this->spaHeaders())
+        $this->getJson("/admin/reservations/{$reservation->id}?clinic_id={$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservation.id', $reservation->id)
             ->assertJsonPath('reservation.patient.gender', User::GENDER_LAKI);
 
-        $this->patchJson("/api/admin/reservations/{$reservation->id}", [
+        $this->patchJson("/admin/reservations/{$reservation->id}", [
             'status' => Reservation::STATUS_APPROVED,
             'admin_notes' => 'Approved for first session.',
             'clinic_id' => $clinic->id,
@@ -630,7 +630,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $createResponse = $this->postJson('/api/reservations', [
+        $createResponse = $this->postJson('/reservations', [
             'clinic_id' => $clinic->id,
             'doctor_clinic_schedule_id' => $scheduleA->id,
             'reservation_date' => $reservationDate,
@@ -648,7 +648,7 @@ class ReservationApiTest extends TestCase
         $oldLineReservation = $this->createReservation($otherPatientOldLine, $scheduleA, $reservationDate, '09:00:00', 2, Reservation::STATUS_PENDING);
         $existingTargetReservation = $this->createReservation($otherPatientNewLine, $scheduleB, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
 
-        $this->patchJson("/api/admin/reservations/{$walkInReservation->id}/details", [
+        $this->patchJson("/admin/reservations/{$walkInReservation->id}/details", [
             'clinic_id' => $clinic->id,
             'patient_id' => $linkedPatient->id,
             'doctor_id' => $doctorB->id,
@@ -720,7 +720,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/reservations/{$reservation->id}/details", [
+        $this->patchJson("/admin/reservations/{$reservation->id}/details", [
             'clinic_id' => $clinic->id,
             'doctor_id' => $doctorB->id,
         ], $this->spaHeaders())
@@ -746,7 +746,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/reservations/{$reservation->id}", [
+        $this->patchJson("/admin/reservations/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'status' => Reservation::STATUS_CANCELLED,
             'cancellation_reason' => 'Doctor unavailable.',
@@ -790,7 +790,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/reservations/{$reservation->id}", [
+        $this->patchJson("/admin/reservations/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'status' => Reservation::STATUS_REJECTED,
             'admin_notes' => 'Rejected after validation.',
@@ -839,7 +839,7 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->getJson('/api/reservations?clinic_id='.$clinic->id, $this->spaHeaders())
+        $this->getJson('/reservations?clinic_id='.$clinic->id, $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservations.0.id', $reservation->id);
     }
@@ -860,10 +860,10 @@ class ReservationApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->getJson("/api/admin/reservations/{$reservation->id}?clinic_id={$clinicA->id}", $this->spaHeaders())
+        $this->getJson("/admin/reservations/{$reservation->id}?clinic_id={$clinicA->id}", $this->spaHeaders())
             ->assertForbidden();
 
-        $this->patchJson("/api/admin/reservations/{$reservation->id}", [
+        $this->patchJson("/admin/reservations/{$reservation->id}", [
             'status' => Reservation::STATUS_APPROVED,
             'clinic_id' => $clinicA->id,
         ], $this->spaHeaders())
@@ -882,14 +882,14 @@ class ReservationApiTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->getJson("/api/reservations/schedules?clinic_id={$clinicA->id}&doctor_id={$doctor->id}&reservation_date={$reservationDate}", $this->spaHeaders())
+        $this->getJson("/reservations/schedules?clinic_id={$clinicA->id}&doctor_id={$doctor->id}&reservation_date={$reservationDate}", $this->spaHeaders())
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['doctor_id']);
     }
 
     private function login(User $user, string $password): void
     {
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => $password,
         ], $this->spaHeaders())->assertOk();
@@ -992,4 +992,6 @@ class ReservationApiTest extends TestCase
         ];
     }
 }
+
+
 

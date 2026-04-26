@@ -19,3 +19,4 @@ class NotificationQueueabilityTest extends TestCase
         $this->assertContains(ShouldQueue::class, class_implements(ReservationReminderNotification::class));
     }
 }
+

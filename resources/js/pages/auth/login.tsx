@@ -1,11 +1,11 @@
-import axios, { AxiosError } from 'axios';
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
 import GuestLayout from '@/layouts/guest-layout';
-import type { ValidationErrors } from '@/types';
+import type { SharedData, ValidationErrors } from '@/types';
 
 export default function Login() {
+    const { flash } = usePage<SharedData>().props;
     const [form, setForm] = useState({
         email: '',
         password: '',
@@ -19,15 +19,10 @@ export default function Login() {
         setProcessing(true);
         setErrors({});
 
-        try {
-            await axios.post('/api/login', form);
-            router.visit('/dashboard');
-        } catch (error) {
-            const response = (error as AxiosError<{ errors?: ValidationErrors; message?: string }>).response;
-            setErrors(response?.data?.errors ?? { email: [response?.data?.message ?? 'Login failed.'] });
-        } finally {
-            setProcessing(false);
-        }
+        router.post('/login', form, {
+            onError: (validationErrors) => setErrors(normalizeInertiaErrors(validationErrors)),
+            onFinish: () => setProcessing(false),
+        });
     };
 
     return (
@@ -36,6 +31,8 @@ export default function Login() {
             subtitle="Sign in using the existing Laravel session-based authentication flow while the new React workspace is phased in."
         >
             <form className="space-y-5" onSubmit={submit}>
+                {flash?.status ? <p className="rounded-2xl bg-clinic-100 px-4 py-3 text-sm text-clinic-700">{flash.status}</p> : null}
+
                 <div>
                     <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="email">
                         Email
@@ -109,4 +106,8 @@ export default function Login() {
             </p>
         </GuestLayout>
     );
+}
+
+function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
+    return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }

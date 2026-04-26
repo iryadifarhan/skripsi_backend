@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -190,3 +190,4 @@ class AdminController extends Controller
         return [(string) $value];
     }
 }
+

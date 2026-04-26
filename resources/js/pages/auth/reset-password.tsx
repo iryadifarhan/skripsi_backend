@@ -1,4 +1,3 @@
-import axios, { AxiosError } from 'axios';
 import { Link, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -25,15 +24,10 @@ export default function ResetPassword({ token, email: initialEmail }: ResetPassw
         setProcessing(true);
         setErrors({});
 
-        try {
-            await axios.post('/api/reset-password', form);
-            router.visit('/login');
-        } catch (error) {
-            const response = (error as AxiosError<{ errors?: ValidationErrors; message?: string }>).response;
-            setErrors(response?.data?.errors ?? { email: [response?.data?.message ?? 'Unable to reset password.'] });
-        } finally {
-            setProcessing(false);
-        }
+        router.post('/reset-password', form, {
+            onError: (validationErrors) => setErrors(normalizeInertiaErrors(validationErrors)),
+            onFinish: () => setProcessing(false),
+        });
     };
 
     return (
@@ -112,4 +106,8 @@ export default function ResetPassword({ token, email: initialEmail }: ResetPassw
             </p>
         </GuestLayout>
     );
+}
+
+function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
+    return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }

@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class ReportApiTest extends TestCase
+class ReportWebTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -48,7 +48,7 @@ class ReportApiTest extends TestCase
         $this->login($admin, 'Password123!');
 
         $this->getJson(
-            '/api/reports/reservations?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate,
+            '/reports/reservations?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate,
             $this->spaHeaders()
         )
             ->assertOk()
@@ -59,7 +59,7 @@ class ReportApiTest extends TestCase
             ->assertJsonPath('reservations.0.clinic.id', $clinic->id);
 
         $response = $this->get(
-            '/api/reports/reservations/export?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate.'&format=xlsx',
+            '/reports/reservations/export?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate.'&format=xlsx',
             $this->spaHeaders()
         );
 
@@ -86,7 +86,7 @@ class ReportApiTest extends TestCase
         $this->login($doctorA, 'Password123!');
 
         $this->getJson(
-            '/api/reports/reservations?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate,
+            '/reports/reservations?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate,
             $this->spaHeaders()
         )
             ->assertOk()
@@ -95,12 +95,12 @@ class ReportApiTest extends TestCase
             ->assertJsonPath('reservations.0.id', $ownReservation->id);
 
         $this->getJson(
-            '/api/reports/reservations?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate.'&doctor_id='.$doctorB->id,
+            '/reports/reservations?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate.'&doctor_id='.$doctorB->id,
             $this->spaHeaders()
         )->assertForbidden();
 
         $response = $this->get(
-            '/api/reports/reservations/export?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate.'&format=pdf',
+            '/reports/reservations/export?clinic_id='.$clinic->id.'&date_from='.$reservationDate.'&date_to='.$reservationDate.'&format=pdf',
             $this->spaHeaders()
         );
 
@@ -131,7 +131,7 @@ class ReportApiTest extends TestCase
         $this->login($admin, 'Password123!');
 
         $this->getJson(
-            '/api/reports/medical-records?clinic_id='.$clinic->id.'&date_from='.$issuedDate.'&date_to='.$issuedDate.'&doctor_id='.$doctorA->id,
+            '/reports/medical-records?clinic_id='.$clinic->id.'&date_from='.$issuedDate.'&date_to='.$issuedDate.'&doctor_id='.$doctorA->id,
             $this->spaHeaders()
         )
             ->assertOk()
@@ -140,7 +140,7 @@ class ReportApiTest extends TestCase
             ->assertJsonPath('medical_records.0.doctor.id', $doctorA->id);
 
         $response = $this->get(
-            '/api/reports/medical-records/export?clinic_id='.$clinic->id.'&date_from='.$issuedDate.'&date_to='.$issuedDate.'&format=pdf',
+            '/reports/medical-records/export?clinic_id='.$clinic->id.'&date_from='.$issuedDate.'&date_to='.$issuedDate.'&format=pdf',
             $this->spaHeaders()
         );
 
@@ -150,7 +150,7 @@ class ReportApiTest extends TestCase
 
     private function login(User $user, string $password): void
     {
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => $password,
         ], $this->spaHeaders())->assertOk();
@@ -299,4 +299,6 @@ class ReportApiTest extends TestCase
         ];
     }
 }
+
+
 

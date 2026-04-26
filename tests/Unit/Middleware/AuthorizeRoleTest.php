@@ -198,7 +198,7 @@ class AuthorizeRoleTest extends TestCase
 
     private function makeRequest(?User $user, array $input = []): Request
     {
-        $request = Request::create('/api/testing', 'POST', $input);
+        $request = Request::create('/testing', 'POST', $input);
         $request->setUserResolver(fn () => $user);
 
         return $request;
@@ -224,3 +224,4 @@ class AuthorizeRoleTest extends TestCase
         return $clinic;
     }
 }
+

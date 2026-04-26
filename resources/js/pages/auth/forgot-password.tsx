@@ -1,31 +1,25 @@
-import axios, { AxiosError } from 'axios';
-import { Link } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
 import GuestLayout from '@/layouts/guest-layout';
-import type { ValidationErrors } from '@/types';
+import type { SharedData, ValidationErrors } from '@/types';
 
 export default function ForgotPassword() {
+    const { flash } = usePage<SharedData>().props;
     const [email, setEmail] = useState('');
     const [errors, setErrors] = useState<ValidationErrors>({});
-    const [status, setStatus] = useState<string | null>(null);
     const [processing, setProcessing] = useState(false);
 
     const submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setProcessing(true);
         setErrors({});
-        setStatus(null);
 
-        try {
-            const response = await axios.post<{ message: string }>('/api/forgot-password', { email });
-            setStatus(response.data.message);
-        } catch (error) {
-            const response = (error as AxiosError<{ errors?: ValidationErrors; message?: string }>).response;
-            setErrors(response?.data?.errors ?? { email: [response?.data?.message ?? 'Unable to send reset link.'] });
-        } finally {
-            setProcessing(false);
-        }
+        router.post('/forgot-password', { email }, {
+            preserveScroll: true,
+            onError: (validationErrors) => setErrors(normalizeInertiaErrors(validationErrors)),
+            onFinish: () => setProcessing(false),
+        });
     };
 
     return (
@@ -53,7 +47,7 @@ export default function ForgotPassword() {
                     ))}
                 </div>
 
-                {status ? <p className="rounded-2xl bg-clinic-100 px-4 py-3 text-sm text-clinic-700">{status}</p> : null}
+                {flash?.status ? <p className="rounded-2xl bg-clinic-100 px-4 py-3 text-sm text-clinic-700">{flash.status}</p> : null}
 
                 <button
                     type="submit"
@@ -73,4 +67,8 @@ export default function ForgotPassword() {
             </p>
         </GuestLayout>
     );
+}
+
+function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
+    return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }

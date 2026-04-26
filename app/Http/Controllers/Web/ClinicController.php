@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Web;
+
+use App\Http\Controllers\Controller;
 
 use App\Models\Clinic;
 use App\Models\ClinicOperatingHour;
@@ -632,3 +634,5 @@ class ClinicController extends Controller
         return (string) config('filesystems.media_disk', 'public');
     }
 }
+
+

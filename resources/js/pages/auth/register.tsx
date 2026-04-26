@@ -1,4 +1,3 @@
-import axios, { AxiosError } from 'axios';
 import { Link, router } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
@@ -24,21 +23,19 @@ export default function Register() {
         setProcessing(true);
         setErrors({});
 
-        try {
-            await axios.post('/api/register', {
+        router.post(
+            '/register',
+            {
                 ...form,
                 phone_number: form.phone_number || null,
                 date_of_birth: form.date_of_birth || null,
                 gender: form.gender || null,
-            });
-
-            router.visit('/dashboard');
-        } catch (error) {
-            const response = (error as AxiosError<{ errors?: ValidationErrors; message?: string }>).response;
-            setErrors(response?.data?.errors ?? { email: [response?.data?.message ?? 'Registration failed.'] });
-        } finally {
-            setProcessing(false);
-        }
+            },
+            {
+                onError: (validationErrors) => setErrors(normalizeInertiaErrors(validationErrors)),
+                onFinish: () => setProcessing(false),
+            },
+        );
     };
 
     return (
@@ -154,4 +151,8 @@ export default function Register() {
             </p>
         </GuestLayout>
     );
+}
+
+function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
+    return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }

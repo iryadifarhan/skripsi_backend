@@ -343,3 +343,4 @@ class ReservationReminderCommandTest extends TestCase
         ]);
     }
 }
+

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Web;
 
 use App\Exports\MedicalRecordsReportExport;
 use App\Exports\ReservationsReportExport;
@@ -166,3 +166,4 @@ class ReportController extends Controller
         return $prefix.'-'.now()->format('Ymd-His').'.'.$format;
     }
 }
+

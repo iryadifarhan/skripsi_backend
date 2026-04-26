@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class ClinicApiTest extends TestCase
+class ClinicWebTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -32,7 +32,7 @@ class ClinicApiTest extends TestCase
         $superadmin = $this->makeUser(User::ROLE_SUPERADMIN, 'superadmin-clinic@example.com');
         $this->login($superadmin, 'Password123!');
 
-        $this->postJson('/api/superadmin/clinic/create', [
+        $this->postJson('/superadmin/clinic/create', [
             'name' => 'Klinik Superadmin',
             'address' => 'Address Klinik Superadmin',
             'phone_number' => '081111111111',
@@ -64,7 +64,7 @@ class ClinicApiTest extends TestCase
             'is_closed' => false,
         ]);
 
-        $this->patchJson("/api/superadmin/clinic/update/{$clinic->id}", [
+        $this->patchJson("/superadmin/clinic/update/{$clinic->id}", [
             'name' => 'Klinik Superadmin Updated',
             'email' => 'superadmin-clinic-updated@example.test',
             'operating_hours' => [
@@ -91,7 +91,7 @@ class ClinicApiTest extends TestCase
             'close_time' => '17:00:00',
         ]);
 
-        $this->deleteJson("/api/superadmin/clinic/delete/{$clinic->id}", [], $this->spaHeaders())
+        $this->deleteJson("/superadmin/clinic/delete/{$clinic->id}", [], $this->spaHeaders())
             ->assertOk();
 
         $this->assertDatabaseMissing('clinics', [
@@ -109,7 +109,7 @@ class ClinicApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/clinic/doctor/{$clinic->id}", [
+        $this->patchJson("/admin/clinic/doctor/{$clinic->id}", [
             'clinic_id' => $clinic->id,
             'doctor_id' => $doctor->id,
             'speciality' => ['Cardiology', 'Orthology'],
@@ -123,7 +123,7 @@ class ClinicApiTest extends TestCase
             'speciality' => json_encode(['Cardiology', 'Orthology']),
         ]);
 
-        $this->deleteJson("/api/admin/clinic/doctor/{$clinic->id}", [
+        $this->deleteJson("/admin/clinic/doctor/{$clinic->id}", [
             'clinic_id' => $clinic->id,
             'doctor_id' => $doctor->id,
         ], $this->spaHeaders())
@@ -144,14 +144,14 @@ class ClinicApiTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->getJson('/api/clinics', $this->spaHeaders())
+        $this->getJson('/clinics', $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('clinics.0.id', $clinic->id)
             ->assertJsonPath('clinics.0.specialities.0', 'Cardiology')
             ->assertJsonPath('clinics.0.specialities.1', 'Orthology')
             ->assertJsonPath('clinics.0.specialities.2', 'Neurology');
 
-        $this->getJson("/api/clinic/{$clinic->id}", $this->spaHeaders())
+        $this->getJson("/clinic/{$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('specialities.0', 'Cardiology')
             ->assertJsonPath('specialities.1', 'Orthology')
@@ -168,7 +168,7 @@ class ClinicApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/clinic/update/{$clinic->id}", [
+        $this->patchJson("/admin/clinic/update/{$clinic->id}", [
             'clinic_id' => $clinic->id,
             'name' => 'clinic-admin-route-updated',
             'address' => 'Updated clinic address',
@@ -181,7 +181,7 @@ class ClinicApiTest extends TestCase
             'address' => 'Updated clinic address',
         ]);
 
-        $this->deleteJson("/api/admin/clinic/delete/{$clinic->id}", [
+        $this->deleteJson("/admin/clinic/delete/{$clinic->id}", [
             'clinic_id' => $clinic->id,
         ], $this->spaHeaders())
             ->assertOk();
@@ -204,7 +204,7 @@ class ClinicApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->postJson('/api/clinic/schedules', [
+        $this->postJson('/clinic/schedules', [
             'clinic_id' => $clinic->id,
             'doctor_id' => $doctor->id,
             'day_of_week' => $dayOfWeek,
@@ -221,7 +221,7 @@ class ClinicApiTest extends TestCase
             ->where('day_of_week', $dayOfWeek)
             ->firstOrFail();
 
-        $this->patchJson("/api/clinic/schedules/{$schedule->id}", [
+        $this->patchJson("/clinic/schedules/{$schedule->id}", [
             'clinic_id' => $clinic->id,
             'start_time' => '10:00:00',
             'end_time' => '13:00:00',
@@ -250,7 +250,7 @@ class ClinicApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->post("/api/admin/clinic/{$clinic->id}/image", [
+        $this->post("/admin/clinic/{$clinic->id}/image", [
             'clinic_id' => $clinic->id,
             'image' => UploadedFile::fake()->image('clinic-logo.png', 400, 400),
         ], $this->spaHeaders())
@@ -262,12 +262,12 @@ class ClinicApiTest extends TestCase
         $this->assertNotNull($clinic->image_path);
         Storage::disk('public')->assertExists($clinic->image_path);
 
-        $this->getJson('/api/clinics', $this->spaHeaders())
+        $this->getJson('/clinics', $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('clinics.0.image_path', $clinic->image_path)
             ->assertJsonPath('clinics.0.image_url', Storage::disk('public')->url($clinic->image_path));
 
-        $this->getJson("/api/clinic/{$clinic->id}", $this->spaHeaders())
+        $this->getJson("/clinic/{$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('image_path', $clinic->image_path)
             ->assertJsonPath('image_url', Storage::disk('public')->url($clinic->image_path));
@@ -284,7 +284,7 @@ class ClinicApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->post("/api/admin/clinic/{$clinic->id}/doctor-image", [
+        $this->post("/admin/clinic/{$clinic->id}/doctor-image", [
             'clinic_id' => $clinic->id,
             'doctor_id' => $doctor->id,
             'image' => UploadedFile::fake()->image('doctor-photo.webp', 500, 500),
@@ -299,13 +299,13 @@ class ClinicApiTest extends TestCase
         $this->assertNotNull($doctor->image_path);
         Storage::disk('public')->assertExists($doctor->image_path);
 
-        $this->getJson("/api/clinic/{$clinic->id}", $this->spaHeaders())
+        $this->getJson("/clinic/{$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('doctors.0.id', $doctor->id)
             ->assertJsonPath('doctors.0.image_path', $doctor->image_path)
             ->assertJsonPath('doctors.0.image_url', Storage::disk('public')->url($doctor->image_path));
 
-        $this->getJson("/api/admin/user/{$doctor->username}?clinic_id={$clinic->id}", $this->spaHeaders())
+        $this->getJson("/admin/user/{$doctor->username}?clinic_id={$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.image_path', $doctor->image_path)
             ->assertJsonPath('user.image_url', Storage::disk('public')->url($doctor->image_path));
@@ -322,12 +322,12 @@ class ClinicApiTest extends TestCase
 
         $this->login($superadmin, 'Password123!');
 
-        $this->post("/api/superadmin/clinic/{$clinic->id}/image", [
+        $this->post("/superadmin/clinic/{$clinic->id}/image", [
             'image' => UploadedFile::fake()->image('superadmin-clinic.png', 320, 320),
         ], $this->spaHeaders())
             ->assertOk();
 
-        $this->post("/api/superadmin/clinic/{$clinic->id}/doctor-image", [
+        $this->post("/superadmin/clinic/{$clinic->id}/doctor-image", [
             'doctor_id' => $doctor->id,
             'image' => UploadedFile::fake()->image('superadmin-doctor.png', 320, 320),
         ], $this->spaHeaders())
@@ -349,7 +349,7 @@ class ClinicApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->postJson('/api/clinic/schedules', [
+        $this->postJson('/clinic/schedules', [
             'clinic_id' => $clinic->id,
             'doctor_id' => $doctor->id,
             'day_of_week' => [1, 2],
@@ -391,7 +391,7 @@ class ClinicApiTest extends TestCase
 
         $this->login($doctor, 'Password123!');
 
-        $this->postJson('/api/clinic/schedules', [
+        $this->postJson('/clinic/schedules', [
             'clinic_id' => $clinic->id,
             'doctor_id' => $doctor->id,
             'day_of_week' => $dayOfWeek,
@@ -408,7 +408,7 @@ class ClinicApiTest extends TestCase
             ->where('day_of_week', $dayOfWeek)
             ->firstOrFail();
 
-        $this->patchJson("/api/clinic/schedules/{$schedule->id}", [
+        $this->patchJson("/clinic/schedules/{$schedule->id}", [
             'clinic_id' => $clinic->id,
             'start_time' => '09:00:00',
             'end_time' => '11:00:00',
@@ -428,7 +428,7 @@ class ClinicApiTest extends TestCase
 
     private function login(User $user, string $password): void
     {
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => $password,
         ], $this->spaHeaders())->assertOk();
@@ -482,4 +482,6 @@ class ClinicApiTest extends TestCase
         ];
     }
 }
+
+
 

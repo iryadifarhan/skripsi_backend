@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class AdminManagementApiTest extends TestCase
+class AdminManagementWebTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -29,7 +29,7 @@ class AdminManagementApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->postJson('/api/admin/user/create', [
+        $this->postJson('/admin/user/create', [
             'clinic_id' => $clinic->id,
             'name' => 'Managed User',
             'username' => 'managed_user',
@@ -47,13 +47,13 @@ class AdminManagementApiTest extends TestCase
             ->assertJsonPath('user.gender', User::GENDER_LAKI)
             ->assertJsonPath('user.role', User::ROLE_DOCTOR);
 
-        $this->getJson("/api/admin/user/managed_user?clinic_id={$clinic->id}", $this->spaHeaders())
+        $this->getJson("/admin/user/managed_user?clinic_id={$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.email', 'managed-user@example.com')
             ->assertJsonPath('user.date_of_birth', '1995-09-14')
             ->assertJsonPath('user.gender', User::GENDER_LAKI);
 
-        $this->patchJson('/api/admin/user/managed_user', [
+        $this->patchJson('/admin/user/managed_user', [
             'clinic_id' => $clinic->id,
             'name' => 'Managed User Updated',
             'username' => 'managed_user',
@@ -76,7 +76,7 @@ class AdminManagementApiTest extends TestCase
             'role' => User::ROLE_PATIENT,
         ]);
 
-        $this->deleteJson('/api/admin/user/managed_user', [
+        $this->deleteJson('/admin/user/managed_user', [
             'clinic_id' => $clinic->id,
         ], $this->spaHeaders())
             ->assertOk();
@@ -93,7 +93,7 @@ class AdminManagementApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->deleteJson("/api/admin/user/{$admin->email}", [
+        $this->deleteJson("/admin/user/{$admin->email}", [
             'clinic_id' => $clinic->id,
         ], $this->spaHeaders())
             ->assertStatus(400)
@@ -109,7 +109,7 @@ class AdminManagementApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->getJson("/api/admin/user/{$doctor->username}?clinic_id={$clinic->id}", $this->spaHeaders())
+        $this->getJson("/admin/user/{$doctor->username}?clinic_id={$clinic->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.role', User::ROLE_DOCTOR)
             ->assertJsonPath('user.specialities.0', 'Dermatology')
@@ -121,7 +121,7 @@ class AdminManagementApiTest extends TestCase
 
     private function login(User $user, string $password): void
     {
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => $password,
         ], $this->spaHeaders())->assertOk();
@@ -160,4 +160,6 @@ class AdminManagementApiTest extends TestCase
         ];
     }
 }
+
+
 

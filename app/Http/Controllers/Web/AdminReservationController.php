@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\DoctorClinicSchedule;
@@ -11,6 +11,7 @@ use App\Services\ReservationQueueService;
 use App\Services\TimeWindowScheduler;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -302,7 +303,7 @@ class AdminReservationController extends Controller
         ]);
     }
 
-    public function processReservation(Request $request, Reservation $reservation): JsonResponse
+    public function processReservation(Request $request, Reservation $reservation): JsonResponse|RedirectResponse
     {
         $this->assertReservationBelongsToRequestedClinic($request, $reservation);
 
@@ -386,6 +387,10 @@ class AdminReservationController extends Controller
 
         if ($reservationNotificationEvent !== null) {
             $this->patientNotificationService->sendReservationStatusNotification($reservation->loadMissing('patient'), $reservationNotificationEvent);
+        }
+
+        if (!$request->expectsJson()) {
+            return back()->with('status', 'Status reservasi berhasil diproses.');
         }
 
         return response()->json([
@@ -558,3 +563,4 @@ class AdminReservationController extends Controller
         return substr((string) $value, 0, 10);
     }
 }
+

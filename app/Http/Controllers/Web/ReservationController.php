@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Clinic;
@@ -10,12 +10,16 @@ use App\Models\User;
 use App\Services\PatientNotificationService;
 use App\Services\ReservationQueueService;
 use App\Services\TimeWindowScheduler;
+use App\Services\Web\WorkspaceViewService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ReservationController extends Controller
 {
@@ -23,36 +27,193 @@ class ReservationController extends Controller
         private readonly TimeWindowScheduler $scheduler,
         private readonly ReservationQueueService $queueService,
         private readonly PatientNotificationService $patientNotificationService,
+        private readonly WorkspaceViewService $workspace,
     ) {
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse|Response
     {
+        /** @var User $user */
+        $user = $request->user();
+        $context = $this->workspace->context($request);
         $payload = $request->validate([
             'status' => ['nullable', 'string', Rule::in(Reservation::STATUSES)],
+            'clinic_id' => ['nullable', 'integer', 'exists:clinics,id'],
+            'booking_clinic_id' => ['nullable', 'integer', 'exists:clinics,id'],
+            'booking_doctor_id' => ['nullable', 'integer', 'exists:users,id'],
+            'booking_reservation_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'booking_schedule_id' => ['nullable', 'integer', 'exists:doctor_clinic_schedules,id'],
         ]);
+        $selectedClinicId = $this->selectedFilterClinicId($request, $context, $payload);
 
-        $query = Reservation::with([
-            'clinic:id,name,address,phone_number,email,image_path',
-            'doctor:id,name,username,email,phone_number,image_path',
-            'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active']);
+        $query = Reservation::query()
+            ->with($this->reservationRelations())
+            ->orderByDesc('reservation_date')
+            ->orderByDesc('window_start_time');
 
-        if ($request->user()->role === User::ROLE_PATIENT) {
-            $query->where('patient_id', $request->user()->id);
-        } elseif ($request->user()->role === User::ROLE_ADMIN) {
-            $query->where('clinic_id', $request->input('clinic_id'));
+        if ($user->role === User::ROLE_PATIENT) {
+            $query->where('patient_id', $user->id);
+        } elseif (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true) && $selectedClinicId !== null) {
+            $query->where('clinic_id', $selectedClinicId);
+        } else {
+            $query->whereRaw('1 = 0');
         }
-        
-        $query->orderByDesc('reservation_date')->orderByDesc('window_start_time');
 
         if (!empty($payload['status'])) {
             $query->where('status', $payload['status']);
         }
 
-        return response()->json([
-            'message' => 'Reservation retrieval successful.',
-            'reservations' => $this->queueService->serializeReservations($query->get()),
+        $reservations = $this->queueService->serializeReservations($query->get());
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Reservation retrieval successful.',
+                'reservations' => $reservations,
+            ]);
+        }
+
+        return Inertia::render('reservations/index', [
+            'context' => $context,
+            'reservations' => $reservations,
+            'booking' => $this->bookingOptions($request, $payload),
+            'filters' => [
+                'status' => $payload['status'] ?? '',
+                'clinicId' => $selectedClinicId,
+            ],
         ]);
+    }
+
+    public function redirectLegacy(Request $request): RedirectResponse
+    {
+        return redirect()->route('reservations.page', $request->query());
+    }
+
+    private function selectedFilterClinicId(Request $request, array $context, array $payload): ?int
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role === User::ROLE_ADMIN) {
+            return $user->clinic_id;
+        }
+
+        if (in_array($user->role, [User::ROLE_DOCTOR, User::ROLE_PATIENT], true)) {
+            return isset($payload['clinic_id'])
+                ? (int) $payload['clinic_id']
+                : ($context['clinics'][0]['id'] ?? null);
+        }
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            return isset($payload['clinic_id'])
+                ? (int) $payload['clinic_id']
+                : ($context['clinics'][0]['id'] ?? null);
+        }
+
+        return isset($payload['clinic_id']) ? (int) $payload['clinic_id'] : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function bookingOptions(Request $request, array $payload): ?array
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role !== User::ROLE_PATIENT) {
+            return null;
+        }
+
+        $clinics = Clinic::query()
+            ->with(['doctors' => fn ($query) => $query
+                ->select(['users.id', 'users.name', 'users.email', 'users.phone_number'])
+                ->orderBy('users.name')])
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        $selectedClinicId = isset($payload['booking_clinic_id'])
+            ? (int) $payload['booking_clinic_id']
+            : ($clinics->first()?->id);
+        $selectedClinic = $clinics->firstWhere('id', $selectedClinicId) ?? $clinics->first();
+        $selectedClinicId = $selectedClinic?->id;
+        $doctors = $selectedClinic?->doctors ?? collect();
+        $selectedDoctorId = isset($payload['booking_doctor_id'])
+            ? (int) $payload['booking_doctor_id']
+            : ($doctors->first()?->id);
+
+        if ($selectedDoctorId !== null && $doctors->firstWhere('id', $selectedDoctorId) === null) {
+            $selectedDoctorId = $doctors->first()?->id;
+        }
+
+        $reservationDate = (string) ($payload['booking_reservation_date'] ?? Carbon::today()->toDateString());
+        $schedules = collect();
+
+        if ($selectedClinicId !== null && $selectedDoctorId !== null) {
+            $schedules = DoctorClinicSchedule::query()
+                ->where('clinic_id', $selectedClinicId)
+                ->where('doctor_id', $selectedDoctorId)
+                ->where('day_of_week', Carbon::parse($reservationDate)->dayOfWeek)
+                ->where('is_active', true)
+                ->orderBy('start_time')
+                ->get([
+                    'id',
+                    'clinic_id',
+                    'doctor_id',
+                    'day_of_week',
+                    'start_time',
+                    'end_time',
+                    'window_minutes',
+                    'max_patients_per_window',
+                    'is_active',
+                ]);
+        }
+
+        $selectedScheduleId = isset($payload['booking_schedule_id'])
+            ? (int) $payload['booking_schedule_id']
+            : ($schedules->first()?->id);
+
+        if ($selectedScheduleId !== null && $schedules->firstWhere('id', $selectedScheduleId) === null) {
+            $selectedScheduleId = $schedules->first()?->id;
+        }
+
+        $selectedSchedule = $selectedScheduleId !== null
+            ? $schedules->firstWhere('id', $selectedScheduleId)
+            : null;
+
+        return [
+            'clinics' => $clinics
+                ->map(fn (Clinic $clinic): array => [
+                    'id' => $clinic->id,
+                    'name' => $clinic->name,
+                ])
+                ->values()
+                ->all(),
+            'selectedClinicId' => $selectedClinicId,
+            'doctors' => $doctors
+                ->map(fn (User $doctor): array => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                ])
+                ->values()
+                ->all(),
+            'selectedDoctorId' => $selectedDoctorId,
+            'reservationDate' => $reservationDate,
+            'schedules' => $schedules
+                ->map(fn (DoctorClinicSchedule $schedule): array => [
+                    'id' => $schedule->id,
+                    'start_time' => $schedule->start_time,
+                    'end_time' => $schedule->end_time,
+                    'window_minutes' => $schedule->window_minutes,
+                    'max_patients_per_window' => $schedule->max_patients_per_window,
+                ])
+                ->values()
+                ->all(),
+            'selectedScheduleId' => $selectedScheduleId,
+            'windows' => $selectedSchedule !== null
+                ? $this->buildWindowsWithAvailability($selectedSchedule, $reservationDate)
+                : [],
+        ];
     }
 
     public function bookingSchedules(Request $request): JsonResponse
@@ -131,7 +292,7 @@ class ReservationController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): JsonResponse|RedirectResponse
     {
         $actor = $request->user();
 
@@ -207,14 +368,18 @@ class ReservationController extends Controller
             return $reservation->fresh();
         });
 
-        return response()->json([
-            'message' => 'Reservation creation successful.',
-            'reservation' => $this->queueService->serializeReservation($reservation->load([
-                'clinic:id,name,address,phone_number,email,image_path',
-                'doctor:id,name,username,email,phone_number,image_path',
-                'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
-            ])),
-        ], 201);
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Reservation creation successful.',
+                'reservation' => $this->queueService->serializeReservation($reservation->load([
+                    'clinic:id,name,address,phone_number,email,image_path',
+                    'doctor:id,name,username,email,phone_number,image_path',
+                    'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
+                ])),
+            ], 201);
+        }
+
+        return redirect()->route('reservations.page')->with('status', 'Reservasi berhasil dibuat dan menunggu approval admin klinik.');
     }
 
     public function reschedule(Request $request, Reservation $reservation): JsonResponse
@@ -645,6 +810,19 @@ class ReservationController extends Controller
         abort(403, 'Forbidden, you are not authorized.');
     }
 
+    /**
+     * @return array<int, string>
+     */
+    private function reservationRelations(): array
+    {
+        return [
+            'patient:id,name,username,email,phone_number,gender',
+            'clinic:id,name,address,phone_number,email,image_path',
+            'doctor:id,name,username,email,phone_number,image_path',
+            'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
+        ];
+    }
+
     private function assertCanInspectReservationAvailability(
         User $actor,
         Reservation $reservation,
@@ -704,3 +882,4 @@ class ReservationController extends Controller
         return substr((string) $value, 0, 10);
     }
 }
+

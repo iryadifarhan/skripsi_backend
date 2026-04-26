@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Web;
+
+use App\Http\Controllers\Controller;
 
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -8,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 
-class UserController extends Controller
+class ProfileController extends Controller
 {
     public function show(Request $request): JsonResponse
     {
@@ -150,3 +152,5 @@ class UserController extends Controller
         return [(string) $value];
     }
 }
+
+

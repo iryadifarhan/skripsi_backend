@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
 
-class AuthApiTest extends TestCase
+class AuthWebTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -27,7 +27,7 @@ class AuthApiTest extends TestCase
 
     public function test_patient_can_register_and_is_authenticated(): void
     {
-        $response = $this->postJson('/api/register', [
+        $response = $this->postJson('/register', [
             'name' => 'Patient One',
             'username' => 'patient_one',
             'email' => 'patient@example.com',
@@ -53,7 +53,7 @@ class AuthApiTest extends TestCase
             'role' => 'patient',
         ]);
 
-        $this->getJson('/api/user', $this->spaHeaders())
+        $this->getJson('/user', $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.username', 'patient_one')
             ->assertJsonPath('user.gender', User::GENDER_LAKI);
@@ -68,7 +68,7 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('Password123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => 'doctor@example.com',
             'password' => 'Password123!',
         ], $this->spaHeaders())
@@ -76,14 +76,14 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('user.id', $user->id)
             ->assertJsonPath('user.role', 'doctor');
 
-        $this->getJson('/api/user', $this->spaHeaders())
+        $this->getJson('/user', $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.username', 'doctor_one');
 
-        $this->postJson('/api/logout', [], $this->spaHeaders())
+        $this->postJson('/logout', [], $this->spaHeaders())
             ->assertOk();
 
-        $this->getJson('/api/user', $this->spaHeaders())
+        $this->getJson('/user', $this->spaHeaders())
             ->assertUnauthorized();
     }
 
@@ -105,19 +105,19 @@ class AuthApiTest extends TestCase
 
         $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['Pediatrics', 'Immunology'])]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => 'doctor-speciality@example.com',
             'password' => 'Password123!',
         ], $this->spaHeaders())
             ->assertOk();
 
-        $this->getJson('/api/user', $this->spaHeaders())
+        $this->getJson('/user', $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.clinic_specialities.0.clinic_id', $clinic->id)
             ->assertJsonPath('user.clinic_specialities.0.specialities.0', 'Pediatrics')
             ->assertJsonPath('user.clinic_specialities.0.specialities.1', 'Immunology');
 
-        $this->getJson('/api/profile', $this->spaHeaders())
+        $this->getJson('/profile', $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('user.gender', $doctor->gender)
             ->assertJsonPath('user.clinic_specialities.0.clinic_id', $clinic->id)
@@ -134,7 +134,7 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('Password123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => 'admin@example.com',
             'password' => 'wrong-password',
         ], $this->spaHeaders())
@@ -144,7 +144,7 @@ class AuthApiTest extends TestCase
 
     public function test_register_handles_explicit_role(): void
     {
-        $this->postJson('/api/register', [
+        $this->postJson('/register', [
             'name' => 'Test Register User Explicit',
             'username' => 'explicit_role_user',
             'email' => 'explicit-role@example.com',
@@ -165,7 +165,7 @@ class AuthApiTest extends TestCase
             'email' => 'reset@example.com',
         ]);
 
-        $this->postJson('/api/forgot-password', [
+        $this->postJson('/forgot-password', [
             'email' => $user->email,
         ], ['Accept' => 'application/json'])
             ->assertOk();
@@ -183,7 +183,7 @@ class AuthApiTest extends TestCase
 
         $token = Password::broker()->createToken($user);
 
-        $this->postJson('/api/reset-password', [
+        $this->postJson('/reset-password', [
             'token' => $token,
             'email' => $user->email,
             'password' => 'NewPassword123!',
@@ -193,7 +193,7 @@ class AuthApiTest extends TestCase
 
         $this->assertTrue(Hash::check('NewPassword123!', $user->fresh()->password));
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => 'patient-reset@example.com',
             'password' => 'NewPassword123!',
         ], $this->spaHeaders())
@@ -214,12 +214,12 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('Password123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'Password123!',
         ], $this->spaHeaders())->assertOk();
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->patchJson('/profile', [
             'name' => 'Patient After',
             'username' => 'patient_after',
             'email' => 'patient-after@example.com',
@@ -253,7 +253,7 @@ class AuthApiTest extends TestCase
     {
         $futureDate = now()->addDay()->toDateString();
 
-        $this->postJson('/api/register', [
+        $this->postJson('/register', [
             'name' => 'Patient Invalid Birthdate',
             'username' => 'patient_invalid_birthdate',
             'email' => 'patient-invalid-birthdate@example.com',
@@ -270,12 +270,12 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('Password123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'Password123!',
         ], $this->spaHeaders())->assertOk();
 
-        $this->patchJson('/api/profile', [
+        $this->patchJson('/profile', [
             'date_of_birth' => $futureDate,
             'gender' => 'Invalid',
         ], $this->spaHeaders())
@@ -296,12 +296,12 @@ class AuthApiTest extends TestCase
             'phone_number' => '+628111111114',
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'Password123!',
         ], $this->spaHeaders())->assertOk();
 
-        $this->patchJson('/api/profile', [
+        $this->patchJson('/profile', [
             'username' => 'taken_username',
             'email' => 'taken@example.com',
             'phone_number' => '+628111111114',
@@ -317,12 +317,12 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('OldPassword123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'OldPassword123!',
         ], $this->spaHeaders())->assertOk();
 
-        $this->patchJson('/api/profile/password', [
+        $this->patchJson('/profile/password', [
             'current_password' => 'OldPassword123!',
             'password' => 'NewPassword123!',
             'password_confirmation' => 'NewPassword123!',
@@ -331,9 +331,9 @@ class AuthApiTest extends TestCase
 
         $this->assertTrue(Hash::check('NewPassword123!', $user->fresh()->password));
 
-        $this->postJson('/api/logout', [], $this->spaHeaders())->assertOk();
+        $this->postJson('/logout', [], $this->spaHeaders())->assertOk();
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'NewPassword123!',
         ], $this->spaHeaders())->assertOk();
@@ -346,12 +346,12 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('CurrentPassword123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'CurrentPassword123!',
         ], $this->spaHeaders())->assertOk();
 
-        $this->patchJson('/api/profile/password', [
+        $this->patchJson('/profile/password', [
             'current_password' => 'InvalidCurrentPassword123!',
             'password' => 'NewPassword123!',
             'password_confirmation' => 'NewPassword123!',
@@ -371,12 +371,12 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('Password123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'Password123!',
         ], $this->spaHeaders())->assertOk();
 
-        $this->getJson('/api/profile/picture-options', $this->spaHeaders())
+        $this->getJson('/profile/picture-options', $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('role', 'doctor')
             ->assertJsonPath('selected_profile_picture', 'doctor_1')
@@ -393,12 +393,12 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('Password123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'Password123!',
         ], $this->spaHeaders())->assertOk();
 
-        $this->patchJson('/api/profile/picture', [
+        $this->patchJson('/profile/picture', [
             'profile_picture' => 'patient_3',
         ], $this->spaHeaders())
             ->assertOk()
@@ -419,18 +419,18 @@ class AuthApiTest extends TestCase
             'password' => Hash::make('Password123!'),
         ]);
 
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'Password123!',
         ], $this->spaHeaders())->assertOk();
 
-        $this->patchJson('/api/profile/picture', [
+        $this->patchJson('/profile/picture', [
             'profile_picture' => 'patient_2',
         ], $this->spaHeaders())
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['profile_picture']);
 
-        $this->patchJson('/api/profile/picture', [
+        $this->patchJson('/profile/picture', [
             'profile_picture' => 'my_custom_photo.png',
         ], $this->spaHeaders())
             ->assertUnprocessable()
@@ -449,4 +449,6 @@ class AuthApiTest extends TestCase
         ];
     }
 }
+
+
 

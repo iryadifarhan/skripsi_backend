@@ -1,88 +1,30 @@
-import axios from 'axios';
-import { Head } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
 
-import { extractErrorMessage } from '@/lib/http';
 import AppLayout from '@/layouts/app-layout';
 import type { MedicalRecordEntry, WorkspaceContext } from '@/types';
 
 type MedicalRecordsPageProps = {
     context: WorkspaceContext;
+    medicalRecords: MedicalRecordEntry[];
+    filters: {
+        clinicId: number | null;
+        reservationDate: string;
+    };
 };
 
-export default function MedicalRecordsPage({ context }: MedicalRecordsPageProps) {
-    const [medicalRecords, setMedicalRecords] = useState<MedicalRecordEntry[]>([]);
-    const [selectedClinicId, setSelectedClinicId] = useState<number | ''>(context.clinicId ?? context.clinics[0]?.id ?? '');
-    const [reservationDate, setReservationDate] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
+export default function MedicalRecordsPage({ context, medicalRecords, filters }: MedicalRecordsPageProps) {
     const canView = context.role === 'patient' || context.role === 'admin' || context.role === 'doctor';
 
-    useEffect(() => {
-        if (!canView) {
-            setLoading(false);
+    const updateFilters = (updates: Partial<MedicalRecordsPageProps['filters']>) => {
+        const nextFilters = { ...filters, ...updates };
 
-            return;
-        }
-
-        if ((context.role === 'admin' || context.role === 'doctor') && selectedClinicId === '') {
-            setMedicalRecords([]);
-            setLoading(false);
-            setError('No clinic is available for this account.');
-
-            return;
-        }
-
-        let active = true;
-
-        const loadMedicalRecords = async () => {
-            setLoading(true);
-            setError(null);
-
-            try {
-                const params: Record<string, string | number> = {};
-                let endpoint = '/api/medical-records';
-
-                if (reservationDate !== '') {
-                    params.reservation_date = reservationDate;
-                }
-
-                if (context.role === 'admin') {
-                    endpoint = '/api/admin/medical-records';
-                    params.clinic_id = selectedClinicId as number;
-                }
-
-                if (context.role === 'doctor') {
-                    endpoint = '/api/doctor/medical-records';
-                    params.clinic_id = selectedClinicId as number;
-                }
-
-                const response = await axios.get<{ medical_records: MedicalRecordEntry[] }>(endpoint, {
-                    params,
-                });
-
-                if (active) {
-                    setMedicalRecords(response.data.medical_records);
-                }
-            } catch (requestError) {
-                if (active) {
-                    setMedicalRecords([]);
-                    setError(extractErrorMessage(requestError, 'Unable to load medical records.'));
-                }
-            } finally {
-                if (active) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        void loadMedicalRecords();
-
-        return () => {
-            active = false;
-        };
-    }, [canView, context.role, reservationDate, selectedClinicId]);
+        router.get('/medical-records', cleanQuery({
+            clinic_id: nextFilters.clinicId,
+            reservation_date: nextFilters.reservationDate,
+        }), {
+            preserveScroll: true,
+        });
+    };
 
     return (
         <AppLayout>
@@ -96,7 +38,7 @@ export default function MedicalRecordsPage({ context }: MedicalRecordsPageProps)
                             Secure consultation outcomes
                         </h2>
                         <p className="mt-5 max-w-2xl text-sm leading-7 text-white/80">
-                            Completed reservations become medical records here. The page stays clinic-scoped for admin and doctor users, and patient users only see records that belong to them.
+                            Completed reservations become medical records here. This page now receives scoped records from web controllers through Inertia props.
                         </p>
                     </div>
 
@@ -106,7 +48,7 @@ export default function MedicalRecordsPage({ context }: MedicalRecordsPageProps)
                             {medicalRecords.length}
                         </p>
                         <p className="mt-4 text-sm leading-7 text-ink-700">
-                            The list below is sourced directly from the existing medical record APIs, now surfaced through the full-stack web shell.
+                            Filters trigger same-origin web requests through the Laravel/Inertia stack.
                         </p>
                     </div>
                 </div>
@@ -117,8 +59,8 @@ export default function MedicalRecordsPage({ context }: MedicalRecordsPageProps)
                             <label className="flex flex-col gap-2 text-sm font-medium text-night-900">
                                 Clinic
                                 <select
-                                    value={selectedClinicId}
-                                    onChange={(event) => setSelectedClinicId(event.target.value === '' ? '' : Number(event.target.value))}
+                                    value={filters.clinicId ?? ''}
+                                    onChange={(event) => updateFilters({ clinicId: event.target.value === '' ? null : Number(event.target.value) })}
                                     className="rounded-2xl border border-night-900/10 bg-white px-4 py-3 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                                 >
                                     {context.clinics.map((clinic) => (
@@ -134,8 +76,8 @@ export default function MedicalRecordsPage({ context }: MedicalRecordsPageProps)
                             Reservation date
                             <input
                                 type="date"
-                                value={reservationDate}
-                                onChange={(event) => setReservationDate(event.target.value)}
+                                value={filters.reservationDate}
+                                onChange={(event) => updateFilters({ reservationDate: event.target.value })}
                                 className="rounded-2xl border border-night-900/10 bg-white px-4 py-3 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                             />
                         </label>
@@ -145,14 +87,6 @@ export default function MedicalRecordsPage({ context }: MedicalRecordsPageProps)
                 {!canView ? (
                     <section className="rounded-[2rem] border border-dashed border-night-900/15 bg-white/70 p-8 text-sm leading-7 text-ink-700 shadow-[0_18px_48px_rgba(16,24,39,0.05)]">
                         Medical records are available to patients, clinic admins, and doctors only.
-                    </section>
-                ) : loading ? (
-                    <section className="rounded-[2rem] border border-white/80 bg-white/85 p-8 text-sm text-ink-700 shadow-[0_18px_48px_rgba(16,24,39,0.08)]">
-                        Loading medical records...
-                    </section>
-                ) : error ? (
-                    <section className="rounded-[2rem] border border-alert-500/20 bg-white/85 p-8 text-sm text-alert-500 shadow-[0_18px_48px_rgba(16,24,39,0.08)]">
-                        {error}
                     </section>
                 ) : medicalRecords.length === 0 ? (
                     <section className="rounded-[2rem] border border-dashed border-night-900/15 bg-white/70 p-8 text-sm leading-7 text-ink-700 shadow-[0_18px_48px_rgba(16,24,39,0.05)]">
@@ -198,4 +132,8 @@ export default function MedicalRecordsPage({ context }: MedicalRecordsPageProps)
             </section>
         </AppLayout>
     );
+}
+
+function cleanQuery(query: Record<string, string | number | boolean | null | undefined>) {
+    return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== '' && value !== null && value !== undefined));
 }

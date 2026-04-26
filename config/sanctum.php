@@ -40,9 +40,9 @@ return [
     | Stateful Domains
     |--------------------------------------------------------------------------
     |
-    | Requests from the following domains / hosts will receive stateful API
-    | authentication cookies. In this application the web shell and API
-    | share the same origin, so these values should match that deployment.
+    | Requests from the following domains / hosts will receive stateful
+    | authentication cookies. Sanctum is kept temporarily for stability while
+    | the application runs as a same-origin Laravel/Inertia web app.
     |
     */
 

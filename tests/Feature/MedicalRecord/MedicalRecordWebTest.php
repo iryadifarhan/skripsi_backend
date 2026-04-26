@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class MedicalRecordApiTest extends TestCase
+class MedicalRecordWebTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -54,7 +54,7 @@ class MedicalRecordApiTest extends TestCase
 
         $this->login($doctor, 'Password123!');
 
-        $this->postJson("/api/doctor/reservations/{$reservation->id}/medical-records", [
+        $this->postJson("/doctor/reservations/{$reservation->id}/medical-records", [
             'clinic_id' => $clinic->id,
             'diagnosis' => 'Common cold',
             'doctor_notes' => 'Patient should rest for three days.',
@@ -123,7 +123,7 @@ class MedicalRecordApiTest extends TestCase
 
         $this->login($doctor, 'Password123!');
 
-        $this->postJson("/api/doctor/reservations/{$currentReservation->id}/medical-records", [
+        $this->postJson("/doctor/reservations/{$currentReservation->id}/medical-records", [
             'clinic_id' => $clinic->id,
             'doctor_notes' => 'Current patient completed consultation.',
         ], $this->spaHeaders())->assertCreated();
@@ -153,7 +153,7 @@ class MedicalRecordApiTest extends TestCase
 
         $this->login($doctor, 'Password123!');
 
-        $this->postJson("/api/doctor/reservations/{$reservation->id}/medical-records", [
+        $this->postJson("/doctor/reservations/{$reservation->id}/medical-records", [
             'clinic_id' => $clinic->id,
             'diagnosis' => 'Common cold',
         ], $this->spaHeaders())
@@ -175,7 +175,7 @@ class MedicalRecordApiTest extends TestCase
 
         $this->login($doctorB, 'Password123!');
 
-        $this->postJson("/api/doctor/reservations/{$reservation->id}/medical-records", [
+        $this->postJson("/doctor/reservations/{$reservation->id}/medical-records", [
             'clinic_id' => $clinic->id,
             'doctor_notes' => 'Unauthorized attempt',
         ], $this->spaHeaders())
@@ -207,14 +207,14 @@ class MedicalRecordApiTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->getJson('/api/medical-records', $this->spaHeaders())
+        $this->getJson('/medical-records', $this->spaHeaders())
             ->assertOk()
             ->assertJsonCount(1, 'medical_records')
             ->assertJsonPath('medical_records.0.id', $medicalRecord->id)
             ->assertJsonPath('medical_records.0.patient.gender', User::GENDER_PEREMPUAN)
             ->assertJsonPath('medical_records.0.clinic.id', $clinic->id);
 
-        $this->getJson("/api/medical-records/{$medicalRecord->id}", $this->spaHeaders())
+        $this->getJson("/medical-records/{$medicalRecord->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('medical_record.id', $medicalRecord->id)
             ->assertJsonPath('medical_record.patient.gender', User::GENDER_PEREMPUAN)
@@ -239,7 +239,7 @@ class MedicalRecordApiTest extends TestCase
 
         $this->login($intruder, 'Password123!');
 
-        $this->getJson("/api/medical-records/{$medicalRecord->id}", $this->spaHeaders())
+        $this->getJson("/medical-records/{$medicalRecord->id}", $this->spaHeaders())
             ->assertForbidden();
     }
 
@@ -256,7 +256,7 @@ class MedicalRecordApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/reservations/{$reservation->id}", [
+        $this->patchJson("/admin/reservations/{$reservation->id}", [
             'clinic_id' => $clinic->id,
             'status' => Reservation::STATUS_COMPLETED,
         ], $this->spaHeaders())
@@ -301,7 +301,7 @@ class MedicalRecordApiTest extends TestCase
 
         $this->login($admin, 'Password123!');
 
-        $this->patchJson("/api/admin/reservations/{$reservation->id}/details", [
+        $this->patchJson("/admin/reservations/{$reservation->id}/details", [
             'clinic_id' => $clinic->id,
             'patient_id' => $patient->id,
         ], $this->spaHeaders())
@@ -317,10 +317,10 @@ class MedicalRecordApiTest extends TestCase
             'guest_phone_number' => null,
         ]);
 
-        $this->postJson('/api/logout', [], $this->spaHeaders())->assertOk();
+        $this->postJson('/logout', [], $this->spaHeaders())->assertOk();
         $this->login($patient, 'Password123!');
 
-        $this->getJson("/api/medical-records/{$medicalRecord->id}", $this->spaHeaders())
+        $this->getJson("/medical-records/{$medicalRecord->id}", $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('medical_record.id', $medicalRecord->id)
             ->assertJsonPath('medical_record.patient_id', $patient->id);
@@ -328,7 +328,7 @@ class MedicalRecordApiTest extends TestCase
 
     private function login(User $user, string $password): void
     {
-        $this->postJson('/api/login', [
+        $this->postJson('/login', [
             'email' => $user->email,
             'password' => $password,
         ], $this->spaHeaders())->assertOk();
@@ -455,4 +455,6 @@ class MedicalRecordApiTest extends TestCase
         ];
     }
 }
+
+
 
