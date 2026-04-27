@@ -341,7 +341,7 @@ class MedicalRecordController extends Controller
             $payload['reservation'] = [
                 'id' => $medicalRecord->reservation->id,
                 'reservation_number' => $medicalRecord->reservation->reservation_number,
-                'reservation_date' => $medicalRecord->reservation->reservation_date,
+                'reservation_date' => $this->normalizeDateValue($medicalRecord->reservation->reservation_date),
                 'window_start_time' => $medicalRecord->reservation->window_start_time,
                 'window_end_time' => $medicalRecord->reservation->window_end_time,
                 'status' => $medicalRecord->reservation->status,
@@ -393,6 +393,15 @@ class MedicalRecordController extends Controller
         }
 
         abort(403, 'Forbidden, you are not authorized to access this clinic medical record.');
+    }
+
+    private function normalizeDateValue(mixed $value): string
+    {
+        if ($value instanceof \Carbon\CarbonInterface) {
+            return $value->toDateString();
+        }
+
+        return substr((string) $value, 0, 10);
     }
 
     private function assertMedicalRecordBelongsToDoctor(User $doctor, int $clinicId, MedicalRecord $medicalRecord): void

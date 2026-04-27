@@ -219,6 +219,7 @@ class MedicalRecordWebTest extends TestCase
             ->assertJsonPath('medical_record.id', $medicalRecord->id)
             ->assertJsonPath('medical_record.patient.gender', User::GENDER_PEREMPUAN)
             ->assertJsonPath('medical_record.doctor.id', $doctor->id)
+            ->assertJsonPath('medical_record.reservation.reservation_date', $reservationDate)
             ->assertJsonPath('medical_record.reservation.reschedule_reason', 'Riwayat reschedule tetap perlu terlihat.')
             ->assertJsonPath('medical_record.reservation.id', $reservation->id);
     }

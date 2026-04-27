@@ -137,6 +137,7 @@ class ReportWebTest extends TestCase
             ->assertOk()
             ->assertJsonPath('summary.total_medical_records', 1)
             ->assertJsonPath('summary.unique_doctors', 1)
+            ->assertJsonPath('medical_records.0.reservation.reservation_date', $reservationDate)
             ->assertJsonPath('medical_records.0.doctor.id', $doctorA->id);
 
         $response = $this->get(

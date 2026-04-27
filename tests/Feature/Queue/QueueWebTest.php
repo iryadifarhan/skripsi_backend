@@ -53,6 +53,7 @@ class QueueWebTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'queues')
             ->assertJsonPath('queues.0.reservation_id', $ownReservation->id)
+            ->assertJsonPath('queues.0.reservation_date', $reservationDate)
             ->assertJsonPath('queues.0.queue.number', 2)
             ->assertJsonPath('queues.0.queue.current_called_number', 1)
             ->assertJsonPath('queues.0.reschedule_reason', 'Pasien sebelumnya meminta pindah antrean.')

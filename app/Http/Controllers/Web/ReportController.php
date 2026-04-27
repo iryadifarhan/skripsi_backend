@@ -151,7 +151,7 @@ class ReportController extends Controller
                 'reservation' => $medicalRecord->reservation === null ? null : [
                     'id' => $medicalRecord->reservation->id,
                     'reservation_number' => $medicalRecord->reservation->reservation_number,
-                    'reservation_date' => $medicalRecord->reservation->reservation_date,
+                    'reservation_date' => $this->normalizeDateValue($medicalRecord->reservation->reservation_date),
                     'window_start_time' => $medicalRecord->reservation->window_start_time,
                     'window_end_time' => $medicalRecord->reservation->window_end_time,
                     'status' => $medicalRecord->reservation->status,
@@ -164,6 +164,15 @@ class ReportController extends Controller
     private function buildFilename(string $prefix, string $format): string
     {
         return $prefix.'-'.now()->format('Ymd-His').'.'.$format;
+    }
+
+    private function normalizeDateValue(mixed $value): string
+    {
+        if ($value instanceof \Carbon\CarbonInterface) {
+            return $value->toDateString();
+        }
+
+        return substr((string) $value, 0, 10);
     }
 }
 

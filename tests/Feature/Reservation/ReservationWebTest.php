@@ -294,7 +294,7 @@ class ReservationWebTest extends TestCase
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservation.id', $reservationToMove->id)
-            ->assertJsonPath('reservation.reservation_date', Carbon::parse($nextReservationDate)->toJSON())
+            ->assertJsonPath('reservation.reservation_date', $nextReservationDate)
             ->assertJsonPath('reservation.window_start_time', '10:00:00')
             ->assertJsonPath('reservation.window_slot_number', 1)
             ->assertJsonPath('reservation.status', Reservation::STATUS_PENDING)
@@ -555,6 +555,7 @@ class ReservationWebTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'reservations')
             ->assertJsonPath('reservations.0.id', $ownReservation->id)
+            ->assertJsonPath('reservations.0.reservation_date', $reservationDate)
             ->assertJsonPath('reservations.0.reschedule_reason', 'Butuh pindah ke jam lain.');
     }
 
