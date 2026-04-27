@@ -3,6 +3,8 @@
 namespace Tests\Feature\Web;
 
 use App\Models\Clinic;
+use App\Models\ClinicOperatingHour;
+use App\Models\DoctorClinicSchedule;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -299,6 +301,201 @@ class InertiaShellTest extends TestCase
                 ->has('context.clinics', 1)
                 ->where('context.clinics.0.id', $clinic->id)
             );
+    }
+
+    public function test_admin_can_manage_own_clinic_settings_and_doctor_schedule_from_full_stack_page(): void
+    {
+        Storage::fake('public');
+        config(['filesystems.media_disk' => 'public']);
+
+        $clinic = Clinic::create([
+            'name' => 'Clinic Settings Admin',
+            'address' => 'Jl. Clinic Settings',
+            'phone_number' => '+6200077777',
+            'email' => 'clinic-settings-admin@example.test',
+        ]);
+        ClinicOperatingHour::create([
+            'clinic_id' => $clinic->id,
+            'day_of_week' => 1,
+            'open_time' => '08:00:00',
+            'close_time' => '17:00:00',
+            'is_closed' => false,
+        ]);
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'clinic_id' => $clinic->id,
+        ]);
+        $doctor = User::factory()->create([
+            'role' => User::ROLE_DOCTOR,
+        ]);
+        $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['General'])]);
+
+        $this->actingAs($admin)
+            ->get('/clinic-settings')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('clinic-settings/index')
+                ->where('context.role', User::ROLE_ADMIN)
+                ->where('selectedClinicId', $clinic->id)
+                ->where('clinic.id', $clinic->id)
+                ->has('clinic.doctors', 1)
+            );
+
+        $this->actingAs($admin)
+            ->patch("/clinic-settings/{$clinic->id}", [
+                'clinic_id' => $clinic->id,
+                'name' => 'Clinic Settings Admin Updated',
+                'address' => 'Jl. Clinic Settings Updated',
+                'phone_number' => '+6200077788',
+                'email' => 'clinic-settings-admin-updated@example.test',
+                'operating_hours' => [
+                    [
+                        'day_of_week' => 1,
+                        'open_time' => '09:00:00',
+                        'close_time' => '16:00:00',
+                        'is_closed' => false,
+                    ],
+                ],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Data klinik berhasil diperbarui.');
+
+        $this->assertDatabaseHas('clinics', [
+            'id' => $clinic->id,
+            'name' => 'Clinic Settings Admin Updated',
+            'email' => 'clinic-settings-admin-updated@example.test',
+        ]);
+        $this->assertDatabaseHas('clinic_operating_hours', [
+            'clinic_id' => $clinic->id,
+            'day_of_week' => 1,
+            'open_time' => '09:00:00',
+            'close_time' => '16:00:00',
+        ]);
+
+        $this->actingAs($admin)
+            ->post("/clinic-settings/{$clinic->id}/image", [
+                'clinic_id' => $clinic->id,
+                'image' => UploadedFile::fake()->image('clinic-settings.png', 400, 400),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Foto klinik berhasil diunggah.');
+
+        Storage::disk('public')->assertExists($clinic->fresh()->image_path);
+
+        $this->actingAs($admin)
+            ->post('/clinic-settings/schedules', [
+                'clinic_id' => $clinic->id,
+                'doctor_id' => $doctor->id,
+                'day_of_week' => [1],
+                'start_time' => '10:00:00',
+                'end_time' => '12:00:00',
+                'window_minutes' => 30,
+                'max_patients_per_window' => 4,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Jadwal dokter berhasil dibuat.');
+
+        $schedule = DoctorClinicSchedule::query()
+            ->where('clinic_id', $clinic->id)
+            ->where('doctor_id', $doctor->id)
+            ->where('day_of_week', 1)
+            ->firstOrFail();
+
+        $this->actingAs($admin)
+            ->patch("/clinic-settings/schedules/{$schedule->id}", [
+                'clinic_id' => $clinic->id,
+                'start_time' => '10:30:00',
+                'end_time' => '12:30:00',
+                'window_minutes' => 45,
+                'max_patients_per_window' => 3,
+                'is_active' => false,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Jadwal dokter berhasil diperbarui.');
+
+        $this->assertDatabaseHas('doctor_clinic_schedules', [
+            'id' => $schedule->id,
+            'start_time' => '10:30:00',
+            'end_time' => '12:30:00',
+            'window_minutes' => 45,
+            'max_patients_per_window' => 3,
+            'is_active' => false,
+        ]);
+    }
+
+    public function test_superadmin_can_select_and_update_any_clinic_settings(): void
+    {
+        $clinicA = Clinic::create([
+            'name' => 'Clinic Settings Super A',
+            'address' => 'Jl. Super A',
+            'phone_number' => '+6200088811',
+            'email' => 'clinic-settings-super-a@example.test',
+        ]);
+        $clinicB = Clinic::create([
+            'name' => 'Clinic Settings Super B',
+            'address' => 'Jl. Super B',
+            'phone_number' => '+6200088822',
+            'email' => 'clinic-settings-super-b@example.test',
+        ]);
+        $superadmin = User::factory()->create([
+            'role' => User::ROLE_SUPERADMIN,
+        ]);
+
+        $this->actingAs($superadmin)
+            ->get("/clinic-settings?clinic_id={$clinicB->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('clinic-settings/index')
+                ->where('context.role', User::ROLE_SUPERADMIN)
+                ->has('context.clinics', 2)
+                ->where('selectedClinicId', $clinicB->id)
+                ->where('clinic.id', $clinicB->id)
+            );
+
+        $this->actingAs($superadmin)
+            ->patch("/clinic-settings/{$clinicA->id}", [
+                'name' => 'Clinic Settings Super A Updated',
+                'address' => 'Jl. Super A Updated',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', 'Data klinik berhasil diperbarui.');
+
+        $this->assertDatabaseHas('clinics', [
+            'id' => $clinicA->id,
+            'name' => 'Clinic Settings Super A Updated',
+            'address' => 'Jl. Super A Updated',
+        ]);
+    }
+
+    public function test_admin_cannot_manage_other_clinic_settings(): void
+    {
+        $ownClinic = Clinic::create([
+            'name' => 'Clinic Settings Own',
+            'address' => 'Jl. Own',
+            'phone_number' => '+6200099911',
+            'email' => 'clinic-settings-own@example.test',
+        ]);
+        $otherClinic = Clinic::create([
+            'name' => 'Clinic Settings Other',
+            'address' => 'Jl. Other',
+            'phone_number' => '+6200099922',
+            'email' => 'clinic-settings-other@example.test',
+        ]);
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'clinic_id' => $ownClinic->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->patch("/clinic-settings/{$otherClinic->id}", [
+                'name' => 'Forbidden Update',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('clinics', [
+            'id' => $otherClinic->id,
+            'name' => 'Forbidden Update',
+        ]);
     }
 
     public function test_legacy_workspace_aliases_redirect_to_full_stack_pages(): void

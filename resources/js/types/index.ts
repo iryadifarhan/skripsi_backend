@@ -155,6 +155,24 @@ export type ClinicDetail = {
     }[];
 };
 
+export type DoctorClinicScheduleEntry = {
+    id: number;
+    clinic_id: number;
+    doctor_id: number;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    window_minutes: number;
+    max_patients_per_window: number;
+    is_active: boolean;
+    doctor?: {
+        id: number;
+        name: string;
+        email?: string | null;
+        phone_number?: string | null;
+    } | null;
+};
+
 export type SharedData = {
     auth?: {
         user: AuthUser | null;

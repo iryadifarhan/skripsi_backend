@@ -47,6 +47,14 @@ Route::middleware('auth')->group(function (): void {
     Route::patch('/doctors/{doctor}', [DoctorController::class, 'update'])->name('doctors.update');
     Route::post('/doctors/{doctor}/image', [DoctorController::class, 'uploadImage'])->name('doctors.image');
 
+    Route::middleware('authorize:admin,superadmin')->group(function (): void {
+        Route::get('/clinic-settings', [ClinicController::class, 'settings'])->name('clinic-settings.index');
+        Route::patch('/clinic-settings/{clinicId}', [ClinicController::class, 'update'])->name('clinic-settings.update');
+        Route::post('/clinic-settings/{clinicId}/image', [ClinicController::class, 'uploadClinicImage'])->name('clinic-settings.image');
+        Route::post('/clinic-settings/schedules', [ClinicController::class, 'createDoctorClinicSchedule'])->name('clinic-settings.schedules.store');
+        Route::patch('/clinic-settings/schedules/{schedule}', [ClinicController::class, 'updateDoctorClinicSchedule'])->name('clinic-settings.schedules.update');
+    });
+
     Route::middleware('authorize:superadmin')->group(function (): void {
         Route::post('/superadmin/clinic/create', [ClinicController::class, 'create']);
         Route::patch('/superadmin/clinic/update/{clinicId}', [ClinicController::class, 'update']);

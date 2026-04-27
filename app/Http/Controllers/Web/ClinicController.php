@@ -3,19 +3,60 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-
 use App\Models\Clinic;
 use App\Models\ClinicOperatingHour;
 use App\Models\DoctorClinicSchedule;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use App\Services\Web\WorkspaceViewService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ClinicController extends Controller
 {
+    public function __construct(
+        private readonly WorkspaceViewService $workspace,
+    ) {}
+
+    public function settings(Request $request): Response
+    {
+        $this->authorizeAdminWorkspace($request);
+
+        $context = $this->workspace->context($request);
+        $clinic = $this->workspace->selectedClinic($request, $context);
+
+        if ($clinic !== null) {
+            $clinic->load([
+                'doctors:id,name,username,email,phone_number,date_of_birth,gender,image_path',
+                'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
+            ]);
+        }
+
+        $schedules = $clinic === null
+            ? []
+            : $clinic->doctorClinicSchedules()
+                ->with('doctor:id,name,email,phone_number')
+                ->orderBy('day_of_week')
+                ->orderBy('start_time')
+                ->get()
+                ->map(fn (DoctorClinicSchedule $schedule): array => $this->serializeDoctorClinicSchedule($schedule))
+                ->values()
+                ->all();
+
+        return Inertia::render('clinic-settings/index', [
+            'context' => $context,
+            'selectedClinicId' => $clinic?->id,
+            'clinic' => $clinic !== null ? $this->workspace->serializeClinicDetail($clinic) : null,
+            'schedules' => $schedules,
+        ]);
+    }
+
     public function index()
     {
         $clinics = Clinic::query()
@@ -63,6 +104,7 @@ class ClinicController extends Controller
         }
 
         $this->assertClinicRequestMatchesRoute($payload['clinic_id'] ?? null, (int) $clinicId);
+        $this->assertCanManageClinic($request, (int) $clinicId);
 
         $previousImagePath = $clinic->image_path;
         $newImagePath = $this->storeImage($request->file('image'), 'clinics/'.$clinic->id);
@@ -73,13 +115,13 @@ class ClinicController extends Controller
 
         $this->deleteStoredImage($previousImagePath, $newImagePath);
 
-        return response()->json([
+        return $this->jsonOrRedirect($request, [
             'message' => 'Clinic image uploaded successfully.',
             'clinic' => $this->serializeClinicDetail($clinic->fresh()->load([
                 'doctors:id,name,username,email,phone_number,image_path',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
             ])),
-        ]);
+        ], flashMessage: 'Foto klinik berhasil diunggah.');
     }
 
     public function uploadDoctorImage(Request $request, $clinicId)
@@ -97,6 +139,7 @@ class ClinicController extends Controller
         }
 
         $this->assertClinicRequestMatchesRoute($payload['clinic_id'] ?? null, (int) $clinicId);
+        $this->assertCanManageClinic($request, (int) $clinicId);
 
         $doctor = User::find($payload['doctor_id']);
 
@@ -174,6 +217,8 @@ class ClinicController extends Controller
             ], 404);
         }
 
+        $this->assertCanManageClinic($request, (int) $clinicId);
+
         $request->validate([
             'name' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:255',
@@ -189,17 +234,19 @@ class ClinicController extends Controller
         $clinic->update($request->only(['name', 'address', 'phone_number', 'email']));
         $this->syncOperatingHours($clinic, $request->input('operating_hours'), false);
 
-        return response()->json([
+        return $this->jsonOrRedirect($request, [
             'message' => 'Clinic updated successfully.',
-        ]);
+        ], flashMessage: 'Data klinik berhasil diperbarui.');
     }
 
-    public function delete($clinicId) {
+    public function delete(Request $request, $clinicId) {
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
                 'message' => 'Clinic not found.',
             ], 404);
         }
+
+        $this->assertCanManageClinic($request, (int) $clinicId);
 
         $clinic->delete();
 
@@ -214,6 +261,8 @@ class ClinicController extends Controller
                 'message' => 'Clinic not found.',
             ], 404);
         }
+
+        $this->assertCanManageClinic($request, (int) $clinicId);
 
         $specialityInput = $request->input('speciality');
 
@@ -264,6 +313,8 @@ class ClinicController extends Controller
                 'message' => 'Clinic not found.',
             ], 404);
         }
+
+        $this->assertCanManageClinic($request, (int) $clinicId);
         
         $request->validate([
             'doctor_id' => 'required|integer|exists:users,id',
@@ -304,6 +355,8 @@ class ClinicController extends Controller
             'window_minutes' => 'required|integer|min:1',
             'max_patients_per_window' => 'required|integer|min:1',
         ]);
+
+        $this->assertCanManageScheduleRequest($request, (int) $request->clinic_id, (int) $request->doctor_id);
 
         $user = User::find($request->doctor_id);
         $clinic = Clinic::find($request->clinic_id);
@@ -379,12 +432,12 @@ class ClinicController extends Controller
             });
         });
 
-        return response()->json([
+        return $this->jsonOrRedirect($request, [
             'message' => $createdSchedules->count() === 1
                 ? 'Doctor clinic schedule created successfully.'
                 : 'Doctor clinic schedules created successfully.',
             'schedules' => $createdSchedules->values(),
-        ], 201);
+        ], 201, 'Jadwal dokter berhasil dibuat.');
     }
 
     /**
@@ -392,6 +445,7 @@ class ClinicController extends Controller
      */
     public function updateDoctorClinicSchedule(Request $request, DoctorClinicSchedule $schedule) {
         $request->validate([
+            'clinic_id' => 'sometimes|nullable|integer|exists:clinics,id',
             'start_time' => 'nullable|date_format:H:i:s',
             'end_time' => 'nullable|date_format:H:i:s|after:start_time',
             'window_minutes' => 'nullable|integer|min:1',
@@ -399,12 +453,25 @@ class ClinicController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
-        $clinicSchedule = $schedule->clinic->operatingHours()->where('day_of_week', $schedule->day_of_week)->first();
+        $this->assertClinicRequestMatchesRoute($request->input('clinic_id'), (int) $schedule->clinic_id);
+        $this->assertCanManageSchedule($request, $schedule);
 
-        if ($request->start_time < $clinicSchedule->open_time || $request->end_time > $clinicSchedule->close_time) {
-            return response()->json([
-                'message' => 'The schedule is outside the clinic\'s operating hours.',
-            ], 400);
+        $clinicSchedule = $schedule->clinic->operatingHours()->where('day_of_week', $schedule->day_of_week)->first();
+        $startTime = $request->input('start_time', $schedule->start_time);
+        $endTime = $request->input('end_time', $schedule->end_time);
+
+        if ($clinicSchedule === null || (bool) $clinicSchedule->is_closed || $startTime < $clinicSchedule->open_time || $endTime > $clinicSchedule->close_time) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'The schedule is outside the clinic\'s operating hours.',
+                ], 400);
+            }
+
+            throw ValidationException::withMessages([
+                'start_time' => [
+                    'The schedule is outside the clinic\'s operating hours.',
+                ],
+            ]);
         }
 
         $schedule->update($request->only([
@@ -415,9 +482,9 @@ class ClinicController extends Controller
             'is_active',
         ]));
 
-        return response()->json([
+        return $this->jsonOrRedirect($request, [
             'message' => 'Doctor clinic schedule updated successfully.',
-        ]);
+        ], flashMessage: 'Jadwal dokter berhasil diperbarui.');
     }
 
     private function syncOperatingHours(Clinic $clinic, ?array $operatingHours, bool $seedDefaultsOnCreate): void
@@ -613,6 +680,103 @@ class ClinicController extends Controller
         throw ValidationException::withMessages([
             'clinic_id' => ['The provided clinic_id does not match the route clinic id.'],
         ]);
+    }
+
+    private function authorizeAdminWorkspace(Request $request): void
+    {
+        abort_unless(in_array($request->user()->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true), 403);
+    }
+
+    private function assertCanManageClinic(Request $request, int $clinicId): void
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            return;
+        }
+
+        if ($user->role === User::ROLE_ADMIN && (int) $user->clinic_id === $clinicId) {
+            return;
+        }
+
+        abort(403, 'Forbidden, you are not authorized to manage this clinic.');
+    }
+
+    private function assertCanManageScheduleRequest(Request $request, int $clinicId, int $doctorId): void
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            return;
+        }
+
+        if ($user->role === User::ROLE_ADMIN && (int) $user->clinic_id === $clinicId) {
+            return;
+        }
+
+        if ($user->role === User::ROLE_DOCTOR && (int) $user->id === $doctorId && $user->clinics()->whereKey($clinicId)->exists()) {
+            return;
+        }
+
+        abort(403, 'Forbidden, you are not authorized to manage this schedule.');
+    }
+
+    private function assertCanManageSchedule(Request $request, DoctorClinicSchedule $schedule): void
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            return;
+        }
+
+        if ($user->role === User::ROLE_ADMIN && (int) $user->clinic_id === (int) $schedule->clinic_id) {
+            return;
+        }
+
+        if ($user->role === User::ROLE_DOCTOR && (int) $user->id === (int) $schedule->doctor_id && $user->clinics()->whereKey($schedule->clinic_id)->exists()) {
+            return;
+        }
+
+        abort(403, 'Forbidden, you are not authorized to manage this schedule.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeDoctorClinicSchedule(DoctorClinicSchedule $schedule): array
+    {
+        return [
+            'id' => $schedule->id,
+            'clinic_id' => $schedule->clinic_id,
+            'doctor_id' => $schedule->doctor_id,
+            'day_of_week' => $schedule->day_of_week,
+            'start_time' => $schedule->start_time,
+            'end_time' => $schedule->end_time,
+            'window_minutes' => $schedule->window_minutes,
+            'max_patients_per_window' => $schedule->max_patients_per_window,
+            'is_active' => (bool) $schedule->is_active,
+            'doctor' => $schedule->doctor !== null ? [
+                'id' => $schedule->doctor->id,
+                'name' => $schedule->doctor->name,
+                'email' => $schedule->doctor->email,
+                'phone_number' => $schedule->doctor->phone_number,
+            ] : null,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function jsonOrRedirect(Request $request, array $payload, int $status = 200, ?string $flashMessage = null): JsonResponse|RedirectResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json($payload, $status);
+        }
+
+        return back()->with('status', $flashMessage ?? ($payload['message'] ?? 'Operation completed successfully.'));
     }
 
     private function storeImage(UploadedFile $image, string $directory): string

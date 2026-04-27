@@ -26,7 +26,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
             { href: '#', label: 'Data Pasien', enabled: false },
             { href: '/medical-records', label: 'Data Rekam Medis', enabled: true },
             { href: '#', label: 'Laporan', enabled: false },
-            { href: '#', label: 'Pengaturan Klinik', enabled: false },
+            { href: '/clinic-settings', label: 'Pengaturan Klinik', enabled: true },
         ];
         const pageTitle = page.url.startsWith('/doctors/') ? 'Edit Data Dokter Page' : {
             '/dashboard': 'Dashboard Page',
@@ -34,6 +34,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
             '/queue': 'Manajemen Antrean Page',
             '/doctors': 'Data Dokter Page',
             '/medical-records': 'Data Rekam Medis Page',
+            '/clinic-settings': 'Pengaturan Klinik Page',
         }[page.url.split('?')[0]] ?? 'Admin Page';
         const clinicLabel = user?.role === 'admin'
             ? user.clinic?.name ?? 'Klinik'
