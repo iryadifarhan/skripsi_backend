@@ -38,10 +38,8 @@ class User extends Authenticatable
     ];
 
     public const PROFILE_PICTURES = [
-        self::ROLE_PATIENT => ['patient_1', 'patient_2', 'patient_3', 'patient_4'],
-        self::ROLE_DOCTOR => ['doctor_1', 'doctor_2', 'doctor_3', 'doctor_4'],
-        self::ROLE_ADMIN => ['admin_1'],
-        self::ROLE_SUPERADMIN => ['admin_1'],
+        self::ROLE_PATIENT => ['patient_1', 'patient_2', 'patient_3'],
+        self::ROLE_DOCTOR => ['doctor_1', 'doctor_2', 'doctor_3'],
     ];
 
     /** @use HasFactory<\Database\Factories\UserFactory> */
@@ -71,6 +69,8 @@ class User extends Authenticatable
      */
     protected $appends = [
         'image_url',
+        'profile_picture_url',
+        'display_avatar_url',
     ];
 
     /**
@@ -156,12 +156,34 @@ class User extends Authenticatable
 
     public static function defaultProfilePictureForRole(string $role): ?string
     {
-        return self::profilePicturesForRole($role)[0] ?? null;
+        return null;
+    }
+
+    public static function supportsProfilePicture(string $role): bool
+    {
+        return in_array($role, [self::ROLE_PATIENT, self::ROLE_DOCTOR], true);
     }
 
     public static function isValidProfilePictureForRole(string $role, string $profilePicture): bool
     {
         return in_array($profilePicture, self::profilePicturesForRole($role), true);
+    }
+
+    public function getProfilePictureUrlAttribute(): ?string
+    {
+        $profilePicture = $this->attributes['profile_picture'] ?? null;
+        $role = $this->attributes['role'] ?? null;
+
+        if (!is_string($role) || !is_string($profilePicture) || !self::isValidProfilePictureForRole($role, $profilePicture)) {
+            return null;
+        }
+
+        return asset('avatars/'.$profilePicture.'.svg');
+    }
+
+    public function getDisplayAvatarUrlAttribute(): ?string
+    {
+        return $this->profile_picture_url ?? $this->image_url;
     }
 
     public function getImageUrlAttribute(): ?string

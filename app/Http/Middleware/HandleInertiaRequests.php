@@ -27,7 +27,9 @@ class HandleInertiaRequests extends Middleware
             'role',
             'phone_number',
             'profile_picture',
+            'profile_picture_url',
             'image_url',
+            'display_avatar_url',
             'gender',
             'date_of_birth',
         ]);

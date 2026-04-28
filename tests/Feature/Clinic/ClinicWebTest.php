@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ClinicWebTest extends TestCase
@@ -132,6 +133,96 @@ class ClinicWebTest extends TestCase
         $this->assertFalse($doctor->fresh()->clinics()->whereKey($clinic->id)->exists());
     }
 
+    public function test_superadmin_can_create_verified_admin_for_clinic_from_settings_page(): void
+    {
+        $superadmin = $this->makeUser(User::ROLE_SUPERADMIN, 'superadmin-create-clinic-admin@example.com');
+        $clinic = $this->makeClinic('clinic-admin-create');
+
+        $this->login($superadmin, 'Password123!');
+
+        $this->postJson("/clinic-settings/{$clinic->id}/admins", [
+            'name' => 'Clinic Admin Baru',
+            'username' => 'clinic_admin_baru',
+            'email' => 'clinic-admin-baru@example.test',
+            'phone_number' => '+628123450001',
+            'date_of_birth' => '1997-03-12',
+            'gender' => User::GENDER_PEREMPUAN,
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ], $this->spaHeaders())
+            ->assertCreated()
+            ->assertJsonPath('message', 'Clinic admin created successfully.')
+            ->assertJsonPath('admin.email', 'clinic-admin-baru@example.test');
+
+        $admin = User::where('email', 'clinic-admin-baru@example.test')->firstOrFail();
+
+        $this->assertSame(User::ROLE_ADMIN, $admin->role);
+        $this->assertSame($clinic->id, $admin->clinic_id);
+        $this->assertNotNull($admin->email_verified_at);
+
+        $this->get("/clinic-settings/{$clinic->id}", $this->spaHeaders())
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('clinic-settings/index')
+                ->where('clinic.admins.0.id', $admin->id)
+                ->where('clinic.admins.0.email', 'clinic-admin-baru@example.test')
+            );
+    }
+
+    public function test_superadmin_can_update_and_delete_clinic_admin_from_settings_page(): void
+    {
+        $superadmin = $this->makeUser(User::ROLE_SUPERADMIN, 'superadmin-manage-clinic-admin@example.com');
+        $clinic = $this->makeClinic('clinic-admin-manage');
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'clinic-admin-manage@example.test', $clinic->id);
+
+        $admin->forceFill([
+            'name' => 'Clinic Admin Lama',
+            'username' => 'clinic_admin_lama',
+            'phone_number' => '+628123450010',
+            'date_of_birth' => '1990-01-01',
+            'gender' => User::GENDER_LAKI,
+            'email_verified_at' => null,
+        ])->save();
+
+        $this->login($superadmin, 'Password123!');
+
+        $this->patchJson("/clinic-settings/{$clinic->id}/admins/{$admin->id}", [
+            'name' => 'Clinic Admin Updated',
+            'username' => 'clinic_admin_updated',
+            'email' => 'clinic-admin-updated@example.test',
+            'phone_number' => '+628123450011',
+            'date_of_birth' => '1992-02-02',
+            'gender' => User::GENDER_PEREMPUAN,
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('message', 'Clinic admin updated successfully.')
+            ->assertJsonPath('admin.email', 'clinic-admin-updated@example.test');
+
+        $admin->refresh();
+
+        $this->assertSame(User::ROLE_ADMIN, $admin->role);
+        $this->assertSame($clinic->id, $admin->clinic_id);
+        $this->assertSame('Clinic Admin Updated', $admin->name);
+        $this->assertSame('clinic_admin_updated', $admin->username);
+        $this->assertSame('clinic-admin-updated@example.test', $admin->email);
+        $this->assertSame('+628123450011', $admin->phone_number);
+        $this->assertSame('1992-02-02', $admin->date_of_birth?->toDateString());
+        $this->assertSame(User::GENDER_PEREMPUAN, $admin->gender);
+        $this->assertNotNull($admin->email_verified_at);
+        $this->assertTrue(Hash::check('NewPassword123!', $admin->password));
+
+        $this->deleteJson("/clinic-settings/{$clinic->id}/admins/{$admin->id}", [], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('message', 'Clinic admin deleted successfully.')
+            ->assertJsonPath('admin_id', $admin->id);
+
+        $this->assertDatabaseMissing('users', [
+            'id' => $admin->id,
+        ]);
+    }
+
     public function test_authenticated_user_can_get_clinic_specialities_and_doctor_speciality(): void
     {
         $clinic = $this->makeClinic('clinic-specialities');
@@ -184,9 +275,10 @@ class ClinicWebTest extends TestCase
         $this->deleteJson("/admin/clinic/delete/{$clinic->id}", [
             'clinic_id' => $clinic->id,
         ], $this->spaHeaders())
-            ->assertOk();
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['clinic']);
 
-        $this->assertDatabaseMissing('clinics', [
+        $this->assertDatabaseHas('clinics', [
             'id' => $clinic->id,
         ]);
     }
@@ -238,6 +330,16 @@ class ClinicWebTest extends TestCase
             'window_minutes' => 30,
             'max_patients_per_window' => 3,
             'is_active' => true,
+        ]);
+
+        $this->deleteJson("/clinic-settings/schedules/{$schedule->id}", [
+            'clinic_id' => $clinic->id,
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('message', 'Doctor clinic schedule deleted successfully.');
+
+        $this->assertDatabaseMissing('doctor_clinic_schedules', [
+            'id' => $schedule->id,
         ]);
     }
 

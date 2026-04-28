@@ -1,0 +1,7 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Doctor avatar 2">
+  <rect width="160" height="160" rx="32" fill="#EAF4FF"/>
+  <circle cx="80" cy="58" r="29" fill="#7B5E57"/>
+  <path d="M34 140c9-31 28-48 46-48s37 17 46 48" fill="#fff"/>
+  <path d="M48 53c7-25 26-35 55-19 4 2 8 4 12 4-8 11-27 14-67 15Z" fill="#2C2115"/>
+  <circle cx="111" cy="115" r="10" fill="#2A9D8F"/>
+</svg>

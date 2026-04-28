@@ -23,38 +23,43 @@ export default function AppLayout({ children }: PropsWithChildren) {
             { href: '/reservations', label: 'Reservasi', enabled: true },
             { href: '/queue', label: 'Manajemen Antrean', enabled: true },
             { href: '/doctors', label: 'Data Dokter', enabled: true },
-            { href: '#', label: 'Data Pasien', enabled: false },
-            { href: '/medical-records', label: 'Data Rekam Medis', enabled: true },
-            { href: '#', label: 'Laporan', enabled: false },
-            { href: '/clinic-settings', label: 'Pengaturan Klinik', enabled: true },
+            { href: '/patients', label: 'Data Pasien', enabled: true },
+            ...(user?.role === 'superadmin' ? [] : [{ href: '/medical-records', label: 'Data Rekam Medis', enabled: true }]),
+            { href: '/reports', label: 'Laporan', enabled: true },
+            user?.role === 'superadmin'
+                ? { href: '/clinics', label: 'Data Klinik', enabled: true, activePrefixes: ['/clinics', '/clinic-settings'] }
+                : { href: '/clinic-settings', label: 'Pengaturan Klinik', enabled: true, activePrefixes: ['/clinic-settings'] },
         ];
-        const pageTitle = page.url.startsWith('/doctors/') ? 'Edit Data Dokter Page' : {
+        const pageTitle = page.url.startsWith('/doctors/') ? 'Edit Data Dokter Page' : page.url.startsWith('/patients/') ? 'Detail Pasien Page' : page.url.startsWith('/clinic-settings/') ? 'Pengaturan Klinik Page' : {
             '/dashboard': 'Dashboard Page',
             '/reservations': 'Reservasi Page',
             '/queue': 'Manajemen Antrean Page',
             '/doctors': 'Data Dokter Page',
+            '/patients': 'Data Pasien Page',
             '/medical-records': 'Data Rekam Medis Page',
             '/clinic-settings': 'Pengaturan Klinik Page',
+            '/clinics': 'Data Klinik Page',
         }[page.url.split('?')[0]] ?? 'Admin Page';
         const clinicLabel = user?.role === 'admin'
             ? user.clinic?.name ?? 'Klinik'
             : 'Superadmin';
 
         return (
-            <div className="min-h-screen bg-[#f1f2f4] text-[#303236]">
-                <aside className="fixed inset-y-0 left-0 z-20 hidden w-[264px] bg-[#7d7f82] px-4 py-7 text-white md:block">
-                    <div className="text-center">
-                        <div className="text-xl font-extrabold tracking-tight">Clini&gt;Queue&gt; Admin</div>
-                        <div className="mt-1 text-lg font-bold">{clinicLabel}</div>
+            <div className="flex h-screen overflow-hidden bg-[#DFE0DF] font-sans text-[#40311D]">
+                <aside className="hidden w-[220px] shrink-0 flex-col bg-[#40311D] text-white md:flex">
+                    <div className="border-b border-white/10 px-4 py-5">
+                        <p className="text-[15px] font-bold leading-snug">Clini&gt;Queue&gt; Admin</p>
+                        <p className="mt-1 text-[11px] text-white/50">{clinicLabel}</p>
                     </div>
 
-                    <nav className="mt-6 space-y-3">
+                    <nav className="flex-1 py-3">
                         {adminNavigation.map((item) => {
-                            const active = item.href !== '#' && page.url.startsWith(item.href);
+                            const activePrefixes = 'activePrefixes' in item ? item.activePrefixes : [item.href];
+                            const active = item.href !== '#' && activePrefixes.some((prefix) => page.url.startsWith(prefix));
 
                             if (!item.enabled) {
                                 return (
-                                    <span key={item.label} className="block rounded-md px-4 py-3 text-sm text-white/70">
+                                    <span key={item.label} className="block px-4 py-2.5 text-[13px] text-white/45">
                                         {item.label}
                                     </span>
                                 );
@@ -64,8 +69,8 @@ export default function AppLayout({ children }: PropsWithChildren) {
                                 <Link
                                     key={item.href}
                                     href={item.href}
-                                    className={`block rounded-md px-4 py-3 text-sm transition ${
-                                        active ? 'bg-[#343434] font-bold text-white' : 'text-white hover:bg-[#6d6f72]'
+                                    className={`block px-4 py-2.5 text-[13px] transition-colors ${
+                                        active ? 'bg-[#2c2115] font-medium text-[#DED0B6]' : 'text-white/60 hover:bg-white/5 hover:text-white'
                                     }`}
                                 >
                                     {item.label}
@@ -74,25 +79,27 @@ export default function AppLayout({ children }: PropsWithChildren) {
                         })}
                     </nav>
 
-                    <button
-                        type="button"
-                        onClick={() => router.post('/logout')}
-                        className="absolute bottom-7 left-4 right-4 rounded-md bg-[#343434] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#222]"
-                    >
-                        Logout
-                    </button>
+                    <div className="border-t border-white/10 p-4">
+                        <button
+                            type="button"
+                            onClick={() => router.post('/logout')}
+                            className="w-full rounded-lg bg-[#2c2115] px-4 py-2.5 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-[#1a140d] hover:text-white"
+                        >
+                            Logout
+                        </button>
+                    </div>
                 </aside>
 
-                <div className="min-h-screen md:pl-[264px]">
-                    <header className="border-b border-[#d9dde3] bg-white px-6 py-5 md:px-8">
+                <div className="flex flex-1 flex-col overflow-hidden">
+                    <header className="border-b border-[#c8bfb0] bg-[#DED0B6] px-6 py-5">
                         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                            <h1 className="text-3xl font-extrabold text-[#898989]">{pageTitle}</h1>
+                            <h1 className="text-[22px] font-bold text-[#40311D]">{pageTitle}</h1>
                             <div className="flex items-center justify-between gap-3 md:hidden">
-                                <span className="text-sm font-bold text-[#666]">{appName} Admin</span>
+                                <span className="text-sm font-bold text-[#40311D]">{appName} Admin</span>
                                 <button
                                     type="button"
                                     onClick={() => router.post('/logout')}
-                                    className="rounded-md bg-[#343434] px-4 py-2 text-sm font-bold text-white"
+                                    className="rounded-md bg-[#40311D] px-4 py-2 text-sm font-bold text-white"
                                 >
                                     Logout
                                 </button>
@@ -100,14 +107,15 @@ export default function AppLayout({ children }: PropsWithChildren) {
                         </div>
                         <nav className="mt-4 flex gap-2 overflow-x-auto md:hidden">
                             {adminNavigation.filter((item) => item.enabled).map((item) => {
-                                const active = item.href !== '#' && page.url.startsWith(item.href);
+                                const activePrefixes = 'activePrefixes' in item ? item.activePrefixes : [item.href];
+                                const active = item.href !== '#' && activePrefixes.some((prefix) => page.url.startsWith(prefix));
 
                                 return (
                                     <Link
                                         key={item.href}
                                         href={item.href}
                                         className={`shrink-0 rounded-md px-3 py-2 text-xs font-bold ${
-                                            active ? 'bg-[#343434] text-white' : 'bg-[#eef0f3] text-[#666]'
+                                            active ? 'bg-[#40311D] text-white' : 'bg-white/60 text-[#40311D]'
                                         }`}
                                     >
                                         {item.label}
@@ -117,7 +125,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
                         </nav>
                     </header>
 
-                    <main className="px-4 py-6 md:px-8">{children}</main>
+                    <main className="flex-1 overflow-hidden">{children}</main>
                 </div>
             </div>
         );
@@ -128,6 +136,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
         { href: '/reservations', label: 'Reservations', visible: user?.role === 'patient' || user?.role === 'admin' },
         { href: '/queue', label: 'Queue', visible: user?.role === 'patient' || user?.role === 'admin' || user?.role === 'doctor' },
         { href: '/medical-records', label: 'Medical Records', visible: user?.role === 'patient' || user?.role === 'admin' || user?.role === 'doctor' },
+        { href: '/profile', label: 'Profile', visible: user?.role === 'patient' || user?.role === 'doctor' },
     ].filter((item) => item.visible);
 
     return (
@@ -152,7 +161,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
                             {navigation.map((item) => {
-                                const active = page.url === item.href;
+                                const active = page.url.split('?')[0] === item.href;
 
                                 return (
                                     <Link

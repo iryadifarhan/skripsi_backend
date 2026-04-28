@@ -17,6 +17,15 @@ class UserFactory extends Factory
      */
     protected static ?string $password;
 
+    public function configure(): static
+    {
+        return $this->afterMaking(function (User $user): void {
+            if (!User::isValidProfilePictureForRole($user->role, (string) $user->profile_picture)) {
+                $user->profile_picture = User::defaultProfilePictureForRole($user->role);
+            }
+        });
+    }
+
     /**
      * Define the model's default state.
      *

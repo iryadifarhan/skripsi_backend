@@ -12,6 +12,33 @@ use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AdminController extends Controller
 {
+    public function searchPatients(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+        $search = trim((string) ($payload['search'] ?? ''));
+
+        $patients = User::query()
+            ->where('role', User::ROLE_PATIENT)
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('username', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone_number', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('name')
+            ->limit(15)
+            ->get(['id', 'name', 'username', 'email', 'phone_number', 'gender']);
+
+        return response()->json([
+            'message' => 'Patient search successful.',
+            'patients' => $patients,
+        ]);
+    }
+
     public function getUser(Request $request, $usernameOrEmail): JsonResponse
     {
         $user = User::where('username', $usernameOrEmail)

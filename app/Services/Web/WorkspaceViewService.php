@@ -105,8 +105,11 @@ class WorkspaceViewService
             'phone_number' => $doctor->phone_number,
             'date_of_birth' => $doctor->date_of_birth?->toDateString(),
             'gender' => $doctor->gender,
+            'profile_picture' => $doctor->profile_picture,
+            'profile_picture_url' => $doctor->profile_picture_url,
             'image_path' => $doctor->image_path,
             'image_url' => $doctor->image_url,
+            'display_avatar_url' => $doctor->display_avatar_url,
             'role' => $doctor->role,
             'specialities' => $this->pivotSpecialities($doctor->pivot?->speciality),
         ];
@@ -118,7 +121,8 @@ class WorkspaceViewService
     public function serializeClinicDetail(Clinic $clinic): array
     {
         $clinic->loadMissing([
-            'doctors:id,name,username,email,phone_number,date_of_birth,gender,image_path',
+            'doctors:id,name,username,email,phone_number,date_of_birth,gender,profile_picture,image_path,role',
+            'users:id,clinic_id,name,username,email,phone_number,date_of_birth,gender,role,email_verified_at,created_at',
             'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
         ]);
 
@@ -140,6 +144,30 @@ class WorkspaceViewService
                 ->map(fn (User $doctor): array => $this->serializeDoctor($doctor))
                 ->values()
                 ->all(),
+            'admins' => $clinic->users
+                ->where('role', User::ROLE_ADMIN)
+                ->sortBy('name')
+                ->values()
+                ->map(fn (User $admin): array => $this->serializeClinicAdmin($admin))
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function serializeClinicAdmin(User $admin): array
+    {
+        return [
+            'id' => $admin->id,
+            'name' => $admin->name,
+            'username' => $admin->username,
+            'email' => $admin->email,
+            'phone_number' => $admin->phone_number,
+            'date_of_birth' => $admin->date_of_birth?->toDateString(),
+            'gender' => $admin->gender,
+            'email_verified_at' => $admin->email_verified_at?->toISOString(),
+            'created_at' => $admin->created_at?->toISOString(),
         ];
     }
 

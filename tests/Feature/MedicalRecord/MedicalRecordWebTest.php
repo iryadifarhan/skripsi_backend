@@ -141,6 +141,124 @@ class MedicalRecordWebTest extends TestCase
         );
     }
 
+    public function test_admin_can_create_medical_record_and_complete_queue_using_reservation_doctor(): void
+    {
+        Notification::fake();
+        Queue::fake();
+        $this->enableFonnte();
+
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-medical-record-admin-complete');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-medical-record-admin-complete@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-medical-record-complete@example.com', $clinic->id);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-medical-record-admin-complete@example.com', null, '081234500012');
+        $reservation = $this->createReservation(
+            patient: $patient,
+            schedule: $schedule,
+            reservationDate: $reservationDate,
+            windowStartTime: '09:00:00',
+            slot: 1,
+            queueNumber: 1,
+            queueStatus: Reservation::QUEUE_STATUS_IN_PROGRESS,
+        );
+        $reservation->update([
+            'status' => Reservation::STATUS_APPROVED,
+        ]);
+
+        $this->login($admin, 'Password123!');
+
+        $this->postJson("/admin/reservations/{$reservation->id}/medical-records", [
+            'clinic_id' => $clinic->id,
+            'diagnosis' => 'Influenza',
+            'treatment' => 'Rest and hydration',
+            'prescription_notes' => 'Paracetamol if needed',
+            'doctor_notes' => 'Admin recorded the consultation result.',
+        ], $this->spaHeaders())
+            ->assertCreated()
+            ->assertJsonPath('medical_record.reservation_id', $reservation->id)
+            ->assertJsonPath('medical_record.patient_id', $patient->id)
+            ->assertJsonPath('medical_record.doctor_id', $doctor->id)
+            ->assertJsonPath('medical_record.diagnosis', 'Influenza')
+            ->assertJsonPath('medical_record.treatment', 'Rest and hydration')
+            ->assertJsonPath('medical_record.prescription_notes', 'Paracetamol if needed')
+            ->assertJsonPath('medical_record.doctor_notes', 'Admin recorded the consultation result.')
+            ->assertJsonPath('reservation.status', Reservation::STATUS_COMPLETED)
+            ->assertJsonPath('reservation.queue_summary.status', Reservation::QUEUE_STATUS_COMPLETED)
+            ->assertJsonPath('reservation.queue_summary.number', null);
+
+        $this->assertDatabaseHas('medical_records', [
+            'reservation_id' => $reservation->id,
+            'patient_id' => $patient->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'diagnosis' => 'Influenza',
+            'treatment' => 'Rest and hydration',
+            'prescription_notes' => 'Paracetamol if needed',
+            'doctor_notes' => 'Admin recorded the consultation result.',
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => Reservation::STATUS_COMPLETED,
+            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
+            'queue_number' => null,
+        ]);
+
+        Notification::assertSentTo($patient, MedicalRecordReadyNotification::class);
+
+        Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
+            $job->phoneNumber === '081234500012'
+            && str_contains($job->message, 'completed')
+            && str_contains($job->message, 'Admin recorded the consultation result.')
+            && str_contains($job->message, '/medical-records')
+        );
+    }
+
+    public function test_admin_cannot_complete_queue_before_it_is_in_progress(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-medical-record-admin-complete-state');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-medical-record-admin-complete-state@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-medical-record-complete-state@example.com', $clinic->id);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-medical-record-admin-complete-state@example.com');
+        $reservation = $this->createReservation(
+            patient: $patient,
+            schedule: $schedule,
+            reservationDate: $reservationDate,
+            windowStartTime: '09:00:00',
+            slot: 1,
+            queueNumber: 1,
+            queueStatus: Reservation::QUEUE_STATUS_CALLED,
+        );
+        $reservation->update([
+            'status' => Reservation::STATUS_APPROVED,
+        ]);
+
+        $this->login($admin, 'Password123!');
+
+        $this->postJson("/admin/reservations/{$reservation->id}/medical-records", [
+            'clinic_id' => $clinic->id,
+            'doctor_notes' => 'Attempt before consultation starts.',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['queue_status']);
+
+        $this->assertDatabaseMissing('medical_records', [
+            'reservation_id' => $reservation->id,
+        ]);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => Reservation::STATUS_APPROVED,
+            'queue_status' => Reservation::QUEUE_STATUS_CALLED,
+            'queue_number' => 1,
+        ]);
+    }
+
     public function test_doctor_notes_is_required_when_creating_medical_record(): void
     {
         $reservationDate = now()->addDay()->toDateString();

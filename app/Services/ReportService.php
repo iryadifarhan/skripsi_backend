@@ -46,6 +46,25 @@ class ReportService
             $query->where('status', $filters['status']);
         }
 
+        if (!empty($filters['search'])) {
+            $search = trim((string) $filters['search']);
+            $query->where(function ($query) use ($search): void {
+                $query->where('reservation_number', 'like', "%{$search}%")
+                    ->orWhere('guest_name', 'like', "%{$search}%")
+                    ->orWhere('guest_phone_number', 'like', "%{$search}%")
+                    ->orWhere('complaint', 'like', "%{$search}%")
+                    ->orWhereHas('patient', function ($patientQuery) use ($search): void {
+                        $patientQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('phone_number', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('doctor', function ($doctorQuery) use ($search): void {
+                        $doctorQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+            });
+        }
+
         $records = $query->get();
 
         return [
@@ -82,7 +101,7 @@ class ReportService
                 'patient:id,name,username,email,phone_number',
                 'doctor:id,name,username,email,phone_number',
                 'clinic:id,name,address,phone_number,email',
-                'reservation:id,reservation_number,reservation_date,window_start_time,window_end_time,status',
+                'reservation:id,reservation_number,reservation_date,window_start_time,window_end_time,status,complaint,reschedule_reason',
             ])
             ->where('clinic_id', $filters['clinic_id'])
             ->whereBetween('issued_at', [$filters['date_from'].' 00:00:00', $filters['date_to'].' 23:59:59'])
@@ -92,6 +111,31 @@ class ReportService
         if ($doctorId !== null) {
             $query->where('doctor_id', $doctorId);
             $filters['doctor_id'] = $doctorId;
+        }
+
+        if (!empty($filters['search'])) {
+            $search = trim((string) $filters['search']);
+            $query->where(function ($query) use ($search): void {
+                $query->where('guest_name', 'like', "%{$search}%")
+                    ->orWhere('guest_phone_number', 'like', "%{$search}%")
+                    ->orWhere('diagnosis', 'like', "%{$search}%")
+                    ->orWhere('treatment', 'like', "%{$search}%")
+                    ->orWhere('prescription_notes', 'like', "%{$search}%")
+                    ->orWhere('doctor_notes', 'like', "%{$search}%")
+                    ->orWhereHas('patient', function ($patientQuery) use ($search): void {
+                        $patientQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('phone_number', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('doctor', function ($doctorQuery) use ($search): void {
+                        $doctorQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('reservation', function ($reservationQuery) use ($search): void {
+                        $reservationQuery->where('reservation_number', 'like', "%{$search}%")
+                            ->orWhere('complaint', 'like', "%{$search}%");
+                    });
+            });
         }
 
         $records = $query->get();

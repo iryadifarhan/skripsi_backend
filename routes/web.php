@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\ClinicController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DoctorController;
 use App\Http\Controllers\Web\MedicalRecordController;
+use App\Http\Controllers\Web\PatientController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\QueueController;
 use App\Http\Controllers\Web\ReportController;
@@ -41,22 +42,48 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/medical-records', [MedicalRecordController::class, 'page'])->name('medical-records.page');
     Route::get('/medical_record', [MedicalRecordController::class, 'redirectLegacy'])->name('medical-records.legacy');
+    Route::get('/reports', [ReportController::class, 'page'])
+        ->middleware('authorize:admin,superadmin')
+        ->name('reports.page');
+    Route::get('/reports/export', [ReportController::class, 'export'])
+        ->middleware('authorize:admin,superadmin')
+        ->name('reports.export');
 
     Route::get('/doctors', [DoctorController::class, 'index'])->name('doctors.index');
+    Route::post('/doctors', [DoctorController::class, 'store'])->name('doctors.store');
     Route::get('/doctors/{doctor}/edit', [DoctorController::class, 'edit'])->name('doctors.edit');
     Route::patch('/doctors/{doctor}', [DoctorController::class, 'update'])->name('doctors.update');
     Route::post('/doctors/{doctor}/image', [DoctorController::class, 'uploadImage'])->name('doctors.image');
+    Route::delete('/doctors/{doctor}/image', [DoctorController::class, 'deleteImage'])->name('doctors.image.destroy');
+    Route::patch('/doctors/{doctor}/picture', [DoctorController::class, 'updateProfilePicture'])->name('doctors.picture');
+    Route::delete('/doctors/{doctor}', [DoctorController::class, 'destroy'])->name('doctors.destroy');
+
+    Route::get('/patients', [PatientController::class, 'index'])->name('patients.index');
+    Route::post('/patients', [PatientController::class, 'store'])->name('patients.store');
+    Route::get('/patients/walk-ins/{walkInKey}', [PatientController::class, 'walkIn'])->name('patients.walk-ins.show');
+    Route::get('/patients/{patient}/edit', [PatientController::class, 'edit'])->name('patients.edit');
+    Route::patch('/patients/{patient}', [PatientController::class, 'update'])->name('patients.update');
+    Route::post('/patients/{patient}/image', [PatientController::class, 'uploadImage'])->name('patients.image');
+    Route::delete('/patients/{patient}/image', [PatientController::class, 'deleteImage'])->name('patients.image.destroy');
+    Route::patch('/patients/{patient}/picture', [PatientController::class, 'updateProfilePicture'])->name('patients.picture');
+    Route::delete('/patients/{patient}', [PatientController::class, 'destroy'])->name('patients.destroy');
 
     Route::middleware('authorize:admin,superadmin')->group(function (): void {
+        Route::get('/admin/patients/search', [AdminController::class, 'searchPatients'])->name('admin.patients.search');
         Route::get('/clinic-settings', [ClinicController::class, 'settings'])->name('clinic-settings.index');
+        Route::get('/clinic-settings/{clinicId}', [ClinicController::class, 'settings'])->name('clinic-settings.show');
         Route::patch('/clinic-settings/{clinicId}', [ClinicController::class, 'update'])->name('clinic-settings.update');
         Route::post('/clinic-settings/{clinicId}/image', [ClinicController::class, 'uploadClinicImage'])->name('clinic-settings.image');
         Route::post('/clinic-settings/schedules', [ClinicController::class, 'createDoctorClinicSchedule'])->name('clinic-settings.schedules.store');
         Route::patch('/clinic-settings/schedules/{schedule}', [ClinicController::class, 'updateDoctorClinicSchedule'])->name('clinic-settings.schedules.update');
+        Route::delete('/clinic-settings/schedules/{schedule}', [ClinicController::class, 'deleteDoctorClinicSchedule'])->name('clinic-settings.schedules.destroy');
     });
 
     Route::middleware('authorize:superadmin')->group(function (): void {
         Route::post('/superadmin/clinic/create', [ClinicController::class, 'create']);
+        Route::post('/clinic-settings/{clinicId}/admins', [ClinicController::class, 'createClinicAdmin'])->name('clinic-settings.admins.store');
+        Route::patch('/clinic-settings/{clinicId}/admins/{adminId}', [ClinicController::class, 'updateClinicAdmin'])->name('clinic-settings.admins.update');
+        Route::delete('/clinic-settings/{clinicId}/admins/{adminId}', [ClinicController::class, 'deleteClinicAdmin'])->name('clinic-settings.admins.destroy');
         Route::patch('/superadmin/clinic/update/{clinicId}', [ClinicController::class, 'update']);
         Route::delete('/superadmin/clinic/delete/{clinicId}', [ClinicController::class, 'delete']);
         Route::post('/superadmin/clinic/{clinicId}/image', [ClinicController::class, 'uploadClinicImage']);
@@ -83,6 +110,7 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('/admin/medical-records', [MedicalRecordController::class, 'adminIndex']);
         Route::get('/admin/medical-records/{medicalRecord}', [MedicalRecordController::class, 'adminShow']);
+        Route::post('/admin/reservations/{reservation}/medical-records', [MedicalRecordController::class, 'store']);
 
         Route::get('/admin/queues', [QueueController::class, 'adminIndex']);
         Route::patch('/admin/queues/{reservation}', [QueueController::class, 'adminUpdate']);
@@ -121,8 +149,10 @@ Route::middleware('auth')->group(function (): void {
     Route::patch('/profile/password', [ProfileController::class, 'updatePassword']);
     Route::get('/profile/picture-options', [ProfileController::class, 'profilePictureOptions']);
     Route::patch('/profile/picture', [ProfileController::class, 'updateProfilePicture']);
+    Route::post('/profile/image', [ProfileController::class, 'uploadImage']);
+    Route::delete('/profile/image', [ProfileController::class, 'deleteImage']);
 
-    Route::get('/clinics', [ClinicController::class, 'index']);
+    Route::get('/clinics', [ClinicController::class, 'index'])->name('clinics.index');
     Route::get('/reservations/schedules', [ReservationController::class, 'bookingSchedules']);
     Route::get('/reservations/booking/windows', [ReservationController::class, 'availableWindows']);
     Route::get('/clinic/{clinicId}', [ClinicController::class, 'show']);

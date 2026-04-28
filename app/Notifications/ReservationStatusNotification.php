@@ -51,12 +51,8 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
             $mail->line('Admin note: '.$this->reservation->admin_notes);
         }
 
-        if ($this->eventType === 'rejected' && !empty($this->reservation->admin_notes)) {
-            $mail->line('Rejection note: '.$this->reservation->admin_notes);
-        }
-
-        if ($this->eventType === 'cancelled' && !empty($this->reservation->cancellation_reason)) {
-            $mail->line('Cancellation reason: '.$this->reservation->cancellation_reason);
+        if (in_array($this->eventType, ['cancelled', 'rejected'], true) && !empty($this->reservation->cancellation_reason)) {
+            $mail->line($this->cancellationReasonLabel().': '.$this->reservation->cancellation_reason);
         }
 
         if ($this->eventType === 'rescheduled' && !empty($this->reservation->reschedule_reason)) {
@@ -93,12 +89,8 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
            $lines[] = '*Admin note*: '.$this->reservation->admin_notes;
         }
 
-        if ($this->eventType === 'rejected' && !empty($this->reservation->admin_notes)) {
-            $lines[] = '*Rejection note*: '.$this->reservation->admin_notes;
-        }
-
-        if ($this->eventType === 'cancelled' && !empty($this->reservation->cancellation_reason)) {
-            $lines[] = '*Cancellation reason*: '.$this->reservation->cancellation_reason;
+        if (in_array($this->eventType, ['cancelled', 'rejected'], true) && !empty($this->reservation->cancellation_reason)) {
+            $lines[] = '*'.$this->cancellationReasonLabel().'*: '.$this->reservation->cancellation_reason;
         }
 
         if ($this->eventType === 'rescheduled' && !empty($this->reservation->reschedule_reason)) {
@@ -144,5 +136,12 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
             'rescheduled' => "Your reservation at {$clinicName} has been rescheduled.",
             default => "There is an update for your reservation at {$clinicName}.",
         };
+    }
+
+    private function cancellationReasonLabel(): string
+    {
+        return $this->eventType === 'rejected'
+            ? 'Rejection reason'
+            : 'Cancellation reason';
     }
 }

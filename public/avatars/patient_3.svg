@@ -1,0 +1,6 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Patient avatar 3">
+  <rect width="160" height="160" rx="32" fill="#E8ECFF"/>
+  <circle cx="80" cy="60" r="29" fill="#6B7FD7"/>
+  <path d="M33 140c9-31 28-49 47-49s38 18 47 49" fill="#3D315B"/>
+  <path d="M53 67c15 11 40 11 54 0" stroke="#fff" stroke-width="7" stroke-linecap="round" fill="none"/>
+</svg>

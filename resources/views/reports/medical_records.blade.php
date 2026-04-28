@@ -23,6 +23,7 @@
         <tr><td>Date From</td><td>{{ $filters['date_from'] }}</td></tr>
         <tr><td>Date To</td><td>{{ $filters['date_to'] }}</td></tr>
         <tr><td>Doctor ID</td><td>{{ $filters['doctor_id'] ?? 'all' }}</td></tr>
+        <tr><td>Search</td><td>{{ $filters['search'] ?? '-' }}</td></tr>
     </table>
 
     <h2>Summary</h2>

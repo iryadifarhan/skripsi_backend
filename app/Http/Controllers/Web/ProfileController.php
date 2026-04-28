@@ -6,15 +6,28 @@ use App\Http\Controllers\Controller;
 
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\Password as PasswordRule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request): JsonResponse
+    public function show(Request $request): JsonResponse|Response
     {
         $user = $request->user()->loadMissing('clinics:id,name');
+
+        if (!$request->expectsJson()) {
+            return Inertia::render('profile', [
+                'user' => $this->serializeProfileUser($user),
+                'profilePictureOptions' => User::profilePicturesForRole($user->role),
+                'canManageAvatar' => User::supportsProfilePicture($user->role),
+            ]);
+        }
 
         return response()->json([
             'message' => 'Profile retrieval successful.',
@@ -22,7 +35,7 @@ class ProfileController extends Controller
         ]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request): JsonResponse|RedirectResponse
     {
         $user = $request->user();
 
@@ -43,13 +56,17 @@ class ProfileController extends Controller
 
         $user->update($payload);
 
+        if (!$request->expectsJson()) {
+            return back()->with('status', 'Profil berhasil diperbarui.');
+        }
+
         return response()->json([
             'message' => 'Profile update successful.',
             'user' => $user->fresh(),
         ]);
     }
 
-    public function updatePassword(Request $request): JsonResponse
+    public function updatePassword(Request $request): JsonResponse|RedirectResponse
     {
         $user = $request->user();
 
@@ -61,6 +78,10 @@ class ProfileController extends Controller
         $user->update([
             'password' => $payload['password'],
         ]);
+
+        if (!$request->expectsJson()) {
+            return back()->with('status', 'Password berhasil diperbarui.');
+        }
 
         return response()->json([
             'message' => 'Password update successful.',
@@ -78,24 +99,90 @@ class ProfileController extends Controller
         ]);
     }
 
-    public function updateProfilePicture(Request $request): JsonResponse
+    public function updateProfilePicture(Request $request): JsonResponse|RedirectResponse
     {
         $user = $request->user();
+        $this->authorizeProfilePictureUser($user);
 
         $payload = $request->validate([
             'profile_picture' => [
-                'required',
+                'present',
+                'nullable',
                 'string',
                 Rule::in(User::profilePicturesForRole($user->role)),
             ],
         ]);
 
+        $profilePicture = $payload['profile_picture'] ?? null;
+
+        if ($profilePicture === null && !filled($user->image_path)) {
+            throw ValidationException::withMessages([
+                'profile_picture' => ['Tidak ada foto upload yang dapat dipilih.'],
+            ]);
+        }
+
         $user->update([
-            'profile_picture' => $payload['profile_picture'],
+            'profile_picture' => $profilePicture,
         ]);
+
+        if (!$request->expectsJson()) {
+            return back()->with('status', $profilePicture === null ? 'Foto upload aktif digunakan.' : 'Avatar bawaan berhasil dipilih.');
+        }
 
         return response()->json([
             'message' => 'Profile picture update successful.',
+            'user' => $user->fresh(),
+        ]);
+    }
+
+    public function uploadImage(Request $request): JsonResponse|RedirectResponse
+    {
+        $user = $request->user();
+        $this->authorizeProfilePictureUser($user);
+
+        $payload = $request->validate([
+            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $disk = (string) config('filesystems.media_disk', 'public');
+        $previousImagePath = $user->image_path;
+        $newImagePath = $payload['image']->storePublicly('users/'.$user->id, $disk);
+
+        $user->update([
+            'image_path' => $newImagePath,
+            'profile_picture' => null,
+        ]);
+
+        if (filled($previousImagePath) && $previousImagePath !== $newImagePath) {
+            Storage::disk($disk)->delete($previousImagePath);
+        }
+
+        if (!$request->expectsJson()) {
+            return back()->with('status', 'Foto profil berhasil diunggah.');
+        }
+
+        return response()->json([
+            'message' => 'Profile image uploaded successfully.',
+            'user' => $user->fresh(),
+        ]);
+    }
+
+    public function deleteImage(Request $request): JsonResponse|RedirectResponse
+    {
+        $user = $request->user();
+        $this->authorizeProfilePictureUser($user);
+
+        $this->deleteUploadedProfileImage($user);
+        $user->update([
+            'image_path' => null,
+        ]);
+
+        if (!$request->expectsJson()) {
+            return back()->with('status', 'Foto upload berhasil dihapus.');
+        }
+
+        return response()->json([
+            'message' => 'Profile image deleted successfully.',
             'user' => $user->fresh(),
         ]);
     }
@@ -150,6 +237,20 @@ class ProfileController extends Controller
         }
 
         return [(string) $value];
+    }
+
+    private function authorizeProfilePictureUser(User $user): void
+    {
+        abort_unless(User::supportsProfilePicture($user->role), 403);
+    }
+
+    private function deleteUploadedProfileImage(User $user): void
+    {
+        if (!filled($user->image_path)) {
+            return;
+        }
+
+        Storage::disk((string) config('filesystems.media_disk', 'public'))->delete($user->image_path);
     }
 }
 

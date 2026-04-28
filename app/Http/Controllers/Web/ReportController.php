@@ -2,24 +2,134 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Exports\CombinedReportExport;
 use App\Exports\MedicalRecordsReportExport;
 use App\Exports\ReservationsReportExport;
 use App\Http\Controllers\Controller;
+use App\Models\Clinic;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
+use App\Models\User;
 use App\Services\ReportService;
 use App\Services\ReservationQueueService;
+use App\Services\Web\WorkspaceViewService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ReportController extends Controller
 {
     public function __construct(
         private readonly ReportService $reportService,
         private readonly ReservationQueueService $queueService,
+        private readonly WorkspaceViewService $workspace,
     ) {
+    }
+
+    public function page(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+        abort_unless(in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true), 403);
+
+        $context = $this->workspace->context($request);
+        $payload = $request->validate($this->pageReportRules());
+        $selectedClinic = $this->selectedReportClinic($request, $context, $payload);
+        $filters = $this->normalizedPageFilters($payload, $selectedClinic?->id);
+
+        $reservationReport = $selectedClinic !== null
+            ? $this->reportService->reservations($user, $filters)
+            : $this->emptyReservationReport($filters);
+
+        $canViewMedicalRecords = $user->role === User::ROLE_ADMIN && $selectedClinic !== null;
+        $medicalRecordReport = $canViewMedicalRecords
+            ? $this->reportService->medicalRecords($user, $this->medicalRecordFiltersFromPage($filters))
+            : $this->emptyMedicalRecordReport($this->medicalRecordFiltersFromPage($filters));
+
+        $reservations = $this->queueService->serializeReservations($reservationReport['records']);
+        $medicalRecords = $canViewMedicalRecords ? $this->serializeMedicalRecords($medicalRecordReport['records']) : [];
+
+        return Inertia::render('reports/index', [
+            'context' => $context,
+            'clinic' => $selectedClinic === null ? null : [
+                'id' => $selectedClinic->id,
+                'name' => $selectedClinic->name,
+            ],
+            'filters' => [
+                'clinicId' => $filters['clinic_id'],
+                'dateFrom' => $filters['date_from'],
+                'dateTo' => $filters['date_to'],
+                'doctorId' => $filters['doctor_id'],
+                'status' => $filters['status'],
+                'search' => $filters['search'],
+            ],
+            'doctorOptions' => $selectedClinic === null ? [] : $this->doctorOptions($selectedClinic),
+            'canViewMedicalRecords' => $canViewMedicalRecords,
+            'reservationSummary' => $reservationReport['summary'],
+            'medicalRecordSummary' => $medicalRecordReport['summary'],
+            'doctorRecap' => $this->doctorRecap($reservationReport['records'], $canViewMedicalRecords ? $medicalRecordReport['records'] : collect(), $canViewMedicalRecords),
+            'reservations' => $reservations,
+            'medicalRecords' => $medicalRecords,
+        ]);
+    }
+
+    public function export(Request $request)
+    {
+        /** @var User $user */
+        $user = $request->user();
+        abort_unless(in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true), 403);
+
+        $context = $this->workspace->context($request);
+        $payload = $request->validate(array_merge($this->pageReportRules(), [
+            'format' => ['required', 'string', 'in:xlsx,pdf'],
+        ]));
+        $selectedClinic = $this->selectedReportClinic($request, $context, $payload);
+        abort_if($selectedClinic === null, 422, 'Clinic is required for report export.');
+
+        $filters = $this->normalizedPageFilters($payload, $selectedClinic->id);
+        $reservationReport = $this->reportService->reservations($user, $filters);
+        $canViewMedicalRecords = $user->role === User::ROLE_ADMIN;
+        $medicalRecordReport = $canViewMedicalRecords
+            ? $this->reportService->medicalRecords($user, $this->medicalRecordFiltersFromPage($filters))
+            : $this->emptyMedicalRecordReport($this->medicalRecordFiltersFromPage($filters));
+        $doctorRecap = $this->doctorRecap(
+            $reservationReport['records'],
+            $canViewMedicalRecords ? $medicalRecordReport['records'] : collect(),
+            $canViewMedicalRecords
+        );
+        $filename = $this->buildFilename('clinic-report', (string) $payload['format']);
+
+        if ($payload['format'] === 'pdf') {
+            $pdf = Pdf::loadView('reports.combined', [
+                'clinic' => $selectedClinic,
+                'filters' => $filters,
+                'canViewMedicalRecords' => $canViewMedicalRecords,
+                'reservationSummary' => $reservationReport['summary'],
+                'medicalRecordSummary' => $medicalRecordReport['summary'],
+                'doctorRecap' => $doctorRecap,
+                'reservations' => $this->queueService->serializeReservations($reservationReport['records']),
+                'medicalRecords' => $canViewMedicalRecords ? $this->serializeMedicalRecords($medicalRecordReport['records']) : [],
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download($filename);
+        }
+
+        return Excel::download(
+            new CombinedReportExport(
+                $filters,
+                $reservationReport['summary'],
+                $medicalRecordReport['summary'],
+                $doctorRecap,
+                $reservationReport['export_rows'],
+                $canViewMedicalRecords ? $medicalRecordReport['export_rows'] : [],
+                $canViewMedicalRecords
+            ),
+            $filename
+        );
     }
 
     public function reservations(Request $request): JsonResponse
@@ -61,6 +171,8 @@ class ReportController extends Controller
 
     public function medicalRecords(Request $request): JsonResponse
     {
+        $this->denySuperadminMedicalRecordAccess($request);
+
         $filters = $request->validate($this->medicalRecordReportRules());
         $report = $this->reportService->medicalRecords($request->user(), $filters);
 
@@ -74,6 +186,8 @@ class ReportController extends Controller
 
     public function exportMedicalRecords(Request $request)
     {
+        $this->denySuperadminMedicalRecordAccess($request);
+
         $filters = $request->validate(array_merge($this->medicalRecordReportRules(), [
             'format' => ['required', 'string', 'in:xlsx,pdf'],
         ]));
@@ -107,6 +221,7 @@ class ReportController extends Controller
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'doctor_id' => ['nullable', 'integer', 'exists:users,id'],
             'status' => ['nullable', 'string', 'in:pending,approved,rejected,cancelled,completed'],
+            'search' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -120,7 +235,192 @@ class ReportController extends Controller
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'doctor_id' => ['nullable', 'integer', 'exists:users,id'],
+            'search' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function pageReportRules(): array
+    {
+        return [
+            'clinic_id' => ['nullable', 'integer', 'exists:clinics,id'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'doctor_id' => ['nullable', 'integer', 'exists:users,id'],
+            'status' => ['nullable', 'string', 'in:pending,approved,rejected,cancelled,completed'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    private function selectedReportClinic(Request $request, array $context, array $payload): ?Clinic
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->role === User::ROLE_ADMIN) {
+            return $user->clinic_id !== null ? Clinic::find($user->clinic_id) : null;
+        }
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            $clinicId = isset($payload['clinic_id'])
+                ? (int) $payload['clinic_id']
+                : ($context['clinics'][0]['id'] ?? null);
+
+            return $clinicId !== null ? Clinic::find($clinicId) : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{clinic_id: int|null, date_from: string, date_to: string, doctor_id: int|null, status: string|null, search: string|null}
+     */
+    private function normalizedPageFilters(array $payload, ?int $clinicId): array
+    {
+        $today = Carbon::today();
+        $dateFrom = (string) ($payload['date_from'] ?? $today->copy()->startOfMonth()->toDateString());
+        $dateTo = (string) ($payload['date_to'] ?? ($payload['date_from'] ?? $today->toDateString()));
+        $search = isset($payload['search']) ? trim((string) $payload['search']) : '';
+
+        return [
+            'clinic_id' => $clinicId,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'doctor_id' => isset($payload['doctor_id']) && $payload['doctor_id'] !== '' ? (int) $payload['doctor_id'] : null,
+            'status' => isset($payload['status']) && $payload['status'] !== '' ? (string) $payload['status'] : null,
+            'search' => $search === '' ? null : $search,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function medicalRecordFiltersFromPage(array $filters): array
+    {
+        return [
+            'clinic_id' => $filters['clinic_id'],
+            'date_from' => $filters['date_from'],
+            'date_to' => $filters['date_to'],
+            'doctor_id' => $filters['doctor_id'] ?? null,
+            'search' => $filters['search'] ?? null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function emptyReservationReport(array $filters): array
+    {
+        return [
+            'filters' => $filters,
+            'records' => new \Illuminate\Database\Eloquent\Collection(),
+            'export_rows' => [],
+            'summary' => [
+                'total_reservations' => 0,
+                'registered_reservations' => 0,
+                'walk_in_reservations' => 0,
+                'pending_reservations' => 0,
+                'approved_reservations' => 0,
+                'rejected_reservations' => 0,
+                'cancelled_reservations' => 0,
+                'completed_reservations' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function emptyMedicalRecordReport(array $filters): array
+    {
+        return [
+            'filters' => $filters,
+            'records' => new \Illuminate\Database\Eloquent\Collection(),
+            'export_rows' => [],
+            'summary' => [
+                'total_medical_records' => 0,
+                'registered_records' => 0,
+                'walk_in_records' => 0,
+                'unique_registered_patients' => 0,
+                'unique_doctors' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function doctorOptions(Clinic $clinic): array
+    {
+        return $clinic->doctors()
+            ->select(['users.id', 'users.name'])
+            ->orderBy('users.name')
+            ->get()
+            ->map(fn (User $doctor): array => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  iterable<int, Reservation>  $reservations
+     * @param  iterable<int, MedicalRecord>  $medicalRecords
+     * @return array<int, array<string, mixed>>
+     */
+    private function doctorRecap(iterable $reservations, iterable $medicalRecords, bool $includeMedicalRecords): array
+    {
+        $rows = [];
+
+        foreach ($reservations as $reservation) {
+            $doctorId = (int) $reservation->doctor_id;
+            $rows[$doctorId] ??= $this->emptyDoctorRecapRow($doctorId, $reservation->doctor?->name ?? '-');
+            $rows[$doctorId]['reservation_count']++;
+            $rows[$doctorId][$reservation->status.'_count'] = ($rows[$doctorId][$reservation->status.'_count'] ?? 0) + 1;
+        }
+
+        if ($includeMedicalRecords) {
+            foreach ($medicalRecords as $medicalRecord) {
+                $doctorId = (int) $medicalRecord->doctor_id;
+                $rows[$doctorId] ??= $this->emptyDoctorRecapRow($doctorId, $medicalRecord->doctor?->name ?? '-');
+                $rows[$doctorId]['medical_record_count']++;
+            }
+        }
+
+        return collect($rows)
+            ->sortBy('doctor_name')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyDoctorRecapRow(int $doctorId, string $doctorName): array
+    {
+        return [
+            'doctor_id' => $doctorId,
+            'doctor_name' => $doctorName,
+            'reservation_count' => 0,
+            'pending_count' => 0,
+            'approved_count' => 0,
+            'rejected_count' => 0,
+            'cancelled_count' => 0,
+            'completed_count' => 0,
+            'medical_record_count' => 0,
+        ];
+    }
+
+    private function denySuperadminMedicalRecordAccess(Request $request): void
+    {
+        abort_if($request->user()->role === User::ROLE_SUPERADMIN, 403, 'Superadmin cannot access medical record data.');
     }
 
     /**
@@ -155,6 +455,7 @@ class ReportController extends Controller
                     'window_start_time' => $medicalRecord->reservation->window_start_time,
                     'window_end_time' => $medicalRecord->reservation->window_end_time,
                     'status' => $medicalRecord->reservation->status,
+                    'complaint' => $medicalRecord->reservation->complaint,
                     'reschedule_reason' => $medicalRecord->reservation->reschedule_reason,
                 ],
             ];

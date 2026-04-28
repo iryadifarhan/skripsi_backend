@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Clinic;
 use App\Models\DoctorClinicSchedule;
 use App\Models\Reservation;
 use App\Models\User;
@@ -54,12 +55,14 @@ class QueueController extends Controller
             }
         } elseif (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true) && $selectedClinicId !== null) {
             $query->where('clinic_id', $selectedClinicId)
+                ->where('status', Reservation::STATUS_APPROVED)
                 ->whereDate('reservation_date', $reservationDate)
                 ->orderBy('queue_number')
                 ->orderBy('window_start_time');
         } elseif ($user->role === User::ROLE_DOCTOR && $selectedClinicId !== null) {
             $query->where('doctor_id', $user->id)
                 ->where('clinic_id', $selectedClinicId)
+                ->where('status', Reservation::STATUS_APPROVED)
                 ->whereDate('reservation_date', $reservationDate)
                 ->orderBy('queue_number')
                 ->orderBy('window_start_time');
@@ -81,6 +84,8 @@ class QueueController extends Controller
 
         return Inertia::render('queue/index', [
             'context' => $context,
+            'clinic' => $selectedClinicId !== null ? $this->workspace->serializeClinicDetail(Clinic::findOrFail($selectedClinicId)) : null,
+            'today' => Carbon::today()->toDateString(),
             'queues' => $this->queueService->serializeQueueEntries($reservations, $user->role !== User::ROLE_PATIENT),
             'filters' => [
                 'clinicId' => $selectedClinicId,
@@ -268,9 +273,9 @@ class QueueController extends Controller
         $payload = $request->validate([
             'clinic_id' => ['required', 'integer', 'exists:clinics,id'],
             'queue_number' => ['sometimes', 'integer', 'min:1'],
-            'queue_status' => ['sometimes', 'string', Rule::in(Reservation::QUEUE_STATUSES), Rule::notIn([Reservation::QUEUE_STATUS_COMPLETED])],   // completed status can only be set by doctors
+            'queue_status' => ['sometimes', 'string', Rule::in(Reservation::QUEUE_STATUSES), Rule::notIn([Reservation::QUEUE_STATUS_COMPLETED])],
         ], [
-            'queue_status.not_in' => 'Only doctors can marks queue entries as completed.',
+            'queue_status.not_in' => 'Queue entries must be completed by creating a medical record.',
         ]);
 
         if (!isset($payload['queue_number']) && !isset($payload['queue_status'])) {
@@ -351,6 +356,15 @@ class QueueController extends Controller
 
     private function applyQueueStateChange(Request $request, Reservation $reservation, string $queueStatus): void
     {
+        if (
+            (string) $reservation->queue_status === Reservation::QUEUE_STATUS_IN_PROGRESS
+            && in_array($queueStatus, [Reservation::QUEUE_STATUS_WAITING, Reservation::QUEUE_STATUS_SKIPPED], true)
+        ) {
+            throw ValidationException::withMessages([
+                'queue_status' => ['In-progress queue entries can only be completed or cancelled.'],
+            ]);
+        }
+
         if (
             in_array($reservation->status, [Reservation::STATUS_CANCELLED, Reservation::STATUS_COMPLETED], true)
             && !in_array($queueStatus, [Reservation::QUEUE_STATUS_CANCELLED, Reservation::QUEUE_STATUS_COMPLETED], true)

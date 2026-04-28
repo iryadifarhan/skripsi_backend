@@ -9,6 +9,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class AuthWebTest extends TestCase
@@ -410,6 +412,89 @@ class AuthWebTest extends TestCase
         ]);
     }
 
+    public function test_patient_can_upload_and_delete_profile_image_from_profile_page(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+            'profile_picture' => 'patient_1',
+            'email' => 'patient-upload-avatar@example.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->post('/profile/image', [
+            'image' => UploadedFile::fake()->image('patient-avatar.png', 400, 400),
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('message', 'Profile image uploaded successfully.');
+
+        $uploadedPath = $user->fresh()->image_path;
+
+        $this->assertNotNull($uploadedPath);
+        $this->assertNull($user->fresh()->profile_picture);
+        Storage::disk('public')->assertExists($uploadedPath);
+
+        $this->deleteJson('/profile/image', [], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('message', 'Profile image deleted successfully.');
+
+        $this->assertNull($user->fresh()->image_path);
+        $this->assertNull($user->fresh()->profile_picture);
+        Storage::disk('public')->assertMissing($uploadedPath);
+    }
+
+    public function test_selecting_predefined_avatar_preserves_uploaded_profile_image(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+            'profile_picture' => 'patient_1',
+            'email' => 'patient-replace-upload-avatar@example.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->post('/profile/image', [
+            'image' => UploadedFile::fake()->image('patient-avatar.jpg', 400, 400),
+        ], $this->spaHeaders())->assertOk();
+
+        $uploadedPath = $user->fresh()->image_path;
+        $this->assertNotNull($uploadedPath);
+
+        $this->patchJson('/profile/picture', [
+            'profile_picture' => 'patient_2',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.profile_picture', 'patient_2')
+            ->assertJsonPath('user.image_path', $uploadedPath);
+
+        $this->assertSame('patient_2', $user->fresh()->profile_picture);
+        $this->assertSame($uploadedPath, $user->fresh()->image_path);
+        Storage::disk('public')->assertExists($uploadedPath);
+
+        $this->patchJson('/profile/picture', [
+            'profile_picture' => null,
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.profile_picture', null)
+            ->assertJsonPath('user.image_path', $uploadedPath);
+
+        $this->assertNull($user->fresh()->profile_picture);
+        $this->assertSame($uploadedPath, $user->fresh()->image_path);
+        Storage::disk('public')->assertExists($uploadedPath);
+    }
+
     public function test_profile_picture_update_rejects_role_mismatch_or_custom_value(): void
     {
         $user = User::factory()->create([
@@ -435,6 +520,42 @@ class AuthWebTest extends TestCase
         ], $this->spaHeaders())
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['profile_picture']);
+    }
+
+    public function test_admin_and_superadmin_cannot_manage_profile_avatar(): void
+    {
+        Storage::fake('public');
+
+        foreach ([User::ROLE_ADMIN, User::ROLE_SUPERADMIN] as $role) {
+            $user = User::factory()->create([
+                'role' => $role,
+                'profile_picture' => null,
+                'email' => "{$role}-no-avatar@example.com",
+                'password' => Hash::make('Password123!'),
+            ]);
+
+            $this->postJson('/login', [
+                'email' => $user->email,
+                'password' => 'Password123!',
+            ], $this->spaHeaders())->assertOk();
+
+            $this->getJson('/profile/picture-options', $this->spaHeaders())
+                ->assertOk()
+                ->assertJsonPath('role', $role)
+                ->assertJsonPath('profile_pictures', []);
+
+            $this->patchJson('/profile/picture', [
+                'profile_picture' => 'patient_1',
+            ], $this->spaHeaders())->assertForbidden();
+
+            $this->post('/profile/image', [
+                'image' => UploadedFile::fake()->image("{$role}-avatar.png", 200, 200),
+            ], $this->spaHeaders())->assertForbidden();
+
+            $this->deleteJson('/profile/image', [], $this->spaHeaders())->assertForbidden();
+
+            $this->postJson('/logout', [], $this->spaHeaders())->assertOk();
+        }
     }
 
     /**

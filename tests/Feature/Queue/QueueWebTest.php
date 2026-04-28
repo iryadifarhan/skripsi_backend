@@ -113,6 +113,36 @@ class QueueWebTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_admin_queue_page_only_shows_approved_reservations(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-queue-page-approved-only');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-queue-page-approved-only@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-queue-page-approved-only@example.com', $clinic->id);
+        $approvedPatient = $this->makeUser(User::ROLE_PATIENT, 'patient-approved-queue-page@example.com');
+        $pendingPatient = $this->makeUser(User::ROLE_PATIENT, 'patient-pending-queue-page@example.com');
+
+        $approvedReservation = $this->createReservation($approvedPatient, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_WAITING);
+        $approvedReservation->update(['status' => Reservation::STATUS_APPROVED]);
+        $pendingReservation = $this->createReservation($pendingPatient, $schedule, $reservationDate, '10:00:00', 1, 2, Reservation::QUEUE_STATUS_WAITING);
+
+        $this->login($admin, 'Password123!');
+
+        $this->get('/queue?clinic_id='.$clinic->id.'&reservation_date='.$reservationDate)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('queue/index')
+                ->has('queues', 1)
+                ->where('queues.0.reservation_id', $approvedReservation->id)
+                ->where('queues.0.reservation_status', Reservation::STATUS_APPROVED)
+            );
+
+        $this->assertNotSame($approvedReservation->id, $pendingReservation->id);
+    }
+
     public function test_manual_queue_override_persists_when_new_reservation_is_created(): void
     {
         $reservationDate = now()->addDay()->toDateString();
@@ -188,6 +218,43 @@ class QueueWebTest extends TestCase
         ], $this->spaHeaders())
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['queue_status']);
+    }
+
+    public function test_admin_cannot_skip_or_reset_in_progress_queue_entry(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-queue-in-progress-lock');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-queue-in-progress-lock@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-queue-in-progress-lock@example.com', $clinic->id);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-in-progress-lock@example.com');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_IN_PROGRESS);
+        $reservation->update([
+            'status' => Reservation::STATUS_APPROVED,
+        ]);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/admin/queues/{$reservation->id}", [
+            'clinic_id' => $clinic->id,
+            'queue_status' => Reservation::QUEUE_STATUS_SKIPPED,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['queue_status']);
+
+        $this->patchJson("/admin/queues/{$reservation->id}", [
+            'clinic_id' => $clinic->id,
+            'queue_status' => Reservation::QUEUE_STATUS_WAITING,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['queue_status']);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'queue_status' => Reservation::QUEUE_STATUS_IN_PROGRESS,
+        ]);
     }
 
     public function test_doctor_can_check_current_queue_for_owned_schedule(): void
