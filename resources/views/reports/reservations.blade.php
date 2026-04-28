@@ -24,6 +24,7 @@
         <tr><td>Date To</td><td>{{ $filters['date_to'] }}</td></tr>
         <tr><td>Doctor ID</td><td>{{ $filters['doctor_id'] ?? 'all' }}</td></tr>
         <tr><td>Status</td><td>{{ $filters['status'] ?? 'all' }}</td></tr>
+        <tr><td>Search</td><td>{{ $filters['search'] ?? '-' }}</td></tr>
     </table>
 
     <h2>Summary</h2>
@@ -59,7 +60,7 @@
                     <td>{{ \Illuminate\Support\Carbon::parse($reservation['reservation_date'])->toDateString() }}</td>
                     <td>{{ $reservation['window_start_time'] }} - {{ $reservation['window_end_time'] }}</td>
                     <td>
-                        {{ $reservation['queue_summary']['number'] ?? '-' }}
+                        #{{ $reservation['queue_summary']['number'] ?? '-' }}
                         / {{ $reservation['queue_summary']['status'] ?? '-' }}
                     </td>
                     <td>{{ $reservation['status'] }}</td>

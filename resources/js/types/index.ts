@@ -29,14 +29,29 @@ export type WorkspaceContext = {
 export type ReservationEntry = {
     id: number;
     reservation_number: string;
+    patient_id?: number | null;
     clinic_id?: number;
+    doctor_id?: number;
+    doctor_clinic_schedule_id?: number;
     status: string;
     reservation_date: string;
     window_start_time: string;
     window_end_time: string;
+    window_slot_number?: number | null;
     complaint?: string | null;
+    guest_name?: string | null;
+    guest_phone_number?: string | null;
+    admin_notes?: string | null;
     reschedule_reason?: string | null;
     cancellation_reason?: string | null;
+    patient?: {
+        id: number;
+        name: string;
+        username?: string;
+        email?: string;
+        phone_number?: string | null;
+        gender?: string | null;
+    } | null;
     clinic?: {
         id: number;
         name: string;
@@ -56,16 +71,65 @@ export type ReservationEntry = {
     } | null;
 };
 
+export type PatientSummaryEntry = {
+    type: 'registered';
+    id: number;
+    name: string;
+    username: string;
+    email: string;
+    phone_number?: string | null;
+    date_of_birth?: string | null;
+    gender?: string | null;
+    image_url?: string | null;
+    reservation_count: number;
+    medical_record_count: number;
+    latest_activity_at?: string | null;
+};
+
+export type WalkInPatientSummaryEntry = {
+    type: 'walk_in';
+    walk_in_key: string;
+    key: string;
+    name: string;
+    phone_number?: string | null;
+    reservation_count: number;
+    medical_record_count: number;
+    latest_activity_at?: string | null;
+    clinics?: string[];
+};
+
+export type PatientDetailEntry = {
+    type: 'registered' | 'walk_in';
+    id?: number;
+    walk_in_key?: string;
+    name: string;
+    username?: string;
+    email?: string;
+    phone_number?: string | null;
+    date_of_birth?: string | null;
+    gender?: string | null;
+    image_url?: string | null;
+    reservation_count?: number;
+    medical_record_count?: number;
+    latest_activity_at?: string | null;
+};
+
 export type QueueEntry = {
     reservation_id: number;
     reservation_number: string;
+    patient_id?: number | null;
     reservation_date: string;
     reservation_status: string;
     complaint?: string | null;
     guest_name?: string | null;
+    guest_phone_number?: string | null;
     patient?: {
         id: number;
         name: string;
+        username?: string;
+        email?: string;
+        phone_number?: string | null;
+        gender?: string | null;
     } | null;
     doctor?: {
         id: number;
@@ -104,6 +168,9 @@ export type MedicalRecordEntry = {
     patient?: {
         id: number;
         name: string;
+        username?: string;
+        email?: string;
+        phone_number?: string | null;
     } | null;
     doctor?: {
         id: number;
@@ -117,7 +184,11 @@ export type MedicalRecordEntry = {
         id: number;
         reservation_number: string;
         reservation_date: string;
+        window_start_time?: string;
+        window_end_time?: string;
         status: string;
+        complaint?: string | null;
+        reschedule_reason?: string | null;
     } | null;
 };
 
@@ -145,6 +216,17 @@ export type ClinicDetail = {
     image_url?: string | null;
     specialities: string[];
     doctors: DoctorEntry[];
+    admins?: {
+        id: number;
+        name: string;
+        username: string;
+        email: string;
+        phone_number?: string | null;
+        date_of_birth?: string | null;
+        gender?: string | null;
+        email_verified_at?: string | null;
+        created_at?: string | null;
+    }[];
     operating_hours?: {
         id: number;
         clinic_id: number;

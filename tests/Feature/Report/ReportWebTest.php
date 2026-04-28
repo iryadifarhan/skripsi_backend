@@ -12,6 +12,7 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ReportWebTest extends TestCase
@@ -24,6 +25,69 @@ class ReportWebTest extends TestCase
 
         config()->set('session.driver', 'database');
         $this->withoutMiddleware(ValidateCsrfToken::class);
+    }
+
+    public function test_admin_can_open_combined_reports_page_and_export(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $issuedDate = now()->toDateString();
+        $clinic = $this->makeClinic('clinic-combined-report-admin');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-combined-report-admin@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $admin = $this->makeUser(User::ROLE_ADMIN, 'admin-combined-report@example.com', $clinic->id);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-combined-report@example.com');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_COMPLETED);
+        $this->createMedicalRecord($reservation, $doctor, 'Combined report notes.');
+
+        $this->actingAs($admin)
+            ->get("/reports?clinic_id={$clinic->id}&date_from={$issuedDate}&date_to={$reservationDate}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('reports/index')
+                ->where('canViewMedicalRecords', true)
+                ->where('clinic.id', $clinic->id)
+                ->where('reservationSummary.total_reservations', 1)
+                ->where('medicalRecordSummary.total_medical_records', 1)
+                ->has('doctorRecap', 1)
+                ->has('reservations', 1)
+                ->has('medicalRecords', 1)
+            );
+
+        $response = $this->actingAs($admin)
+            ->get("/reports/export?clinic_id={$clinic->id}&date_from={$issuedDate}&date_to={$reservationDate}&format=xlsx");
+
+        $response->assertOk();
+        $this->assertStringContainsString('.xlsx', (string) $response->headers->get('content-disposition'));
+    }
+
+    public function test_superadmin_reports_page_hides_medical_records(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $issuedDate = now()->toDateString();
+        $clinic = $this->makeClinic('clinic-combined-report-superadmin');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-combined-report-superadmin@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+        $patient = $this->makeUser(User::ROLE_PATIENT, 'patient-combined-report-superadmin@example.com');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_COMPLETED);
+        $this->createMedicalRecord($reservation, $doctor, 'Hidden from superadmin reports.');
+        $superadmin = User::factory()->create([
+            'role' => User::ROLE_SUPERADMIN,
+        ]);
+
+        $this->actingAs($superadmin)
+            ->get("/reports?clinic_id={$clinic->id}&date_from={$issuedDate}&date_to={$reservationDate}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('reports/index')
+                ->where('canViewMedicalRecords', false)
+                ->where('clinic.id', $clinic->id)
+                ->where('reservationSummary.total_reservations', 1)
+                ->where('medicalRecordSummary.total_medical_records', 0)
+                ->has('reservations', 1)
+                ->has('medicalRecords', 0)
+            );
     }
 
     public function test_admin_can_view_reservations_report_and_export_excel(): void

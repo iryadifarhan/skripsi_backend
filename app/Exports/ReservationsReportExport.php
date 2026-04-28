@@ -42,6 +42,7 @@ class ReservationsReportExport implements WithMultipleSheets
             ['Date To', (string) $this->filters['date_to']],
             ['Doctor ID', (string) ($this->filters['doctor_id'] ?? 'all')],
             ['Status Filter', (string) ($this->filters['status'] ?? 'all')],
+            ['Search', (string) ($this->filters['search'] ?? '-')],
             ['Report Type', 'reservations'],
             ['Total Reservations', $this->summary['total_reservations']],
             ['Registered Reservations', $this->summary['registered_reservations']],

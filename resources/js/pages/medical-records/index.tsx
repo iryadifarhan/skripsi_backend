@@ -1,19 +1,31 @@
 import { Head, router } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 import AppLayout from '@/layouts/app-layout';
+import { PaginationControls, useClientPagination } from '@/lib/client-pagination';
 import type { MedicalRecordEntry, WorkspaceContext } from '@/types';
+
+type DoctorOption = {
+    id: number;
+    name: string;
+};
 
 type MedicalRecordsPageProps = {
     context: WorkspaceContext;
     medicalRecords: MedicalRecordEntry[];
+    doctorOptions: DoctorOption[];
+    canViewMedicalRecords: boolean;
     filters: {
         clinicId: number | null;
         reservationDate: string;
     };
 };
 
-export default function MedicalRecordsPage({ context, medicalRecords, filters }: MedicalRecordsPageProps) {
-    const canView = context.role === 'patient' || context.role === 'admin' || context.role === 'doctor';
+export default function MedicalRecordsPage({ context, medicalRecords, doctorOptions, canViewMedicalRecords, filters }: MedicalRecordsPageProps) {
+    const canView = canViewMedicalRecords;
+    const canFilterByDoctor = canView && context.role === 'admin';
+    const [search, setSearch] = useState('');
+    const [doctorFilter, setDoctorFilter] = useState('');
 
     const updateFilters = (updates: Partial<MedicalRecordsPageProps['filters']>) => {
         const nextFilters = { ...filters, ...updates };
@@ -26,42 +38,47 @@ export default function MedicalRecordsPage({ context, medicalRecords, filters }:
         });
     };
 
+    const filteredMedicalRecords = useMemo(() => {
+        const keyword = search.trim().toLowerCase();
+
+        return medicalRecords.filter((record) => {
+            const matchesDoctor = doctorFilter === '' || String(record.doctor?.id ?? '') === doctorFilter;
+            const searchableValues = [
+                record.patient?.name,
+                record.guest_name,
+                record.doctor?.name,
+                record.clinic?.name,
+                record.reservation?.reservation_number,
+                record.reservation?.complaint,
+                record.diagnosis,
+                record.treatment,
+                record.prescription_notes,
+                record.doctor_notes,
+            ];
+            const matchesSearch = keyword === '' || searchableValues
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(keyword));
+
+            return matchesDoctor && matchesSearch;
+        });
+    }, [doctorFilter, medicalRecords, search]);
+    const recordPagination = useClientPagination(filteredMedicalRecords);
+
     return (
         <AppLayout>
-            <Head title="Medical Records" />
+            <Head title="Data Rekam Medis" />
 
-            <section className="space-y-8">
-                <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-                    <div className="rounded-[2rem] border border-white/80 bg-night-900 p-8 text-white shadow-[0_25px_80px_rgba(16,24,39,0.18)]">
-                        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-clinic-300">Medical record workspace</p>
-                        <h2 className="mt-4 text-4xl font-black leading-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                            Secure consultation outcomes
-                        </h2>
-                        <p className="mt-5 max-w-2xl text-sm leading-7 text-white/80">
-                            Completed reservations become medical records here. This page now receives scoped records from web controllers through Inertia props.
-                        </p>
-                    </div>
-
-                    <div className="rounded-[2rem] border border-white/80 bg-white/85 p-8 shadow-[0_25px_80px_rgba(16,24,39,0.08)] backdrop-blur">
-                        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-clinic-700">Record count</p>
-                        <p className="mt-4 text-5xl font-black text-night-900" style={{ fontFamily: 'var(--font-display)' }}>
-                            {medicalRecords.length}
-                        </p>
-                        <p className="mt-4 text-sm leading-7 text-ink-700">
-                            Filters trigger same-origin web requests through the Laravel/Inertia stack.
-                        </p>
-                    </div>
-                </div>
-
-                <section className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_48px_rgba(16,24,39,0.08)] backdrop-blur">
-                    <div className="grid gap-4 lg:grid-cols-3">
-                        {(context.role === 'admin' || context.role === 'doctor') ? (
-                            <label className="flex flex-col gap-2 text-sm font-medium text-night-900">
-                                Clinic
+            <section className="h-full overflow-y-auto bg-[#DFE0DF]">
+                <div className="flex flex-col gap-4 p-5">
+                    
+                    {canView && context.role === 'superadmin' && context.clinics.length > 0 ? (
+                        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                            <label className="flex w-full flex-col gap-2 text-[12px] font-medium text-[#40311D] md:w-80">
+                                Klinik
                                 <select
                                     value={filters.clinicId ?? ''}
                                     onChange={(event) => updateFilters({ clinicId: event.target.value === '' ? null : Number(event.target.value) })}
-                                    className="rounded-2xl border border-night-900/10 bg-white px-4 py-3 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
+                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
                                 >
                                     {context.clinics.map((clinic) => (
                                         <option key={clinic.id} value={clinic.id}>
@@ -70,68 +87,146 @@ export default function MedicalRecordsPage({ context, medicalRecords, filters }:
                                     ))}
                                 </select>
                             </label>
-                        ) : null}
+                        </div>
+                    ) : null}
 
-                        <label className="flex flex-col gap-2 text-sm font-medium text-night-900">
-                            Reservation date
-                            <input
-                                type="date"
-                                value={filters.reservationDate}
-                                onChange={(event) => updateFilters({ reservationDate: event.target.value })}
-                                className="rounded-2xl border border-night-900/10 bg-white px-4 py-3 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
-                            />
-                        </label>
-                    </div>
-                </section>
+                    {canView ? (
+                        <section className="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                            <p className="mb-2 text-[12px] font-medium text-[#40311D]">Filter Rekam Medis</p>
+                            <div className="flex flex-wrap items-center gap-2">
 
-                {!canView ? (
-                    <section className="rounded-[2rem] border border-dashed border-night-900/15 bg-white/70 p-8 text-sm leading-7 text-ink-700 shadow-[0_18px_48px_rgba(16,24,39,0.05)]">
-                        Medical records are available to patients, clinic admins, and doctors only.
-                    </section>
-                ) : medicalRecords.length === 0 ? (
-                    <section className="rounded-[2rem] border border-dashed border-night-900/15 bg-white/70 p-8 text-sm leading-7 text-ink-700 shadow-[0_18px_48px_rgba(16,24,39,0.05)]">
-                        No medical records matched the current filters.
-                    </section>
-                ) : (
-                    <section className="grid gap-5">
-                        {medicalRecords.map((record) => (
-                            <article key={record.id} className="rounded-[1.75rem] border border-white/80 bg-white/88 p-6 shadow-[0_18px_48px_rgba(16,24,39,0.08)] backdrop-blur">
-                                <div className="space-y-4">
-                                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                        <div>
-                                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-clinic-700">
-                                                {record.reservation?.reservation_number ?? `Record #${record.id}`}
-                                            </p>
-                                            <h3 className="mt-2 text-xl font-bold text-night-900">
-                                                {record.patient?.name ?? record.guest_name ?? 'Walk-in Patient'}
-                                            </h3>
-                                        </div>
-                                        <div className="rounded-2xl bg-clinic-100 px-4 py-3 text-sm font-semibold text-clinic-700">
-                                            Issued at {record.issued_at.slice(0, 16).replace('T', ' ')}
-                                        </div>
-                                    </div>
-
-                                    <div className="grid gap-2 text-sm leading-7 text-ink-700 sm:grid-cols-2">
-                                        <p>Clinic: {record.clinic?.name ?? '-'}</p>
-                                        <p>Doctor: {record.doctor?.name ?? '-'}</p>
-                                        <p>Reservation date: {record.reservation?.reservation_date.slice(0, 10) ?? '-'}</p>
-                                        <p>Reservation status: {record.reservation?.status ?? '-'}</p>
-                                    </div>
-
-                                    <div className="grid gap-3 rounded-[1.5rem] bg-ink-50 p-5 text-sm leading-7 text-ink-700">
-                                        <p><span className="font-semibold text-night-900">Doctor notes:</span> {record.doctor_notes}</p>
-                                        {record.diagnosis ? <p><span className="font-semibold text-night-900">Diagnosis:</span> {record.diagnosis}</p> : null}
-                                        {record.treatment ? <p><span className="font-semibold text-night-900">Treatment:</span> {record.treatment}</p> : null}
-                                        {record.prescription_notes ? <p><span className="font-semibold text-night-900">Prescription notes:</span> {record.prescription_notes}</p> : null}
-                                    </div>
+                                <div className="flex min-w-64 items-center gap-2 rounded-full border border-gray-300 px-3 py-1 transition focus-within:border-[#40311D]">
+                                    <span className="text-[12px] text-gray-400">Search</span>
+                                    <input
+                                        value={search}
+                                        onChange={(event) => setSearch(event.target.value)}
+                                        placeholder="Pasien, kode, diagnosis..."
+                                        type="text"
+                                        className="min-w-0 flex-1 bg-transparent text-[12px] italic outline-none placeholder:text-gray-400"
+                                    />
                                 </div>
-                            </article>
-                        ))}
-                    </section>
-                )}
+
+                                {canFilterByDoctor ? (
+                                    <label className="flex min-w-52 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1 text-[12px] text-gray-600 transition focus-within:border-[#40311D]">
+                                        <span className="whitespace-nowrap text-gray-400">Dokter</span>
+                                        <select
+                                            value={doctorFilter}
+                                            onChange={(event) => setDoctorFilter(event.target.value)}
+                                            className="min-w-0 flex-1 bg-transparent text-[12px] text-gray-700 outline-none"
+                                        >
+                                            <option value="">Semua Dokter</option>
+                                            {doctorOptions.map((doctor) => (
+                                                <option key={doctor.id} value={doctor.id}>
+                                                    {doctor.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                ) : null}
+
+                                <label className="flex min-w-48 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1 text-[12px] text-gray-600 transition focus-within:border-[#40311D]">
+                                    <span className="whitespace-nowrap text-gray-400">Tanggal</span>
+                                    <input
+                                        type="date"
+                                        value={filters.reservationDate}
+                                        onChange={(event) => updateFilters({ reservationDate: event.target.value })}
+                                        className="min-w-0 flex-1 bg-transparent text-[12px] text-gray-700 outline-none"
+                                    />
+                                </label>
+                            </div>
+                        </section>
+                    ) : null}
+
+                    {!canView ? (
+                        <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
+                            Rekam medis bersifat clinic-scoped dan tidak ditampilkan untuk superadmin. Data ini hanya tersedia untuk admin klinik, dokter terkait, dan pasien pemilik.
+                        </section>
+                    ) : (
+                        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                            <div className="border-b border-[#e4ddd4] bg-[#faf9f7] px-4 py-3">
+                                <p className="text-[13px] font-medium text-[#40311D]">Daftar Rekam Medis</p>
+                                <p className="mt-0.5 text-[11px] text-gray-400">
+                                    Rekam medis clinic-scoped dari klinik terpilih
+                                </p>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[1180px] border-collapse text-[12px] whitespace-nowrap">
+                                    <thead>
+                                        <tr className="border-b border-[#e4ddd4] bg-[#faf9f7]">
+                                            {['No', 'Tanggal', 'Pasien/Walk-In', 'Dokter', 'Reservation Number', 'Keluhan', 'Diagnosis', 'Treatment', 'Prescription Note', 'Doctor Notes'].map((header) => (
+                                                <th key={header} className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">
+                                                    {header}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredMedicalRecords.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={10} className="px-4 py-8 text-center text-[12px] italic text-gray-400">
+                                                    Tidak ada rekam medis yang sesuai filter.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            recordPagination.paginatedItems.map((record, index) => (
+                                                <tr key={record.id} className="border-b border-[#ede8e2] last:border-0 hover:bg-[#faf9f7]">
+                                                    <td className="px-4 py-2.5 text-gray-700">{String(recordPagination.startItem + index).padStart(3, '0')}</td>
+                                                    <td className="px-4 py-2.5 text-gray-700">{dateTimeLabel(record.issued_at)}</td>
+                                                    <td className="px-4 py-2.5 text-gray-700">{patientName(record)}</td>
+                                                    <td className="px-4 py-2.5 text-gray-700">{record.doctor?.name ?? '-'}</td>
+                                                    <td className="px-4 py-2.5 font-medium text-[#40311D]">{record.reservation?.reservation_number ?? '-'}</td>
+                                                    <td className="max-w-[220px] truncate px-4 py-2.5 text-gray-700" title={record.reservation?.complaint ?? '-'}>
+                                                        {record.reservation?.complaint ?? '-'}
+                                                    </td>
+                                                    <td className="max-w-[220px] truncate px-4 py-2.5 text-gray-700" title={record.diagnosis ?? '-'}>
+                                                        {record.diagnosis ?? '-'}
+                                                    </td>
+                                                    <td className="max-w-[220px] truncate px-4 py-2.5 text-gray-700" title={record.treatment ?? '-'}>
+                                                        {record.treatment ?? '-'}
+                                                    </td>
+                                                    <td className="max-w-[220px] truncate px-4 py-2.5 text-gray-700" title={record.prescription_notes ?? '-'}>
+                                                        {record.prescription_notes ?? '-'}
+                                                    </td>
+                                                    <td className="max-w-[260px] truncate px-4 py-2.5 text-gray-700" title={record.doctor_notes}>
+                                                        {record.doctor_notes}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <PaginationControls
+                                page={recordPagination.page}
+                                perPage={recordPagination.perPage}
+                                total={recordPagination.total}
+                                pageCount={recordPagination.pageCount}
+                                startItem={recordPagination.startItem}
+                                endItem={recordPagination.endItem}
+                                perPageOptions={recordPagination.perPageOptions}
+                                onPageChange={recordPagination.setPage}
+                                onPerPageChange={recordPagination.setPerPage}
+                            />
+                        </section>
+                    )}
+                </div>
             </section>
         </AppLayout>
     );
+}
+
+function patientName(record: MedicalRecordEntry): string {
+    return record.patient?.name ?? record.guest_name ?? 'Walk-in Patient';
+}
+
+function dateTimeLabel(value: string): string {
+    if (!value) {
+        return '-';
+    }
+
+    return value.replace('T', ' ').slice(0, 16);
 }
 
 function cleanQuery(query: Record<string, string | number | boolean | null | undefined>) {

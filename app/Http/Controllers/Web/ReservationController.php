@@ -301,6 +301,7 @@ class ReservationController extends Controller
             'reservation_date' => ['required', 'date', 'after_or_equal:today'],
             'window_start_time' => ['required', 'date_format:H:i'],
             'patient_id' => ['nullable', 'integer', 'exists:users,id'],
+            'status' => ['nullable', 'string', Rule::in(Reservation::STATUSES)],
             'guest_name' => ['nullable', 'string', 'max:255'],
             'guest_phone_number' => ['nullable', 'string', 'max:30'],
             'complaint' => ['nullable', 'string', 'max:1000'],
@@ -359,7 +360,7 @@ class ReservationController extends Controller
                 'window_start_time' => $this->normalizeTimeString($selectedWindow['window_start_time']),
                 'window_end_time' => $this->normalizeTimeString($selectedWindow['window_end_time']),
                 'window_slot_number' => $assignedSlot,
-                'status' => Reservation::STATUS_PENDING,
+                'status' => $payload['status'] ?? Reservation::STATUS_PENDING,
                 'complaint' => $payload['complaint'] ?? null,
             ]);
 

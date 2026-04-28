@@ -1,14 +1,23 @@
-﻿import { Head, router, usePage } from '@inertiajs/react';
-import { FormEvent, useMemo, useRef, useState } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import AppLayout from '@/layouts/app-layout';
-import type { ClinicDetail, DoctorClinicScheduleEntry, SharedData, ValidationErrors, WorkspaceContext } from '@/types';
+import type { ClinicDetail, SharedData, ValidationErrors, WorkspaceContext } from '@/types';
 
 type ClinicSettingsPageProps = {
     context: WorkspaceContext;
     selectedClinicId: number | null;
     clinic: ClinicDetail | null;
-    schedules: DoctorClinicScheduleEntry[];
+    summary: ClinicSettingsSummary;
+};
+
+type ClinicSettingsSummary = {
+    doctor_count: number;
+    active_schedule_count: number;
+    today_reservation_count: number;
+    active_queue_count: number;
+    operating_day_count: number;
+    medical_records_this_month: number | null;
 };
 
 type ClinicForm = {
@@ -18,6 +27,19 @@ type ClinicForm = {
     email: string;
 };
 
+type AdminForm = {
+    name: string;
+    username: string;
+    email: string;
+    phone_number: string;
+    date_of_birth: string;
+    gender: string;
+    password: string;
+    password_confirmation: string;
+};
+
+type ClinicAdmin = NonNullable<ClinicDetail['admins']>[number];
+
 type OperatingHourForm = {
     day_of_week: number;
     open_time: string;
@@ -25,65 +47,105 @@ type OperatingHourForm = {
     is_closed: boolean;
 };
 
-type ScheduleForm = {
-    doctor_id: string;
-    day_of_week: string[];
-    start_time: string;
-    end_time: string;
-    window_minutes: string;
-    max_patients_per_window: string;
+type BulkOperatingMode = 'open' | 'closed' | 'full_day';
+
+const dayOptions = [
+    { value: 1, label: 'Senin', short: 'Sen' },
+    { value: 2, label: 'Selasa', short: 'Sel' },
+    { value: 3, label: 'Rabu', short: 'Rab' },
+    { value: 4, label: 'Kamis', short: 'Kam' },
+    { value: 5, label: 'Jumat', short: 'Jum' },
+    { value: 6, label: 'Sabtu', short: 'Sab' },
+    { value: 0, label: 'Minggu', short: 'Min' },
+];
+
+const emptyAdminForm: AdminForm = {
+    name: '',
+    username: '',
+    email: '',
+    phone_number: '',
+    date_of_birth: '',
+    gender: '',
+    password: '',
+    password_confirmation: '',
 };
 
-type ScheduleEditForm = {
-    start_time: string;
-    end_time: string;
-    window_minutes: string;
-    max_patients_per_window: string;
-    is_active: boolean;
-};
-
-const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-
-export default function ClinicSettingsPage({ context, selectedClinicId, clinic, schedules }: ClinicSettingsPageProps) {
+export default function ClinicSettingsPage({ context, clinic, summary }: ClinicSettingsPageProps) {
     const { flash } = usePage<SharedData>().props;
     const fileInput = useRef<HTMLInputElement | null>(null);
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [error, setError] = useState<string | null>(null);
     const [savingClinic, setSavingClinic] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [creatingSchedule, setCreatingSchedule] = useState(false);
-    const [updatingScheduleId, setUpdatingScheduleId] = useState<number | null>(null);
-
-    const [clinicForm, setClinicForm] = useState<ClinicForm>({
-        name: clinic?.name ?? '',
-        address: clinic?.address ?? '',
-        phone_number: clinic?.phone_number ?? '',
-        email: clinic?.email ?? '',
-    });
-
+    const [clinicForm, setClinicForm] = useState<ClinicForm>(() => clinicToForm(clinic));
     const [operatingHours, setOperatingHours] = useState<OperatingHourForm[]>(() => buildOperatingHours(clinic));
-    const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({
-        doctor_id: clinic?.doctors?.[0]?.id ? String(clinic.doctors[0].id) : '',
-        day_of_week: [],
-        start_time: '09:00:00',
-        end_time: '12:00:00',
-        window_minutes: '30',
-        max_patients_per_window: '4',
-    });
-    const [scheduleEdits, setScheduleEdits] = useState<Record<number, ScheduleEditForm>>(() =>
-        Object.fromEntries(schedules.map((schedule) => [schedule.id, scheduleToEditForm(schedule)])),
-    );
+    const [localImagePreviewUrl, setLocalImagePreviewUrl] = useState<string | null>(null);
+    const [bulkDays, setBulkDays] = useState<number[]>([1, 2, 3, 4, 5]);
+    const [bulkMode, setBulkMode] = useState<BulkOperatingMode>('open');
+    const [bulkOpenTime, setBulkOpenTime] = useState('09:00:00');
+    const [bulkCloseTime, setBulkCloseTime] = useState('21:00:00');
+    const [showAdminModal, setShowAdminModal] = useState(false);
+    const [adminForm, setAdminForm] = useState<AdminForm>(emptyAdminForm);
+    const [savingAdmin, setSavingAdmin] = useState(false);
+    const [editingAdmin, setEditingAdmin] = useState<ClinicAdmin | null>(null);
+    const [deletingAdmin, setDeletingAdmin] = useState<ClinicAdmin | null>(null);
+    const [deletingClinic, setDeletingClinic] = useState(false);
+    const isSuperadmin = context.role === 'superadmin';
 
-    const scheduleByDoctor = useMemo(() => {
-        const groups = new Map<string, DoctorClinicScheduleEntry[]>();
+    useEffect(() => {
+        setClinicForm(clinicToForm(clinic));
+        setOperatingHours(buildOperatingHours(clinic));
+        setErrors({});
+        setError(null);
+        if (fileInput.current) {
+            fileInput.current.value = '';
+        }
+        setLocalImagePreviewUrl((currentUrl) => {
+            if (currentUrl) {
+                URL.revokeObjectURL(currentUrl);
+            }
 
-        schedules.forEach((schedule) => {
-            const key = schedule.doctor?.name ?? 'Dokter tidak ditemukan';
-            groups.set(key, [...(groups.get(key) ?? []), schedule]);
+            return null;
         });
+        setShowAdminModal(false);
+        setAdminForm(emptyAdminForm);
+        setEditingAdmin(null);
+        setDeletingAdmin(null);
+        setDeletingClinic(false);
+    }, [clinic?.id]);
 
-        return Array.from(groups.entries());
-    }, [schedules]);
+    const summaryCards = [
+        {
+            label: 'Dokter Terdaftar',
+            value: summary.doctor_count,
+            helper: 'Dokter yang terhubung ke klinik',
+        },
+        {
+            label: 'Jadwal Aktif',
+            value: summary.active_schedule_count,
+            helper: 'Jadwal praktik dokter aktif',
+        },
+        {
+            label: 'Reservasi Hari Ini',
+            value: summary.today_reservation_count,
+            helper: 'Semua status reservasi hari ini',
+        },
+        {
+            label: 'Antrean Aktif',
+            value: summary.active_queue_count,
+            helper: 'Queue approved yang masih berjalan',
+        },
+        {
+            label: 'Hari Operasional',
+            value: `${summary.operating_day_count}/7`,
+            helper: 'Hari klinik tidak ditandai tutup',
+        },
+        {
+            label: 'Rekam Medis Bulan Ini',
+            value: context.role === 'superadmin' ? 'Hidden' : summary.medical_records_this_month ?? 0,
+            helper: 'Hanya untuk admin klinik',
+        },
+    ];
 
     const submitClinic = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -103,8 +165,8 @@ export default function ClinicSettingsPage({ context, selectedClinicId, clinic, 
                 ...clinicForm,
                 operating_hours: operatingHours.map((hour) => ({
                     day_of_week: hour.day_of_week,
-                    open_time: hour.is_closed ? null : hour.open_time,
-                    close_time: hour.is_closed ? null : hour.close_time,
+                    open_time: hour.is_closed ? null : withSeconds(hour.open_time),
+                    close_time: hour.is_closed ? null : withSeconds(hour.close_time),
                     is_closed: hour.is_closed,
                 })),
             },
@@ -127,6 +189,7 @@ export default function ClinicSettingsPage({ context, selectedClinicId, clinic, 
         const file = fileInput.current?.files?.[0];
 
         if (!file) {
+            setError('Pilih file foto klinik terlebih dahulu.');
             return;
         }
 
@@ -145,6 +208,13 @@ export default function ClinicSettingsPage({ context, selectedClinicId, clinic, 
                 if (fileInput.current) {
                     fileInput.current.value = '';
                 }
+                setLocalImagePreviewUrl((currentUrl) => {
+                    if (currentUrl) {
+                        URL.revokeObjectURL(currentUrl);
+                    }
+
+                    return null;
+                });
             },
             onError: (validationErrors) => {
                 setErrors(normalizeInertiaErrors(validationErrors));
@@ -154,314 +224,713 @@ export default function ClinicSettingsPage({ context, selectedClinicId, clinic, 
         });
     };
 
-    const createSchedule = (event: FormEvent<HTMLFormElement>) => {
+    const previewSelectedImage = () => {
+        const file = fileInput.current?.files?.[0];
+
+        setLocalImagePreviewUrl((currentUrl) => {
+            if (currentUrl) {
+                URL.revokeObjectURL(currentUrl);
+            }
+
+            return file ? URL.createObjectURL(file) : null;
+        });
+    };
+
+    const clearSelectedImage = () => {
+        if (fileInput.current) {
+            fileInput.current.value = '';
+        }
+
+        setLocalImagePreviewUrl((currentUrl) => {
+            if (currentUrl) {
+                URL.revokeObjectURL(currentUrl);
+            }
+
+            return null;
+        });
+    };
+
+    const applyBulkOperatingHours = () => {
+        if (bulkDays.length === 0) {
+            setError('Pilih minimal satu hari untuk menerapkan jam operasional.');
+            return;
+        }
+
+        setError(null);
+        setOperatingHours((current) => current.map((hour) => {
+            if (!bulkDays.includes(hour.day_of_week)) {
+                return hour;
+            }
+
+            if (bulkMode === 'closed') {
+                return {
+                    ...hour,
+                    is_closed: true,
+                };
+            }
+
+            if (bulkMode === 'full_day') {
+                return {
+                    ...hour,
+                    open_time: '00:00:00',
+                    close_time: '23:59:00',
+                    is_closed: false,
+                };
+            }
+
+            return {
+                ...hour,
+                open_time: withSeconds(bulkOpenTime),
+                close_time: withSeconds(bulkCloseTime),
+                is_closed: false,
+            };
+        }));
+    };
+
+    const openAdminModal = () => {
+        setAdminForm(emptyAdminForm);
+        setEditingAdmin(null);
+        setErrors({});
+        setError(null);
+        setShowAdminModal(true);
+    };
+
+    const openEditAdminModal = (admin: ClinicAdmin) => {
+        setAdminForm({
+            name: admin.name,
+            username: admin.username,
+            email: admin.email,
+            phone_number: admin.phone_number ?? '',
+            date_of_birth: admin.date_of_birth ?? '',
+            gender: admin.gender ?? '',
+            password: '',
+            password_confirmation: '',
+        });
+        setEditingAdmin(admin);
+        setErrors({});
+        setError(null);
+        setShowAdminModal(true);
+    };
+
+    const closeAdminModal = () => {
+        setShowAdminModal(false);
+        setEditingAdmin(null);
+        setAdminForm(emptyAdminForm);
+        setErrors({});
+    };
+
+    const submitAdmin = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
         if (clinic === null) {
             return;
         }
 
-        setCreatingSchedule(true);
+        setSavingAdmin(true);
         setErrors({});
         setError(null);
 
-        router.post(
-            '/clinic-settings/schedules',
-            {
-                clinic_id: clinic.id,
-                doctor_id: scheduleForm.doctor_id,
-                day_of_week: scheduleForm.day_of_week,
-                start_time: scheduleForm.start_time,
-                end_time: scheduleForm.end_time,
-                window_minutes: scheduleForm.window_minutes,
-                max_patients_per_window: scheduleForm.max_patients_per_window,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setScheduleForm((current) => ({ ...current, day_of_week: [] }));
-                },
-                onError: (validationErrors) => {
-                    setErrors(normalizeInertiaErrors(validationErrors));
-                    setError('Gagal membuat jadwal dokter.');
-                },
-                onFinish: () => setCreatingSchedule(false),
-            },
-        );
-    };
+        const payload: Record<string, string | null> = {
+            name: adminForm.name,
+            username: adminForm.username,
+            email: adminForm.email,
+            phone_number: adminForm.phone_number || null,
+            date_of_birth: adminForm.date_of_birth || null,
+            gender: adminForm.gender || null,
+        };
 
-    const updateSchedule = (schedule: DoctorClinicScheduleEntry) => {
-        if (clinic === null) {
+        if (editingAdmin === null || adminForm.password !== '' || adminForm.password_confirmation !== '') {
+            payload.password = adminForm.password;
+            payload.password_confirmation = adminForm.password_confirmation;
+        }
+
+        const options = {
+            preserveScroll: true,
+            onSuccess: () => closeAdminModal(),
+            onError: (validationErrors: Record<string, string | string[]>) => {
+                setErrors(normalizeInertiaErrors(validationErrors));
+                setError(editingAdmin === null ? 'Gagal membuat admin klinik.' : 'Gagal memperbarui admin klinik.');
+            },
+            onFinish: () => setSavingAdmin(false),
+        };
+
+        if (editingAdmin === null) {
+            router.post(`/clinic-settings/${clinic.id}/admins`, payload, options);
             return;
         }
 
-        const edit = scheduleEdits[schedule.id] ?? scheduleToEditForm(schedule);
+        router.patch(`/clinic-settings/${clinic.id}/admins/${editingAdmin.id}`, payload, options);
+    };
 
-        setUpdatingScheduleId(schedule.id);
+    const deleteAdmin = () => {
+        if (clinic === null || deletingAdmin === null) {
+            return;
+        }
+
+        setSavingAdmin(true);
         setErrors({});
         setError(null);
 
-        router.patch(
-            `/clinic-settings/schedules/${schedule.id}`,
-            {
-                clinic_id: clinic.id,
-                start_time: edit.start_time,
-                end_time: edit.end_time,
-                window_minutes: edit.window_minutes,
-                max_patients_per_window: edit.max_patients_per_window,
-                is_active: edit.is_active,
+        router.delete(`/clinic-settings/${clinic.id}/admins/${deletingAdmin.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeletingAdmin(null),
+            onError: (validationErrors) => {
+                setErrors(normalizeInertiaErrors(validationErrors));
+                setError('Gagal menghapus admin klinik.');
             },
-            {
-                preserveScroll: true,
-                onError: (validationErrors) => {
-                    setErrors(normalizeInertiaErrors(validationErrors));
-                    setError('Gagal memperbarui jadwal dokter.');
-                },
-                onFinish: () => setUpdatingScheduleId(null),
+            onFinish: () => setSavingAdmin(false),
+        });
+    };
+
+    const deleteClinic = () => {
+        if (!isSuperadmin || clinic === null) {
+            return;
+        }
+
+        setSavingClinic(true);
+        setErrors({});
+        setError(null);
+
+        router.delete(`/superadmin/clinic/delete/${clinic.id}`, {
+            preserveScroll: true,
+            onSuccess: () => router.visit('/clinics'),
+            onError: (validationErrors) => {
+                setErrors(normalizeInertiaErrors(validationErrors));
+                setError(validationErrors.clinic ?? 'Gagal menghapus klinik.');
             },
-        );
+            onFinish: () => setSavingClinic(false),
+        });
     };
 
     return (
         <AppLayout>
             <Head title="Pengaturan Klinik" />
 
-            <section className="space-y-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                    <div>
-                        <h2 className="text-xl font-extrabold text-[#555]">Pengaturan Klinik</h2>
-                        <p className="mt-1 text-sm font-semibold text-[#8b8f98]">Ubah profil klinik, foto klinik, jam operasional, dan jadwal praktik dokter.</p>
-                    </div>
+            <section className="h-full overflow-y-auto bg-[#DFE0DF]">
+                <div className="flex flex-col gap-4 p-5">
+                    {flash?.status ? <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-[12px] font-medium text-green-700">{flash.status}</div> : null}
+                    {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] font-medium text-red-600">{error}</div> : null}
 
-                    {context.role === 'superadmin' ? (
-                        <label className="flex min-w-[280px] flex-col gap-2 text-sm font-semibold text-[#555]">
-                            Pilih Klinik
-                            <select
-                                value={selectedClinicId ?? ''}
-                                onChange={(event) => router.get('/clinic-settings', { clinic_id: event.target.value }, { preserveScroll: true })}
-                                className="rounded-md border border-[#cfd4dc] bg-white px-4 py-3 text-sm outline-none focus:border-[#888]"
-                            >
-                                {context.clinics.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                        {item.name}
-                                    </option>
+                    {clinic === null ? (
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] font-medium text-red-600">
+                            Tidak ada klinik yang tersedia untuk akun ini.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                                {summaryCards.map((card) => (
+                                    <div key={card.label} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+                                        <p className="mb-1 text-[11px] text-gray-400">{card.label}</p>
+                                        <p className="text-[24px] font-medium text-[#40311D]">{card.value}</p>
+                                        <p className="mt-1 text-[10px] text-gray-400">{card.helper}</p>
+                                    </div>
                                 ))}
-                            </select>
-                        </label>
-                    ) : null}
-                </div>
+                            </div>
 
-                {flash?.status ? <div className="rounded-lg border border-green-200 bg-white p-4 text-sm font-semibold text-green-700">{flash.status}</div> : null}
-                {error ? <div className="rounded-lg border border-red-200 bg-white p-4 text-sm font-semibold text-red-600">{error}</div> : null}
+                            <form onSubmit={submitClinic} className="flex flex-col gap-4">
+                                <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+                                    <Panel title="Profil Klinik" subtitle="Foto identitas klinik">
+                                        <div className="p-4">
+                                            <div className="flex items-center gap-4">
+                                                {clinic.image_url ? (
+                                                    <img src={clinic.image_url} alt={clinic.name} className="h-24 w-24 rounded-xl object-cover" />
+                                                ) : (
+                                                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[#40311D] text-xl font-bold text-white">
+                                                        {clinic.name.slice(0, 2).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-[15px] font-medium text-[#40311D]">{clinic.name}</p>
+                                                    <p className="truncate text-[12px] text-gray-500">{clinic.email}</p>
+                                                    <p className="mt-2 inline-block rounded-full bg-teal-50 px-2 py-1 text-[10px] font-medium text-teal-700">
+                                                        {summary.operating_day_count > 0 ? 'Memiliki jam operasional' : 'Belum ada jam operasional aktif'}
+                                                    </p>
+                                                </div>
+                                            </div>
 
-                {clinic === null ? (
-                    <div className="rounded-lg border border-red-200 bg-white p-4 text-sm font-semibold text-red-600">Tidak ada klinik yang tersedia untuk akun ini.</div>
-                ) : (
-                    <>
-                        <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-                            <section className="rounded-lg border border-[#ccd2da] bg-white p-5">
-                                <h3 className="text-sm font-extrabold text-[#929292]">Foto Klinik</h3>
-                                <div className="mt-5 flex flex-col items-center gap-4">
-                                    {clinic.image_url ? (
-                                        <img src={clinic.image_url} alt={clinic.name} className="h-52 w-52 rounded-lg object-cover" />
-                                    ) : (
-                                        <div className="flex h-52 w-52 items-center justify-center rounded-lg bg-[#7d7f82] text-4xl font-extrabold text-white">
-                                            {clinic.name.slice(0, 2).toUpperCase()}
+                                            <div className="mt-5 flex flex-col gap-3">
+                                                {localImagePreviewUrl ? (
+                                                    <div className="relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={clearSelectedImage}
+                                                            className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#2c2115] text-[14px] leading-none text-white shadow-sm transition-colors hover:bg-red-600"
+                                                            aria-label="Hapus foto yang dipilih"
+                                                        >
+                                                            x
+                                                        </button>
+                                                        <img
+                                                            src={localImagePreviewUrl}
+                                                            alt={`Preview foto baru ${clinic.name}`}
+                                                            className="h-48 w-full rounded-xl border border-[#e4ddd4] bg-[#faf9f7] object-contain p-2"
+                                                        />
+                                                    </div>
+                                                ) : null}
+                                                <input
+                                                    ref={fileInput}
+                                                    type="file"
+                                                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                                                    onChange={previewSelectedImage}
+                                                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700"
+                                                />
+                                                {errors.image?.[0] ? <span className="text-[11px] font-medium text-red-600">{errors.image[0]}</span> : null}
+                                                <button
+                                                    type="button"
+                                                    onClick={uploadImage}
+                                                    disabled={uploading}
+                                                    className="rounded-lg bg-[#40311D] px-4 py-2.5 text-[12px] font-medium text-white transition hover:bg-[#2c2115] disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {uploading ? 'Mengunggah...' : 'Upload Foto Klinik'}
+                                                </button>
+                                            </div>
                                         </div>
-                                    )}
-                                    <input
-                                        ref={fileInput}
-                                        type="file"
-                                        accept="image/png,image/jpeg,image/jpg,image/webp"
-                                        className="w-full rounded-md border border-[#cfd4dc] bg-white px-4 py-3 text-sm"
-                                    />
-                                    {errors.image?.[0] ? <span className="w-full text-xs font-bold text-red-600">{errors.image[0]}</span> : null}
+                                    </Panel>
+
+                                    <Panel title="Data Klinik" subtitle="Informasi utama klinik">
+                                        <div className="grid gap-4 p-4 md:grid-cols-2">
+                                            <TextField label="Nama Klinik" value={clinicForm.name} error={errors.name?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, name: value }))} />
+                                            <TextField label="Email" type="email" value={clinicForm.email} error={errors.email?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, email: value }))} />
+                                            <TextField label="Nomor Telepon" value={clinicForm.phone_number} error={errors.phone_number?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, phone_number: value }))} />
+                                            <TextField label="Alamat" value={clinicForm.address} error={errors.address?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, address: value }))} />
+                                        </div>
+                                    </Panel>
+                                </div>
+
+                                <Panel title="Jam Operasional Klinik" subtitle="Hari dan jam buka yang menjadi batas validasi jadwal dokter">
+                                    <div className="border-b border-[#e4ddd4] bg-[#faf9f7] p-4">
+                                        <div className="flex flex-col xl:gap-4 gap-6 xl:flex-row items-center xl:justify-between">
+                                            <div className="space-y-3">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {dayOptions.map((day) => {
+                                                        const selected = bulkDays.includes(day.value);
+
+                                                        return (
+                                                            <button
+                                                                key={day.value}
+                                                                type="button"
+                                                                onClick={() => setBulkDays((current) => toggleNumber(current, day.value))}
+                                                                className={`h-10 min-w-12 rounded-full border px-3 text-[12px] font-medium transition ${
+                                                                    selected
+                                                                        ? 'border-[#40311D] bg-[#40311D] text-white'
+                                                                        : 'border-gray-200 bg-white text-[#40311D] hover:bg-[#DFE0DF]'
+                                                                }`}
+                                                            >
+                                                                {day.short}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col xl:flex-row gap-3 xl:min-w-[680px] items-end justify-end ">
+                                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                    <ModeButton active={bulkMode === 'open'} onClick={() => setBulkMode('open')}>Buka sesuai jam</ModeButton>
+                                                    <ModeButton active={bulkMode === 'full_day'} onClick={() => setBulkMode('full_day')}>Buka 24 jam</ModeButton>
+                                                    <ModeButton active={bulkMode === 'closed'} onClick={() => setBulkMode('closed')}>Tutup</ModeButton>
+                                                </div>
+
+                                                <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                                                    <label className="flex flex-col gap-1 text-[11px] font-medium text-[#40311D]">
+                                                        Jam Buka
+                                                        <input
+                                                            type="time"
+                                                            value={bulkOpenTime}
+                                                            disabled={bulkMode !== 'open'}
+                                                            onChange={(event) => setBulkOpenTime(event.target.value)}
+                                                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D] disabled:bg-gray-100 disabled:text-gray-400"
+                                                        />
+                                                    </label>
+                                                    <label className="flex flex-col gap-1 text-[11px] font-medium text-[#40311D]">
+                                                        Jam Tutup
+                                                        <input
+                                                            type="time"
+                                                            value={bulkCloseTime}
+                                                            disabled={bulkMode !== 'open'}
+                                                            onChange={(event) => setBulkCloseTime(event.target.value)}
+                                                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D] disabled:bg-gray-100 disabled:text-gray-400"
+                                                        />
+                                                    </label>
+                                                    <div className="flex items-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={applyBulkOperatingHours}
+                                                            className="w-full rounded-lg bg-[#40311D] px-4 py-2.5 text-[12px] font-medium text-white transition hover:bg-[#2c2115] md:w-auto"
+                                                        >
+                                                            Terapkan
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full min-w-[860px] border-collapse text-[12px]">
+                                            <thead>
+                                                <tr className="border-b border-[#e4ddd4] bg-[#faf9f7]">
+                                                    {['Hari', 'Status', 'Jam Buka', 'Jam Tutup'].map((header) => (
+                                                        <th key={header} className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">
+                                                            {header}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {operatingHours.map((hour, index) => (
+                                                    <tr key={hour.day_of_week} className="border-b border-[#ede8e2] last:border-0 hover:bg-[#faf9f7]">
+                                                        <td className="px-4 py-3 align-top">
+                                                            <p className="font-medium text-[#40311D]">{dayLabel(hour.day_of_week)}</p>
+                                                            <p className="mt-0.5 text-[11px] text-gray-400">
+                                                                {hour.is_closed ? 'Klinik tutup pada hari ini' : `${hour.open_time} - ${hour.close_time}`}
+                                                            </p>
+                                                        </td>
+                                                        <td className="px-4 py-3 align-top">
+                                                            <label className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-[12px] text-gray-600">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={hour.is_closed}
+                                                                    onChange={(event) => updateOperatingHour(index, { is_closed: event.target.checked }, setOperatingHours)}
+                                                                />
+                                                                Tutup
+                                                            </label>
+                                                        </td>
+                                                        <td className="px-4 py-3 align-top">
+                                                            <TextField compact type="time" value={hour.open_time} disabled={hour.is_closed} error={errors[`operating_hours.${index}.open_time`]?.[0]} onChange={(value) => updateOperatingHour(index, { open_time: value }, setOperatingHours)} />
+                                                        </td>
+                                                        <td className="px-4 py-3 align-top">
+                                                            <TextField compact type="time" value={hour.close_time} disabled={hour.is_closed} error={errors[`operating_hours.${index}.close_time`]?.[0]} onChange={(value) => updateOperatingHour(index, { close_time: value }, setOperatingHours)} />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="flex justify-end border-t border-[#e4ddd4] bg-[#faf9f7] px-4 py-3">
+                                        <button
+                                            type="submit"
+                                            disabled={savingClinic}
+                                            className="rounded-lg bg-[#40311D] px-5 py-2.5 text-[12px] font-medium text-white transition hover:bg-[#2c2115] disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {savingClinic ? 'Menyimpan...' : 'Simpan Pengaturan Klinik'}
+                                        </button>
+                                    </div>
+                                </Panel>
+                            </form>
+
+                            {isSuperadmin ? (
+                                <>
+                                    <Panel
+                                        title="Admin Klinik Terdaftar"
+                                        subtitle="Akun admin yang terhubung dengan klinik ini"
+                                        action={(
+                                            <button
+                                                type="button"
+                                                onClick={openAdminModal}
+                                                className="rounded-lg bg-[#40311D] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[#2c2115]"
+                                            >
+                                                Tambah Admin Klinik
+                                            </button>
+                                        )}
+                                    >
+                                        <ClinicAdminsTable admins={clinic.admins ?? []} onEdit={openEditAdminModal} onDelete={setDeletingAdmin} />
+                                    </Panel>
+
+                                    <Panel title="Hapus Klinik" subtitle="Aksi destruktif hanya tersedia di halaman detail klinik">
+                                        <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+                                            <p className="text-[12px] text-gray-500">
+                                                Klinik hanya dapat dihapus jika tidak memiliki admin, dokter terassign, jadwal dokter, reservasi, atau rekam medis.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDeletingClinic(true)}
+                                                disabled={savingClinic}
+                                                className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-[12px] font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                Hapus Klinik
+                                            </button>
+                                        </div>
+                                    </Panel>
+                                </>
+                            ) : null}
+                        </>
+                    )}
+                </div>
+            </section>
+
+            {showAdminModal && clinic !== null ? (
+                <CreateAdminModal
+                    mode={editingAdmin === null ? 'create' : 'edit'}
+                    clinicName={clinic.name}
+                    form={adminForm}
+                    errors={errors}
+                    saving={savingAdmin}
+                    onChange={setAdminForm}
+                    onClose={closeAdminModal}
+                    onSubmit={submitAdmin}
+                />
+            ) : null}
+
+            {deletingAdmin !== null ? (
+                <DeleteAdminModal
+                    admin={deletingAdmin}
+                    saving={savingAdmin}
+                    onClose={() => setDeletingAdmin(null)}
+                    onConfirm={deleteAdmin}
+                />
+            ) : null}
+
+            {deletingClinic && clinic !== null ? (
+                <DeleteClinicModal
+                    clinicName={clinic.name}
+                    saving={savingClinic}
+                    onClose={() => setDeletingClinic(false)}
+                    onConfirm={deleteClinic}
+                />
+            ) : null}
+        </AppLayout>
+    );
+}
+
+function Panel({ title, subtitle, children, action }: { title: string; subtitle: string; children: ReactNode; action?: ReactNode }) {
+    return (
+        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="flex items-center justify-between gap-3 border-b border-[#e4ddd4] bg-[#faf9f7] px-4 py-3">
+                <div>
+                    <p className="text-[13px] font-medium text-[#40311D]">{title}</p>
+                    <p className="mt-0.5 text-[11px] text-gray-400">{subtitle}</p>
+                </div>
+                {action}
+            </div>
+            {children}
+        </section>
+    );
+}
+
+function ClinicAdminsTable({ admins, onEdit, onDelete }: { admins: ClinicAdmin[]; onEdit: (admin: ClinicAdmin) => void; onDelete: (admin: ClinicAdmin) => void }) {
+    if (admins.length === 0) {
+        return (
+            <div className="px-4 py-8 text-center text-[12px] italic text-gray-400">
+                Belum ada admin klinik yang terdaftar.
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full min-w-[1100px] border-collapse text-[12px]">
+                <thead>
+                    <tr className="border-b border-[#e4ddd4] bg-[#faf9f7]">
+                        {['No', 'Nama', 'Username', 'Email', 'Telepon', 'Gender', 'Tanggal Lahir', 'Verified', 'Aksi'].map((header) => (
+                            <th key={header} className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">
+                                {header}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {admins.map((admin, index) => (
+                        <tr key={admin.id} className="border-b border-[#ede8e2] last:border-0 hover:bg-[#faf9f7]">
+                            <td className="px-4 py-3 text-gray-700">{String(index + 1).padStart(2, '0')}</td>
+                            <td className="px-4 py-3 font-medium text-[#40311D]">{admin.name}</td>
+                            <td className="px-4 py-3 text-gray-700">{admin.username}</td>
+                            <td className="px-4 py-3 text-gray-700">{admin.email}</td>
+                            <td className="px-4 py-3 text-gray-700">{admin.phone_number ?? '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">{admin.gender ?? '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">{admin.date_of_birth ?? '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">
+                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${admin.email_verified_at ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700'}`}>
+                                    {admin.email_verified_at ? 'Verified' : 'Belum'}
+                                </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={uploadImage}
-                                        disabled={uploading}
-                                        className="w-full rounded-md bg-[#343434] px-4 py-3 text-sm font-extrabold text-white transition hover:bg-[#222] disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={() => onEdit(admin)}
+                                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-medium text-[#40311D] transition hover:bg-[#DFE0DF]"
                                     >
-                                        {uploading ? 'Mengunggah...' : 'Upload Foto Klinik'}
+                                        Update
                                     </button>
-                                </div>
-                            </section>
-
-                            <form onSubmit={submitClinic} className="rounded-lg border border-[#ccd2da] bg-white p-5">
-                                <h3 className="text-sm font-extrabold text-[#929292]">Data Klinik</h3>
-                                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                                    <TextField label="Nama Klinik" value={clinicForm.name} error={errors.name?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, name: value }))} />
-                                    <TextField label="Email" type="email" value={clinicForm.email} error={errors.email?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, email: value }))} />
-                                    <TextField label="Nomor Telepon" value={clinicForm.phone_number} error={errors.phone_number?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, phone_number: value }))} />
-                                    <TextField label="Alamat" value={clinicForm.address} error={errors.address?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, address: value }))} />
-                                </div>
-
-                                <div className="mt-7">
-                                    <h4 className="text-sm font-extrabold text-[#929292]">Jam Operasional</h4>
-                                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                                        {operatingHours.map((hour, index) => (
-                                            <div key={hour.day_of_week} className="rounded-lg border border-[#e0e4ea] p-4">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <div className="text-sm font-extrabold text-[#555]">{dayNames[hour.day_of_week]}</div>
-                                                    <label className="flex items-center gap-2 text-xs font-bold text-[#777]">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={hour.is_closed}
-                                                            onChange={(event) => updateOperatingHour(index, { is_closed: event.target.checked }, setOperatingHours)}
-                                                        />
-                                                        Tutup
-                                                    </label>
-                                                </div>
-                                                <div className="mt-3 grid grid-cols-2 gap-3">
-                                                    <TextField compact label="Buka" value={hour.open_time} disabled={hour.is_closed} error={errors[`operating_hours.${index}.open_time`]?.[0]} onChange={(value) => updateOperatingHour(index, { open_time: value }, setOperatingHours)} />
-                                                    <TextField compact label="Tutup" value={hour.close_time} disabled={hour.is_closed} error={errors[`operating_hours.${index}.close_time`]?.[0]} onChange={(value) => updateOperatingHour(index, { close_time: value }, setOperatingHours)} />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 flex justify-end">
                                     <button
-                                        type="submit"
-                                        disabled={savingClinic}
-                                        className="rounded-md bg-[#343434] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#222] disabled:cursor-not-allowed disabled:opacity-60"
+                                        type="button"
+                                        onClick={() => onDelete(admin)}
+                                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-medium text-red-600 transition hover:bg-red-100"
                                     >
-                                        {savingClinic ? 'Menyimpan...' : 'Simpan Data Klinik'}
+                                        Delete
                                     </button>
                                 </div>
-                            </form>
-                        </div>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
 
-                        <section className="rounded-lg border border-[#ccd2da] bg-white p-5">
-                            <div className="flex flex-col gap-1">
-                                <h3 className="text-sm font-extrabold text-[#929292]">Buat Jadwal Dokter</h3>
-                                <p className="text-xs font-semibold text-[#7d8491]">Mendukung bulk create dengan memilih lebih dari satu hari praktik.</p>
-                            </div>
+function CreateAdminModal({
+    mode,
+    clinicName,
+    form,
+    errors,
+    saving,
+    onChange,
+    onClose,
+    onSubmit,
+}: {
+    mode: 'create' | 'edit';
+    clinicName: string;
+    form: AdminForm;
+    errors: ValidationErrors;
+    saving: boolean;
+    onChange: (form: AdminForm) => void;
+    onClose: () => void;
+    onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+    const isEdit = mode === 'edit';
 
-                            <form onSubmit={createSchedule} className="mt-5 grid gap-4 lg:grid-cols-6">
-                                <label className="flex flex-col gap-2 text-sm font-semibold text-[#555] lg:col-span-2">
-                                    Dokter
-                                    <select
-                                        value={scheduleForm.doctor_id}
-                                        onChange={(event) => setScheduleForm((current) => ({ ...current, doctor_id: event.target.value }))}
-                                        className="rounded-md border border-[#cfd4dc] bg-white px-4 py-3 text-sm outline-none focus:border-[#888]"
-                                    >
-                                        <option value="">Pilih dokter</option>
-                                        {clinic.doctors.map((doctor) => (
-                                            <option key={doctor.id} value={doctor.id}>{doctor.name}</option>
-                                        ))}
-                                    </select>
-                                    {errors.doctor_id?.[0] ? <span className="text-xs font-bold text-red-600">{errors.doctor_id[0]}</span> : null}
-                                </label>
-                                <TextField label="Mulai" value={scheduleForm.start_time} error={errors.start_time?.[0]} onChange={(value) => setScheduleForm((current) => ({ ...current, start_time: value }))} />
-                                <TextField label="Selesai" value={scheduleForm.end_time} error={errors.end_time?.[0]} onChange={(value) => setScheduleForm((current) => ({ ...current, end_time: value }))} />
-                                <TextField label="Window Menit" value={scheduleForm.window_minutes} error={errors.window_minutes?.[0]} onChange={(value) => setScheduleForm((current) => ({ ...current, window_minutes: value }))} />
-                                <TextField label="Kapasitas Window" value={scheduleForm.max_patients_per_window} error={errors.max_patients_per_window?.[0]} onChange={(value) => setScheduleForm((current) => ({ ...current, max_patients_per_window: value }))} />
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+            <form onSubmit={onSubmit} className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="border-b border-[#e4ddd4] bg-[#faf9f7] px-5 py-4">
+                    <p className="text-[16px] font-medium text-[#40311D]">{isEdit ? 'Update Admin Klinik' : 'Tambah Admin Klinik'}</p>
+                    <p className="mt-1 text-[12px] text-gray-400">
+                        {isEdit
+                            ? `Perbarui data admin yang terhubung dengan ${clinicName}. Kosongkan password jika tidak ingin mengubahnya.`
+                            : `Admin baru akan langsung terhubung dan terverifikasi untuk ${clinicName}.`}
+                    </p>
+                </div>
 
-                                <div className="lg:col-span-5">
-                                    <div className="text-sm font-semibold text-[#555]">Hari Praktik</div>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {dayNames.map((day, index) => {
-                                            const value = String(index);
-                                            const selected = scheduleForm.day_of_week.includes(value);
+                <div className="grid gap-3 p-5 md:grid-cols-2">
+                    <TextField label="Nama" value={form.name} error={errors.name?.[0]} onChange={(value) => onChange({ ...form, name: value })} />
+                    <TextField label="Username" value={form.username} error={errors.username?.[0]} onChange={(value) => onChange({ ...form, username: value })} />
+                    <TextField label="Email" type="email" value={form.email} error={errors.email?.[0]} onChange={(value) => onChange({ ...form, email: value })} />
+                    <TextField label="Nomor Telepon" value={form.phone_number} error={errors.phone_number?.[0]} onChange={(value) => onChange({ ...form, phone_number: value })} />
+                    <TextField label="Tanggal Lahir" type="date" value={form.date_of_birth} error={errors.date_of_birth?.[0]} onChange={(value) => onChange({ ...form, date_of_birth: value })} />
+                    <label className="flex flex-col gap-2 text-[12px] font-medium text-[#40311D]">
+                        Gender
+                        <select
+                            value={form.gender}
+                            onChange={(event) => onChange({ ...form, gender: event.target.value })}
+                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
+                        >
+                            <option value="">Tidak diisi</option>
+                            <option value="Laki">Laki</option>
+                            <option value="Perempuan">Perempuan</option>
+                        </select>
+                        {errors.gender?.[0] ? <span className="text-[11px] font-medium text-red-600">{errors.gender[0]}</span> : null}
+                    </label>
+                    <TextField label="Password" type="password" value={form.password} error={errors.password?.[0]} onChange={(value) => onChange({ ...form, password: value })} />
+                    <TextField label="Konfirmasi Password" type="password" value={form.password_confirmation} error={errors.password_confirmation?.[0]} onChange={(value) => onChange({ ...form, password_confirmation: value })} />
+                </div>
 
-                                            return (
-                                                <button
-                                                    key={day}
-                                                    type="button"
-                                                    onClick={() => toggleScheduleDay(value, setScheduleForm)}
-                                                    className={`rounded-full px-4 py-2 text-xs font-extrabold transition ${selected ? 'bg-[#343434] text-white' : 'bg-[#eef1f4] text-[#6f7584] hover:bg-[#dfe4ea]'}`}
-                                                >
-                                                    {day}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    {errors.day_of_week?.[0] ? <span className="mt-2 block text-xs font-bold text-red-600">{errors.day_of_week[0]}</span> : null}
-                                </div>
+                <div className="flex justify-end gap-2 border-t border-[#e4ddd4] px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-[12px] text-[#40311D] transition hover:bg-[#DFE0DF]"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="rounded-lg bg-[#40311D] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[#2c2115] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {saving ? 'Menyimpan...' : isEdit ? 'Update Admin' : 'Simpan Admin'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
 
-                                <div className="flex items-end lg:col-span-1">
-                                    <button
-                                        type="submit"
-                                        disabled={creatingSchedule || clinic.doctors.length === 0}
-                                        className="w-full rounded-md bg-[#343434] px-4 py-3 text-sm font-extrabold text-white transition hover:bg-[#222] disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        {creatingSchedule ? 'Membuat...' : 'Tambah Jadwal'}
-                                    </button>
-                                </div>
-                            </form>
-                        </section>
+function DeleteAdminModal({ admin, saving, onClose, onConfirm }: { admin: ClinicAdmin; saving: boolean; onClose: () => void; onConfirm: () => void }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+            <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="border-b border-[#e4ddd4] bg-[#faf9f7] px-5 py-4">
+                    <p className="text-[16px] font-medium text-[#40311D]">Hapus Admin Klinik</p>
+                    <p className="mt-1 text-[12px] text-gray-400">Akun admin akan dihapus dari sistem.</p>
+                </div>
+                <div className="p-5 text-[12px] text-gray-600">
+                    Hapus akun <span className="font-medium text-[#40311D]">{admin.name}</span> ({admin.email})?
+                </div>
+                <div className="flex justify-end gap-2 border-t border-[#e4ddd4] px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={saving}
+                        className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-[12px] text-[#40311D] transition hover:bg-[#DFE0DF] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={saving}
+                        className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-[12px] font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {saving ? 'Menghapus...' : 'Hapus Admin'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-                        <section className="overflow-hidden rounded-lg border border-[#ccd2da] bg-white">
-                            <div className="px-5 py-4">
-                                <h3 className="text-sm font-extrabold text-[#929292]">Jadwal Dokter Klinik</h3>
-                                <p className="mt-2 text-xs font-semibold text-[#7d8491]">Edit jam praktik, durasi window, kapasitas per window, dan status aktif jadwal.</p>
-                            </div>
+function DeleteClinicModal({ clinicName, saving, onClose, onConfirm }: { clinicName: string; saving: boolean; onClose: () => void; onConfirm: () => void }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+            <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="border-b border-red-100 bg-red-50 px-5 py-4">
+                    <p className="text-[16px] font-medium text-red-700">Hapus Klinik</p>
+                    <p className="mt-1 text-[12px] text-red-500">Klinik hanya dapat dihapus jika belum memiliki data terkait.</p>
+                </div>
+                <div className="space-y-3 p-5 text-[12px] text-gray-600">
+                    <p>
+                        Anda akan menghapus <span className="font-medium text-[#40311D]">{clinicName}</span>.
+                    </p>
+                    <p>
+                        Sistem akan menolak penghapusan jika klinik masih memiliki admin, dokter terassign, jadwal dokter, reservasi, atau rekam medis.
+                    </p>
+                </div>
+                <div className="flex justify-end gap-2 border-t border-[#e4ddd4] px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={saving}
+                        className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-[12px] text-[#40311D] transition hover:bg-[#DFE0DF] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={saving}
+                        className="rounded-lg bg-red-600 px-4 py-2 text-[12px] font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {saving ? 'Menghapus...' : 'Hapus Klinik'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-                            {schedules.length === 0 ? (
-                                <div className="border-t border-[#d6dbe3] px-5 py-8 text-sm font-semibold text-[#8b8f98]">Belum ada jadwal dokter untuk klinik ini.</div>
-                            ) : (
-                                <div className="space-y-5 border-t border-[#d6dbe3] p-5">
-                                    {scheduleByDoctor.map(([doctorName, doctorSchedules]) => (
-                                        <div key={doctorName}>
-                                            <h4 className="text-sm font-extrabold text-[#555]">{doctorName}</h4>
-                                            <div className="mt-3 overflow-x-auto rounded-lg border border-[#e0e4ea]">
-                                                <table className="w-full min-w-[980px] text-left text-sm text-[#616875]">
-                                                    <thead>
-                                                        <tr className="border-b border-[#e2e5ea] text-xs text-[#8b8f98]">
-                                                            <th className="px-4 py-3 font-extrabold">Hari</th>
-                                                            <th className="px-4 py-3 font-extrabold">Mulai</th>
-                                                            <th className="px-4 py-3 font-extrabold">Selesai</th>
-                                                            <th className="px-4 py-3 font-extrabold">Window</th>
-                                                            <th className="px-4 py-3 font-extrabold">Kapasitas</th>
-                                                            <th className="px-4 py-3 font-extrabold">Aktif</th>
-                                                            <th className="px-4 py-3 text-right font-extrabold">Aksi</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {doctorSchedules.map((schedule) => {
-                                                            const edit = scheduleEdits[schedule.id] ?? scheduleToEditForm(schedule);
-
-                                                            return (
-                                                                <tr key={schedule.id} className="border-b border-[#edf0f3] last:border-0">
-                                                                    <td className="px-4 py-4 font-extrabold text-[#303236]">{dayNames[schedule.day_of_week]}</td>
-                                                                    <td className="px-4 py-4"><SmallInput value={edit.start_time} onChange={(value) => updateScheduleEdit(schedule.id, { start_time: value }, setScheduleEdits)} /></td>
-                                                                    <td className="px-4 py-4"><SmallInput value={edit.end_time} onChange={(value) => updateScheduleEdit(schedule.id, { end_time: value }, setScheduleEdits)} /></td>
-                                                                    <td className="px-4 py-4"><SmallInput value={edit.window_minutes} onChange={(value) => updateScheduleEdit(schedule.id, { window_minutes: value }, setScheduleEdits)} /></td>
-                                                                    <td className="px-4 py-4"><SmallInput value={edit.max_patients_per_window} onChange={(value) => updateScheduleEdit(schedule.id, { max_patients_per_window: value }, setScheduleEdits)} /></td>
-                                                                    <td className="px-4 py-4">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={edit.is_active}
-                                                                            onChange={(event) => updateScheduleEdit(schedule.id, { is_active: event.target.checked }, setScheduleEdits)}
-                                                                        />
-                                                                    </td>
-                                                                    <td className="px-4 py-4 text-right">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => updateSchedule(schedule)}
-                                                                            disabled={updatingScheduleId === schedule.id}
-                                                                            className="rounded-md bg-[#343434] px-4 py-2 text-sm font-extrabold text-white transition hover:bg-[#222] disabled:cursor-not-allowed disabled:opacity-60"
-                                                                        >
-                                                                            {updatingScheduleId === schedule.id ? 'Menyimpan...' : 'Simpan'}
-                                                                        </button>
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </section>
-                    </>
-                )}
-            </section>
-        </AppLayout>
+function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
+                active
+                    ? 'border-[#40311D] bg-[#40311D] text-white'
+                    : 'border-gray-200 bg-white text-[#40311D] hover:bg-[#DFE0DF]'
+            }`}
+        >
+            {children}
+        </button>
     );
 }
 
@@ -474,7 +943,7 @@ function TextField({
     disabled = false,
     compact = false,
 }: {
-    label: string;
+    label?: string;
     value: string;
     onChange: (value: string) => void;
     error?: string;
@@ -483,38 +952,37 @@ function TextField({
     compact?: boolean;
 }) {
     return (
-        <label className={`flex flex-col gap-2 text-sm font-semibold text-[#555] ${compact ? 'text-xs' : ''}`}>
+        <label className={`flex flex-col gap-2 text-[12px] font-medium text-[#40311D] ${compact ? 'text-[11px]' : ''}`}>
             {label}
             <input
                 type={type}
                 value={value}
                 disabled={disabled}
                 onChange={(event) => onChange(event.target.value)}
-                className="rounded-md border border-[#cfd4dc] bg-white px-4 py-3 text-sm outline-none focus:border-[#888] disabled:bg-[#f2f3f5] disabled:text-[#9aa1ad]"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D] disabled:bg-gray-100 disabled:text-gray-400"
             />
-            {error ? <span className="text-xs font-bold text-red-600">{error}</span> : null}
+            {error ? <span className="text-[11px] font-medium text-red-600">{error}</span> : null}
         </label>
     );
 }
 
-function SmallInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-    return (
-        <input
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            className="w-28 rounded-md border border-[#cfd4dc] bg-white px-3 py-2 text-sm outline-none focus:border-[#888]"
-        />
-    );
+function clinicToForm(clinic: ClinicDetail | null): ClinicForm {
+    return {
+        name: clinic?.name ?? '',
+        address: clinic?.address ?? '',
+        phone_number: clinic?.phone_number ?? '',
+        email: clinic?.email ?? '',
+    };
 }
 
 function buildOperatingHours(clinic: ClinicDetail | null): OperatingHourForm[] {
     const existing = new Map((clinic?.operating_hours ?? []).map((hour) => [hour.day_of_week, hour]));
 
-    return dayNames.map((_, day) => {
-        const hour = existing.get(day);
+    return dayOptions.map((day) => {
+        const hour = existing.get(day.value);
 
         return {
-            day_of_week: day,
+            day_of_week: day.value,
             open_time: hour?.open_time ?? '08:00:00',
             close_time: hour?.close_time ?? '17:00:00',
             is_closed: Boolean(hour?.is_closed ?? false),
@@ -522,41 +990,26 @@ function buildOperatingHours(clinic: ClinicDetail | null): OperatingHourForm[] {
     });
 }
 
-function scheduleToEditForm(schedule: DoctorClinicScheduleEntry): ScheduleEditForm {
-    return {
-        start_time: schedule.start_time,
-        end_time: schedule.end_time,
-        window_minutes: String(schedule.window_minutes),
-        max_patients_per_window: String(schedule.max_patients_per_window),
-        is_active: schedule.is_active,
-    };
+function dayLabel(value: number): string {
+    return dayOptions.find((day) => day.value === value)?.label ?? String(value);
+}
+
+function toggleNumber(values: number[], value: number): number[] {
+    return values.includes(value)
+        ? values.filter((item) => item !== value)
+        : [...values, value];
+}
+
+function withSeconds(value: string): string {
+    if (value.length === 5) {
+        return `${value}:00`;
+    }
+
+    return value;
 }
 
 function updateOperatingHour(index: number, patch: Partial<OperatingHourForm>, setOperatingHours: (updater: (current: OperatingHourForm[]) => OperatingHourForm[]) => void) {
     setOperatingHours((current) => current.map((hour, currentIndex) => (currentIndex === index ? { ...hour, ...patch } : hour)));
-}
-
-function updateScheduleEdit(
-    scheduleId: number,
-    patch: Partial<ScheduleEditForm>,
-    setScheduleEdits: (updater: (current: Record<number, ScheduleEditForm>) => Record<number, ScheduleEditForm>) => void,
-) {
-    setScheduleEdits((current) => ({
-        ...current,
-        [scheduleId]: {
-            ...current[scheduleId],
-            ...patch,
-        },
-    }));
-}
-
-function toggleScheduleDay(value: string, setScheduleForm: (updater: (current: ScheduleForm) => ScheduleForm) => void) {
-    setScheduleForm((current) => ({
-        ...current,
-        day_of_week: current.day_of_week.includes(value)
-            ? current.day_of_week.filter((day) => day !== value)
-            : [...current.day_of_week, value],
-    }));
 }
 
 function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {

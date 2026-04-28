@@ -41,7 +41,9 @@ class DashboardController extends Controller
         $dashboardData = null;
 
         if (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true) && $selectedClinic !== null) {
-            $today = Carbon::today()->toDateString();
+            $today = Carbon::today();
+            $todayDate = $today->toDateString();
+            $selectedScheduleDay = $this->selectedScheduleDay($request, $today);
             $reservations = Reservation::query()
                 ->with($this->workspace->reservationRelations())
                 ->where('clinic_id', $selectedClinic->id)
@@ -52,17 +54,16 @@ class DashboardController extends Controller
             $queueReservations = Reservation::query()
                 ->with($this->workspace->reservationRelations())
                 ->where('clinic_id', $selectedClinic->id)
-                ->whereDate('reservation_date', $today)
+                ->whereDate('reservation_date', $todayDate)
                 ->orderBy('queue_number')
                 ->orderBy('window_start_time')
                 ->get()
                 ->filter(fn (Reservation $reservation): bool => $this->queueService->isActiveQueueReservation($reservation))
                 ->values();
-            $dayOfWeek = Carbon::parse($today)->dayOfWeek;
             $schedules = DoctorClinicSchedule::query()
                 ->with('doctor:id,name')
                 ->where('clinic_id', $selectedClinic->id)
-                ->where('day_of_week', $dayOfWeek)
+                ->where('day_of_week', $selectedScheduleDay)
                 ->orderBy('start_time')
                 ->get()
                 ->map(fn (DoctorClinicSchedule $schedule): array => [
@@ -84,7 +85,9 @@ class DashboardController extends Controller
                 'reservations' => $this->queueService->serializeReservations($reservations),
                 'queues' => $this->queueService->serializeQueueEntries($queueReservations, true),
                 'schedules' => $schedules,
-                'today' => $today,
+                'today' => $todayDate,
+                'selectedScheduleDay' => $selectedScheduleDay,
+                'selectedScheduleDayLabel' => $this->dayLabel($selectedScheduleDay),
             ];
         }
 
@@ -136,5 +139,33 @@ class DashboardController extends Controller
                 ['title' => 'Medical Records', 'description' => 'Access completed consultation results securely by clinic scope.'],
             ],
         };
+    }
+
+    private function selectedScheduleDay(Request $request, Carbon $today): int
+    {
+        $rawDay = $request->query('schedule_day');
+
+        if (is_scalar($rawDay) && ctype_digit((string) $rawDay)) {
+            $day = (int) $rawDay;
+
+            if ($day >= 0 && $day <= 6) {
+                return $day;
+            }
+        }
+
+        return $today->dayOfWeek;
+    }
+
+    private function dayLabel(int $day): string
+    {
+        return [
+            0 => 'Minggu',
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+        ][$day] ?? 'Hari ini';
     }
 }

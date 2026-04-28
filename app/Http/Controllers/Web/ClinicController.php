@@ -6,15 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Clinic;
 use App\Models\ClinicOperatingHour;
 use App\Models\DoctorClinicSchedule;
+use App\Models\Reservation;
 use App\Models\User;
 use App\Services\Web\WorkspaceViewService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,49 +28,87 @@ class ClinicController extends Controller
         private readonly WorkspaceViewService $workspace,
     ) {}
 
-    public function settings(Request $request): Response
+    public function settings(Request $request, ?int $clinicId = null): RedirectResponse|Response
     {
         $this->authorizeAdminWorkspace($request);
 
         $context = $this->workspace->context($request);
-        $clinic = $this->workspace->selectedClinic($request, $context);
+        $user = $request->user();
+        $requestedClinicId = $clinicId ?? ($request->query('clinic_id') !== null ? (int) $request->query('clinic_id') : null);
+
+        if ($requestedClinicId === null) {
+            if ($user->role === User::ROLE_SUPERADMIN) {
+                return to_route('clinics.index');
+            }
+
+            if ($user->role === User::ROLE_ADMIN && $user->clinic_id !== null) {
+                return to_route('clinic-settings.show', ['clinicId' => $user->clinic_id]);
+            }
+        }
+
+        if ($requestedClinicId !== null && $clinicId === null) {
+            return to_route('clinic-settings.show', ['clinicId' => $requestedClinicId]);
+        }
+
+        if ($user->role === User::ROLE_ADMIN && $requestedClinicId !== null) {
+            abort_unless((int) $user->clinic_id === $requestedClinicId, 403);
+        }
+
+        $clinic = $requestedClinicId !== null
+            ? Clinic::query()->whereKey($requestedClinicId)->first()
+            : null;
 
         if ($clinic !== null) {
             $clinic->load([
                 'doctors:id,name,username,email,phone_number,date_of_birth,gender,image_path',
+                'users:id,clinic_id,name,username,email,phone_number,date_of_birth,gender,role,email_verified_at,created_at',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
             ]);
         }
-
-        $schedules = $clinic === null
-            ? []
-            : $clinic->doctorClinicSchedules()
-                ->with('doctor:id,name,email,phone_number')
-                ->orderBy('day_of_week')
-                ->orderBy('start_time')
-                ->get()
-                ->map(fn (DoctorClinicSchedule $schedule): array => $this->serializeDoctorClinicSchedule($schedule))
-                ->values()
-                ->all();
 
         return Inertia::render('clinic-settings/index', [
             'context' => $context,
             'selectedClinicId' => $clinic?->id,
             'clinic' => $clinic !== null ? $this->workspace->serializeClinicDetail($clinic) : null,
-            'schedules' => $schedules,
+            'summary' => $clinic !== null ? $this->settingsSummary($clinic, $request->user()) : $this->emptySettingsSummary($request->user()),
         ]);
     }
 
-    public function index()
+    public function index(Request $request): JsonResponse|RedirectResponse|Response
     {
+        if (!$request->expectsJson() && $request->user()?->role === User::ROLE_ADMIN) {
+            if ($request->user()->clinic_id === null) {
+                return to_route('clinic-settings.index');
+            }
+
+            return to_route('clinic-settings.show', ['clinicId' => $request->user()->clinic_id]);
+        }
+
         $clinics = Clinic::query()
             ->select(['id', 'name', 'address', 'phone_number', 'email', 'image_path'])
             ->with([
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
                 'doctors:id,name,username,email,phone_number,image_path',
             ])
+            ->withCount([
+                'doctors as doctor_count',
+                'users as admin_count' => fn ($query) => $query->where('role', User::ROLE_ADMIN),
+                'doctorClinicSchedules as schedule_count',
+                'reservations as reservation_count',
+                'medicalRecords as medical_record_count',
+                'operatingHours as operating_day_count' => fn ($query) => $query->where('is_closed', false),
+            ])
             ->orderBy('name')
             ->get();
+
+        if (!$request->expectsJson()) {
+            abort_unless($request->user()?->role === User::ROLE_SUPERADMIN, 403);
+
+            return Inertia::render('clinics/index', [
+                'context' => $this->workspace->context($request),
+                'clinics' => $clinics->map(fn (Clinic $clinic): array => $this->serializeClinicIndexEntry($clinic))->values()->all(),
+            ]);
+        }
 
         return response()->json([
             'message' => 'Clinic retrieval successful.',
@@ -183,8 +225,8 @@ class ClinicController extends Controller
         ]);
     }
 
-    public function create(Request $request) {
-        $request->validate([
+    public function create(Request $request): JsonResponse|RedirectResponse {
+        $payload = $request->validate([
             'name' => 'required|string|max:255|unique:clinics,name',
             'address' => 'required|string|max:255',
             'phone_number' => 'required|string|max:20|unique:clinics,phone_number',
@@ -197,17 +239,21 @@ class ClinicController extends Controller
         ]);
 
         $clinic = Clinic::create([
-            'name' => $request->name,
-            'address' => $request->address,
-            'phone_number' => $request->phone_number,
-            'email' => $request->email,
+            'name' => $payload['name'],
+            'address' => $payload['address'],
+            'phone_number' => $payload['phone_number'],
+            'email' => $payload['email'],
         ]);
 
-        $this->syncOperatingHours($clinic, $request->input('operating_hours'), true);
+        $this->syncOperatingHours($clinic, $payload['operating_hours'] ?? null, true);
 
-        return response()->json([
+        return $this->jsonOrRedirect($request, [
             'message' => 'Clinic created successfully.',
-        ], 201);
+            'clinic' => $this->serializeClinicDetail($clinic->fresh()->load([
+                'doctors:id,name,username,email,phone_number,image_path',
+                'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
+            ])),
+        ], 201, 'Data klinik berhasil dibuat.');
     }
 
     public function update(Request $request, $clinicId) {
@@ -222,8 +268,8 @@ class ClinicController extends Controller
         $request->validate([
             'name' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:255',
-            'phone_number' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255|unique:clinics,email,' . $clinicId,
+            'phone_number' => ['nullable', 'string', 'max:20', Rule::unique('clinics', 'phone_number')->ignore($clinicId)],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('clinics', 'email')->ignore($clinicId)],
             'operating_hours' => 'nullable|array',
             'operating_hours.*.day_of_week' => 'required|integer|min:0|max:6',
             'operating_hours.*.open_time' => 'nullable|date_format:H:i:s',
@@ -239,7 +285,140 @@ class ClinicController extends Controller
         ], flashMessage: 'Data klinik berhasil diperbarui.');
     }
 
-    public function delete(Request $request, $clinicId) {
+    public function createClinicAdmin(Request $request, $clinicId): JsonResponse|RedirectResponse
+    {
+        abort_unless($request->user()?->role === User::ROLE_SUPERADMIN, 403);
+
+        if (!$clinic = Clinic::find($clinicId)) {
+            return response()->json([
+                'message' => 'Clinic not found.',
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:users,username'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'phone_number' => ['nullable', 'string', 'max:30', 'unique:users,phone_number'],
+            'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
+            'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ]);
+
+        $admin = User::create([
+            'name' => $payload['name'],
+            'username' => $payload['username'],
+            'email' => $payload['email'],
+            'phone_number' => $payload['phone_number'] ?? null,
+            'date_of_birth' => $payload['date_of_birth'] ?? null,
+            'gender' => $payload['gender'] ?? null,
+            'role' => User::ROLE_ADMIN,
+            'clinic_id' => $clinic->id,
+            'profile_picture' => User::defaultProfilePictureForRole(User::ROLE_ADMIN),
+            'password' => $payload['password'],
+        ]);
+
+        $admin->forceFill([
+            'email_verified_at' => now(),
+        ])->save();
+
+        return $this->jsonOrRedirect($request, [
+            'message' => 'Clinic admin created successfully.',
+            'admin' => $this->serializeClinicAdmin($admin),
+        ], 201, 'Admin klinik berhasil dibuat.');
+    }
+
+    public function updateClinicAdmin(Request $request, $clinicId, $adminId): JsonResponse|RedirectResponse
+    {
+        abort_unless($request->user()?->role === User::ROLE_SUPERADMIN, 403);
+
+        if (!$clinic = Clinic::find($clinicId)) {
+            return response()->json([
+                'message' => 'Clinic not found.',
+            ], 404);
+        }
+
+        $admin = $this->findClinicAdmin($clinic, $adminId);
+
+        if ($admin === null) {
+            return response()->json([
+                'message' => 'Clinic admin not found.',
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique('users', 'username')->ignore($admin->id)],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($admin->id)],
+            'phone_number' => ['nullable', 'string', 'max:30', Rule::unique('users', 'phone_number')->ignore($admin->id)],
+            'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
+            'password' => ['nullable', 'confirmed', PasswordRule::defaults()],
+        ]);
+
+        $updates = [
+            'name' => $payload['name'],
+            'username' => $payload['username'],
+            'email' => $payload['email'],
+            'phone_number' => $payload['phone_number'] ?? null,
+            'date_of_birth' => $payload['date_of_birth'] ?? null,
+            'gender' => $payload['gender'] ?? null,
+            'role' => User::ROLE_ADMIN,
+            'clinic_id' => $clinic->id,
+        ];
+
+        if (filled($payload['password'] ?? null)) {
+            $updates['password'] = $payload['password'];
+        }
+
+        $admin->forceFill($updates);
+
+        if ($admin->email_verified_at === null) {
+            $admin->email_verified_at = now();
+        }
+
+        $admin->save();
+
+        return $this->jsonOrRedirect($request, [
+            'message' => 'Clinic admin updated successfully.',
+            'admin' => $this->serializeClinicAdmin($admin),
+        ], flashMessage: 'Admin klinik berhasil diperbarui.');
+    }
+
+    public function deleteClinicAdmin(Request $request, $clinicId, $adminId): JsonResponse|RedirectResponse
+    {
+        abort_unless($request->user()?->role === User::ROLE_SUPERADMIN, 403);
+
+        if (!$clinic = Clinic::find($clinicId)) {
+            return response()->json([
+                'message' => 'Clinic not found.',
+            ], 404);
+        }
+
+        $admin = $this->findClinicAdmin($clinic, $adminId);
+
+        if ($admin === null) {
+            return response()->json([
+                'message' => 'Clinic admin not found.',
+            ], 404);
+        }
+
+        if ((int) $request->user()->id === (int) $admin->id) {
+            throw ValidationException::withMessages([
+                'admin' => 'Akun yang sedang digunakan tidak dapat dihapus dari halaman ini.',
+            ]);
+        }
+
+        $deletedAdminId = $admin->id;
+        $admin->delete();
+
+        return $this->jsonOrRedirect($request, [
+            'message' => 'Clinic admin deleted successfully.',
+            'admin_id' => $deletedAdminId,
+        ], flashMessage: 'Admin klinik berhasil dihapus.');
+    }
+
+    public function delete(Request $request, $clinicId): JsonResponse|RedirectResponse {
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
                 'message' => 'Clinic not found.',
@@ -247,12 +426,17 @@ class ClinicController extends Controller
         }
 
         $this->assertCanManageClinic($request, (int) $clinicId);
+        $this->assertClinicCanBeDeleted($clinic);
+
+        if (filled($clinic->image_path)) {
+            Storage::disk($this->mediaDisk())->delete($clinic->image_path);
+        }
 
         $clinic->delete();
 
-        return response()->json([
+        return $this->jsonOrRedirect($request, [
             'message' => 'Clinic deleted successfully.',
-        ]);
+        ], flashMessage: 'Data klinik berhasil dihapus.');
     }
 
     public function assignDoctor(Request $request, $clinicId) {
@@ -264,7 +448,8 @@ class ClinicController extends Controller
 
         $this->assertCanManageClinic($request, (int) $clinicId);
 
-        $specialityInput = $request->input('speciality');
+        $user = $request->user();
+        $specialityInput = $user->role === User::ROLE_SUPERADMIN ? null : $request->input('speciality');
 
         if ($specialityInput !== null && !is_array($specialityInput)) {
             $request->merge([
@@ -272,11 +457,16 @@ class ClinicController extends Controller
             ]);
         }
 
-        $request->validate([
+        $rules = [
             'doctor_id' => 'required|integer|exists:users,id',
-            'speciality' => 'sometimes|nullable|array',
-            'speciality.*' => 'required|string|max:255|distinct',
-        ]);
+        ];
+
+        if ($user->role !== User::ROLE_SUPERADMIN) {
+            $rules['speciality'] = 'sometimes|nullable|array';
+            $rules['speciality.*'] = 'required|string|max:255|distinct';
+        }
+
+        $request->validate($rules);
 
         if (User::where('id', $request->doctor_id)->where('role', User::ROLE_DOCTOR)->doesntExist()) {
             return response()->json([
@@ -286,7 +476,7 @@ class ClinicController extends Controller
 
         $pivotAttributes = [];
 
-        if ($request->has('speciality')) {
+        if ($user->role !== User::ROLE_SUPERADMIN && $request->has('speciality')) {
             $specialities = collect($request->input('speciality', []))
                 ->filter(fn ($speciality): bool => filled($speciality))
                 ->map(fn ($speciality): string => (string) $speciality)
@@ -487,6 +677,30 @@ class ClinicController extends Controller
         ], flashMessage: 'Jadwal dokter berhasil diperbarui.');
     }
 
+    public function deleteDoctorClinicSchedule(Request $request, DoctorClinicSchedule $schedule): JsonResponse|RedirectResponse
+    {
+        $request->validate([
+            'clinic_id' => 'sometimes|nullable|integer|exists:clinics,id',
+        ]);
+
+        $this->assertClinicRequestMatchesRoute($request->input('clinic_id'), (int) $schedule->clinic_id);
+        $this->assertCanManageSchedule($request, $schedule);
+
+        if (Reservation::query()->where('doctor_clinic_schedule_id', $schedule->id)->exists()) {
+            throw ValidationException::withMessages([
+                'schedule' => [
+                    'Jadwal dokter tidak dapat dihapus karena sudah digunakan pada reservasi.',
+                ],
+            ]);
+        }
+
+        $schedule->delete();
+
+        return $this->jsonOrRedirect($request, [
+            'message' => 'Doctor clinic schedule deleted successfully.',
+        ], flashMessage: 'Jadwal dokter berhasil dihapus.');
+    }
+
     private function syncOperatingHours(Clinic $clinic, ?array $operatingHours, bool $seedDefaultsOnCreate): void
     {
         if ($operatingHours === null) {
@@ -598,6 +812,29 @@ class ClinicController extends Controller
     /**
      * @return array<string, mixed>
      */
+    private function serializeClinicIndexEntry(Clinic $clinic): array
+    {
+        return [
+            'id' => $clinic->id,
+            'name' => $clinic->name,
+            'address' => $clinic->address,
+            'phone_number' => $clinic->phone_number,
+            'email' => $clinic->email,
+            'image_path' => $clinic->image_path,
+            'image_url' => $clinic->image_url,
+            'specialities' => $this->collectClinicSpecialities($clinic),
+            'doctor_count' => (int) ($clinic->doctor_count ?? 0),
+            'admin_count' => (int) ($clinic->admin_count ?? 0),
+            'schedule_count' => (int) ($clinic->schedule_count ?? 0),
+            'reservation_count' => (int) ($clinic->reservation_count ?? 0),
+            'medical_record_count' => (int) ($clinic->medical_record_count ?? 0),
+            'operating_day_count' => (int) ($clinic->operating_day_count ?? 0),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function serializeClinicDetail(Clinic $clinic): array
     {
         return [
@@ -622,7 +859,39 @@ class ClinicController extends Controller
                     'specialities' => $this->pivotSpecialities($doctor->pivot?->speciality),
                 ];
             })->all(),
+            'admins' => $clinic->users
+                ->where('role', User::ROLE_ADMIN)
+                ->sortBy('name')
+                ->values()
+                ->map(fn (User $admin): array => $this->serializeClinicAdmin($admin))
+                ->all(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeClinicAdmin(User $admin): array
+    {
+        return [
+            'id' => $admin->id,
+            'name' => $admin->name,
+            'username' => $admin->username,
+            'email' => $admin->email,
+            'phone_number' => $admin->phone_number,
+            'date_of_birth' => $admin->date_of_birth?->toDateString(),
+            'gender' => $admin->gender,
+            'email_verified_at' => $admin->email_verified_at?->toISOString(),
+            'created_at' => $admin->created_at?->toISOString(),
+        ];
+    }
+
+    private function findClinicAdmin(Clinic $clinic, int|string $adminId): ?User
+    {
+        return $clinic->users()
+            ->whereKey($adminId)
+            ->where('role', User::ROLE_ADMIN)
+            ->first();
     }
 
     /**
@@ -687,6 +956,49 @@ class ClinicController extends Controller
         abort_unless(in_array($request->user()->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true), 403);
     }
 
+    /**
+     * @return array<string, int|null>
+     */
+    private function settingsSummary(Clinic $clinic, User $actor): array
+    {
+        $today = Carbon::today();
+
+        return [
+            'doctor_count' => $clinic->doctors()->count(),
+            'active_schedule_count' => $clinic->doctorClinicSchedules()->where('is_active', true)->count(),
+            'today_reservation_count' => $clinic->reservations()->whereDate('reservation_date', $today->toDateString())->count(),
+            'active_queue_count' => $clinic->reservations()
+                ->whereDate('reservation_date', $today->toDateString())
+                ->where('status', Reservation::STATUS_APPROVED)
+                ->whereIn('queue_status', Reservation::ACTIVE_QUEUE_STATUSES)
+                ->count(),
+            'operating_day_count' => $clinic->operatingHours()->where('is_closed', false)->count(),
+            'medical_records_this_month' => $actor->role === User::ROLE_SUPERADMIN
+                ? null
+                : $clinic->medicalRecords()
+                    ->whereBetween('issued_at', [
+                        $today->copy()->startOfMonth()->startOfDay(),
+                        $today->copy()->endOfMonth()->endOfDay(),
+                    ])
+                    ->count(),
+        ];
+    }
+
+    /**
+     * @return array<string, int|null>
+     */
+    private function emptySettingsSummary(User $actor): array
+    {
+        return [
+            'doctor_count' => 0,
+            'active_schedule_count' => 0,
+            'today_reservation_count' => 0,
+            'active_queue_count' => 0,
+            'operating_day_count' => 0,
+            'medical_records_this_month' => $actor->role === User::ROLE_SUPERADMIN ? null : 0,
+        ];
+    }
+
     private function assertCanManageClinic(Request $request, int $clinicId): void
     {
         /** @var User $user */
@@ -701,6 +1013,41 @@ class ClinicController extends Controller
         }
 
         abort(403, 'Forbidden, you are not authorized to manage this clinic.');
+    }
+
+    private function assertClinicCanBeDeleted(Clinic $clinic): void
+    {
+        $blockingReasons = [];
+
+        if ($clinic->users()->exists()) {
+            $blockingReasons[] = 'admin/user klinik';
+        }
+
+        if ($clinic->doctors()->exists()) {
+            $blockingReasons[] = 'dokter terassign';
+        }
+
+        if ($clinic->doctorClinicSchedules()->exists()) {
+            $blockingReasons[] = 'jadwal dokter';
+        }
+
+        if ($clinic->reservations()->exists()) {
+            $blockingReasons[] = 'reservasi';
+        }
+
+        if ($clinic->medicalRecords()->exists()) {
+            $blockingReasons[] = 'rekam medis';
+        }
+
+        if ($blockingReasons === []) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'clinic' => [
+                'Klinik tidak dapat dihapus karena masih memiliki '.implode(', ', $blockingReasons).'.',
+            ],
+        ]);
     }
 
     private function assertCanManageScheduleRequest(Request $request, int $clinicId, int $doctorId): void

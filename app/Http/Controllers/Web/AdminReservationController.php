@@ -87,6 +87,7 @@ class AdminReservationController extends Controller
             'reservation_date' => ['sometimes', 'date', 'after_or_equal:today'],
             'window_start_time' => ['sometimes', 'date_format:H:i'],
             'complaint' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'admin_notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
         ]);
 
         if (count(array_diff(array_keys($payload), ['clinic_id'])) === 0) {
@@ -237,6 +238,10 @@ class AdminReservationController extends Controller
                 $attributes['complaint'] = $payload['complaint'];
             }
 
+            if (array_key_exists('admin_notes', $payload)) {
+                $attributes['admin_notes'] = $payload['admin_notes'];
+            }
+
             if ($isScheduleChanged && $targetSchedule !== null) {
                 $attributes = array_merge($attributes, [
                     'queue_number' => $isSameQueueLine
@@ -339,18 +344,27 @@ class AdminReservationController extends Controller
                     ]);
                 }
 
-                if ($payload['status'] === Reservation::STATUS_CANCELLED && empty($payload['cancellation_reason'])) {
+                if (
+                    in_array($payload['status'], [Reservation::STATUS_CANCELLED, Reservation::STATUS_REJECTED], true)
+                    && empty($payload['cancellation_reason'])
+                ) {
                     throw ValidationException::withMessages([
-                        'cancellation_reason' => ['Cancellation reason is required when status is cancelled.'],
+                        'cancellation_reason' => ['Cancellation or rejection reason is required when status is cancelled or rejected.'],
                     ]);
                 }
 
-                if ($payload['status'] !== Reservation::STATUS_CANCELLED && array_key_exists('cancellation_reason', $payload)) {
+                if (
+                    !in_array($payload['status'], [Reservation::STATUS_CANCELLED, Reservation::STATUS_REJECTED], true)
+                    && array_key_exists('cancellation_reason', $payload)
+                ) {
                     $payload['cancellation_reason'] = null;
                     $payload['cancelled_at'] = null;
                 }
 
-                if ($payload['status'] !== Reservation::STATUS_CANCELLED && $lockedReservation->status === Reservation::STATUS_CANCELLED) {
+                if (
+                    !in_array($payload['status'], [Reservation::STATUS_CANCELLED, Reservation::STATUS_REJECTED], true)
+                    && in_array($lockedReservation->status, [Reservation::STATUS_CANCELLED, Reservation::STATUS_REJECTED], true)
+                ) {
                     $payload['cancellation_reason'] = null;
                     $payload['cancelled_at'] = null;
                 }

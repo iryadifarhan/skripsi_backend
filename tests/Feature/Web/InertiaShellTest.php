@@ -5,7 +5,10 @@ namespace Tests\Feature\Web;
 use App\Models\Clinic;
 use App\Models\ClinicOperatingHour;
 use App\Models\DoctorClinicSchedule;
+use App\Models\MedicalRecord;
+use App\Models\Reservation;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -130,6 +133,80 @@ class InertiaShellTest extends TestCase
             );
     }
 
+    public function test_admin_dashboard_can_filter_doctor_schedules_by_day(): void
+    {
+        Carbon::setTestNow('2026-04-29 08:00:00');
+
+        try {
+            $clinic = Clinic::create([
+                'name' => 'Clinic Dashboard Schedule Filter',
+                'address' => 'Jl. Dashboard Schedule',
+                'phone_number' => '+6200011199',
+                'email' => 'dashboard-schedule@example.test',
+            ]);
+            $admin = User::factory()->create([
+                'role' => User::ROLE_ADMIN,
+                'clinic_id' => $clinic->id,
+            ]);
+            $tuesdayDoctor = User::factory()->create([
+                'role' => User::ROLE_DOCTOR,
+                'name' => 'Doctor Tuesday',
+            ]);
+            $wednesdayDoctor = User::factory()->create([
+                'role' => User::ROLE_DOCTOR,
+                'name' => 'Doctor Wednesday',
+            ]);
+
+            $tuesdayDoctor->clinics()->attach($clinic->id, ['speciality' => null]);
+            $wednesdayDoctor->clinics()->attach($clinic->id, ['speciality' => null]);
+
+            DoctorClinicSchedule::create([
+                'clinic_id' => $clinic->id,
+                'doctor_id' => $tuesdayDoctor->id,
+                'day_of_week' => 2,
+                'start_time' => '09:00:00',
+                'end_time' => '12:00:00',
+                'window_minutes' => 30,
+                'max_patients_per_window' => 4,
+                'is_active' => true,
+            ]);
+            DoctorClinicSchedule::create([
+                'clinic_id' => $clinic->id,
+                'doctor_id' => $wednesdayDoctor->id,
+                'day_of_week' => 3,
+                'start_time' => '13:00:00',
+                'end_time' => '16:00:00',
+                'window_minutes' => 30,
+                'max_patients_per_window' => 4,
+                'is_active' => true,
+            ]);
+
+            $this->actingAs($admin)
+                ->get('/dashboard?schedule_day=2')
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('dashboard')
+                    ->where('dashboardData.selectedScheduleDay', 2)
+                    ->where('dashboardData.selectedScheduleDayLabel', 'Selasa')
+                    ->has('dashboardData.schedules', 1)
+                    ->where('dashboardData.schedules.0.doctor_id', $tuesdayDoctor->id)
+                );
+
+            $this->actingAs($admin)
+                ->get('/dashboard?schedule_day=99')
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('dashboard')
+                    ->where('dashboardData.selectedScheduleDay', 3)
+                    ->where('dashboardData.selectedScheduleDayLabel', 'Rabu')
+                    ->has('dashboardData.schedules', 1)
+                    ->where('dashboardData.schedules.0.doctor_id', $wednesdayDoctor->id)
+                );
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     public function test_admin_doctor_pages_render_with_clinic_context(): void
     {
         $clinic = Clinic::create([
@@ -146,7 +223,101 @@ class InertiaShellTest extends TestCase
         $doctor = User::factory()->create([
             'role' => User::ROLE_DOCTOR,
         ]);
+        $unassignedDoctor = User::factory()->create([
+            'role' => User::ROLE_DOCTOR,
+        ]);
         $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['Pediatrics'])]);
+        $schedule = DoctorClinicSchedule::create([
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 1,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+            'is_active' => true,
+        ]);
+        DoctorClinicSchedule::create([
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 0,
+            'start_time' => '10:00:00',
+            'end_time' => '11:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 2,
+            'is_active' => false,
+        ]);
+        $otherClinic = Clinic::create([
+            'name' => 'Clinic Other Doctor Records',
+            'address' => 'Jl. Other Doctor Records',
+            'phone_number' => '+6200022233',
+            'email' => 'other-doctor-records@example.test',
+        ]);
+        $otherSchedule = DoctorClinicSchedule::create([
+            'clinic_id' => $otherClinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 2,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+            'is_active' => true,
+        ]);
+        $patient = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+        ]);
+        $reservation = Reservation::create([
+            'reservation_number' => 'RSV-WEB-DOCTOR-RECORD',
+            'patient_id' => $patient->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => '2026-04-27',
+            'window_start_time' => '09:00:00',
+            'window_end_time' => '09:30:00',
+            'window_slot_number' => 1,
+            'queue_number' => 1,
+            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
+            'status' => Reservation::STATUS_COMPLETED,
+            'complaint' => 'Scoped clinic complaint',
+        ]);
+        MedicalRecord::create([
+            'reservation_id' => $reservation->id,
+            'patient_id' => $patient->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'diagnosis' => 'Scoped diagnosis',
+            'treatment' => 'Scoped treatment',
+            'prescription_notes' => 'Scoped prescription',
+            'doctor_notes' => 'Scoped doctor notes',
+            'issued_at' => '2026-04-27 10:00:00',
+        ]);
+        $otherReservation = Reservation::create([
+            'reservation_number' => 'RSV-WEB-OTHER-RECORD',
+            'patient_id' => $patient->id,
+            'clinic_id' => $otherClinic->id,
+            'doctor_id' => $doctor->id,
+            'doctor_clinic_schedule_id' => $otherSchedule->id,
+            'reservation_date' => '2026-04-28',
+            'window_start_time' => '09:00:00',
+            'window_end_time' => '09:30:00',
+            'window_slot_number' => 1,
+            'queue_number' => 1,
+            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
+            'status' => Reservation::STATUS_COMPLETED,
+            'complaint' => 'Other clinic complaint',
+        ]);
+        MedicalRecord::create([
+            'reservation_id' => $otherReservation->id,
+            'patient_id' => $patient->id,
+            'clinic_id' => $otherClinic->id,
+            'doctor_id' => $doctor->id,
+            'diagnosis' => 'Other diagnosis',
+            'treatment' => 'Other treatment',
+            'prescription_notes' => 'Other prescription',
+            'doctor_notes' => 'Other doctor notes',
+            'issued_at' => '2026-04-28 10:00:00',
+        ]);
 
         $this->actingAs($admin)
             ->get('/doctors')
@@ -155,6 +326,11 @@ class InertiaShellTest extends TestCase
                 ->component('doctors/index')
                 ->where('context.role', User::ROLE_ADMIN)
                 ->where('context.clinicId', $clinic->id)
+                ->where('clinic.doctors.0.id', $doctor->id)
+                ->where('unassignedDoctors.0.id', $unassignedDoctor->id)
+                ->where('schedules.0.doctor_id', $doctor->id)
+                ->where('schedules.0.day_of_week', 1)
+                ->where('schedules.1.day_of_week', 0)
             );
 
         $this->actingAs($admin)
@@ -164,6 +340,14 @@ class InertiaShellTest extends TestCase
                 ->component('doctors/edit')
                 ->where('doctorId', $doctor->id)
                 ->where('clinicId', $clinic->id)
+                ->where('isClinicDoctor', true)
+                ->where('schedules.0.doctor_id', $doctor->id)
+                ->where('schedules.0.day_of_week', 1)
+                ->where('schedules.1.day_of_week', 0)
+                ->has('medicalRecords', 1)
+                ->where('medicalRecords.0.reservation.reservation_number', 'RSV-WEB-DOCTOR-RECORD')
+                ->where('medicalRecords.0.reservation.complaint', 'Scoped clinic complaint')
+                ->where('medicalRecords.0.doctor_notes', 'Scoped doctor notes')
             );
     }
 
@@ -303,6 +487,436 @@ class InertiaShellTest extends TestCase
             );
     }
 
+    public function test_superadmin_cannot_view_medical_record_pages_or_doctor_medical_history(): void
+    {
+        $clinic = Clinic::create([
+            'name' => 'Clinic Superadmin Medical Hidden',
+            'address' => 'Jl. Superadmin Medical Hidden',
+            'phone_number' => '+6200033399',
+            'email' => 'superadmin-medical-hidden@example.test',
+        ]);
+        $superadmin = User::factory()->create([
+            'role' => User::ROLE_SUPERADMIN,
+        ]);
+        $doctor = User::factory()->create([
+            'role' => User::ROLE_DOCTOR,
+        ]);
+        $doctor->clinics()->attach($clinic->id, ['speciality' => null]);
+        $patient = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+        ]);
+        $schedule = DoctorClinicSchedule::create([
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 1,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+            'is_active' => true,
+        ]);
+        $reservation = Reservation::create([
+            'reservation_number' => 'RSV-SUPERADMIN-HIDDEN-MEDICAL',
+            'patient_id' => $patient->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => '2026-04-27',
+            'window_start_time' => '09:00:00',
+            'window_end_time' => '09:30:00',
+            'window_slot_number' => 1,
+            'queue_number' => 1,
+            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
+            'status' => Reservation::STATUS_COMPLETED,
+            'complaint' => 'Hidden medical complaint',
+        ]);
+        MedicalRecord::create([
+            'reservation_id' => $reservation->id,
+            'patient_id' => $patient->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'diagnosis' => 'Hidden diagnosis',
+            'treatment' => 'Hidden treatment',
+            'doctor_notes' => 'Hidden doctor notes',
+            'issued_at' => '2026-04-27 10:00:00',
+        ]);
+
+        $this->actingAs($superadmin)
+            ->get("/medical-records?clinic_id={$clinic->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('medical-records/index')
+                ->where('canViewMedicalRecords', false)
+                ->has('medicalRecords', 0)
+                ->has('doctorOptions', 0)
+            );
+
+        $this->actingAs($superadmin)
+            ->getJson("/medical-records?clinic_id={$clinic->id}")
+            ->assertForbidden();
+
+        $this->actingAs($superadmin)
+            ->getJson("/admin/medical-records?clinic_id={$clinic->id}")
+            ->assertForbidden();
+
+        $this->actingAs($superadmin)
+            ->getJson("/reports/medical-records?clinic_id={$clinic->id}&date_from=2026-04-27&date_to=2026-04-27")
+            ->assertForbidden();
+
+        $this->actingAs($superadmin)
+            ->get("/doctors/{$doctor->id}/edit?clinic_id={$clinic->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('doctors/edit')
+                ->where('doctorId', $doctor->id)
+                ->where('canViewMedicalRecords', false)
+                ->has('medicalRecords', 0)
+            );
+    }
+
+    public function test_superadmin_can_crud_global_doctor_without_managing_speciality(): void
+    {
+        $clinic = Clinic::create([
+            'name' => 'Clinic Superadmin Doctor CRUD',
+            'address' => 'Jl. Superadmin Doctor CRUD',
+            'phone_number' => '+6200033344',
+            'email' => 'superadmin-doctor-crud@example.test',
+        ]);
+        $superadmin = User::factory()->create([
+            'role' => User::ROLE_SUPERADMIN,
+        ]);
+
+        $this->actingAs($superadmin)
+            ->post('/doctors', [
+                'clinic_id' => $clinic->id,
+                'name' => 'Doctor Global CRUD',
+                'username' => 'doctor-global-crud',
+                'email' => 'doctor-global-crud@example.test',
+                'phone_number' => '+62811112222',
+                'date_of_birth' => '1988-01-01',
+                'gender' => User::GENDER_PEREMPUAN,
+                'password' => 'Password123!',
+                'password_confirmation' => 'Password123!',
+            ])
+            ->assertRedirect();
+
+        $doctor = User::query()
+            ->where('email', 'doctor-global-crud@example.test')
+            ->firstOrFail();
+
+        $this->assertSame(User::ROLE_DOCTOR, $doctor->role);
+
+        $this->actingAs($superadmin)
+            ->patch("/admin/clinic/doctor/{$clinic->id}", [
+                'doctor_id' => $doctor->id,
+                'speciality' => ['Should Not Be Stored'],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('clinic_user', [
+            'clinic_id' => $clinic->id,
+            'user_id' => $doctor->id,
+            'speciality' => null,
+        ]);
+
+        $this->actingAs($superadmin)
+            ->patch("/doctors/{$doctor->id}", [
+                'clinic_id' => $clinic->id,
+                'name' => 'Doctor Global CRUD Updated',
+                'username' => 'doctor-global-crud-updated',
+                'email' => 'doctor-global-crud-updated@example.test',
+                'phone_number' => '+62811113333',
+                'date_of_birth' => '1988-02-02',
+                'gender' => User::GENDER_LAKI,
+                'specialities' => ['Still Ignored'],
+            ])
+            ->assertRedirect(route('doctors.edit', [
+                'doctor' => $doctor->id,
+                'clinic_id' => $clinic->id,
+            ]))
+            ->assertSessionHas('status', 'Data dokter berhasil diperbarui.');
+
+        $doctor->refresh();
+        $this->assertSame('Doctor Global CRUD Updated', $doctor->name);
+        $this->assertDatabaseHas('clinic_user', [
+            'clinic_id' => $clinic->id,
+            'user_id' => $doctor->id,
+            'speciality' => null,
+        ]);
+
+        $this->actingAs($superadmin)
+            ->delete("/doctors/{$doctor->id}", [
+                'clinic_id' => $clinic->id,
+            ])
+            ->assertRedirect(route('doctors.index', [
+                'clinic_id' => $clinic->id,
+            ]))
+            ->assertSessionHas('status', 'Data dokter berhasil dihapus.');
+
+        $this->assertDatabaseMissing('users', [
+            'id' => $doctor->id,
+        ]);
+    }
+
+    public function test_admin_patient_pages_are_clinic_scoped_and_walk_ins_are_grouped(): void
+    {
+        $clinic = Clinic::create([
+            'name' => 'Clinic Patient Scope',
+            'address' => 'Jl. Patient Scope',
+            'phone_number' => '+6200012121',
+            'email' => 'patient-scope@example.test',
+        ]);
+        $otherClinic = Clinic::create([
+            'name' => 'Clinic Patient Other',
+            'address' => 'Jl. Patient Other',
+            'phone_number' => '+6200012122',
+            'email' => 'patient-other@example.test',
+        ]);
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'clinic_id' => $clinic->id,
+        ]);
+        $doctor = User::factory()->create([
+            'role' => User::ROLE_DOCTOR,
+        ]);
+        $schedule = DoctorClinicSchedule::create([
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 1,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+            'is_active' => true,
+        ]);
+        $otherSchedule = DoctorClinicSchedule::create([
+            'clinic_id' => $otherClinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 1,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+            'is_active' => true,
+        ]);
+        $clinicPatient = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+            'name' => 'Clinic Scoped Patient',
+            'email' => 'clinic-scoped-patient@example.test',
+        ]);
+        $otherPatient = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+            'name' => 'Other Clinic Patient',
+            'email' => 'other-clinic-patient@example.test',
+        ]);
+
+        $reservation = Reservation::create([
+            'reservation_number' => 'RSV-PATIENT-SCOPE',
+            'patient_id' => $clinicPatient->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => '2026-04-27',
+            'window_start_time' => '09:00:00',
+            'window_end_time' => '09:30:00',
+            'window_slot_number' => 1,
+            'queue_number' => 1,
+            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
+            'status' => Reservation::STATUS_COMPLETED,
+            'complaint' => 'Scoped patient complaint',
+        ]);
+        MedicalRecord::create([
+            'reservation_id' => $reservation->id,
+            'patient_id' => $clinicPatient->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'diagnosis' => 'Scoped patient diagnosis',
+            'treatment' => 'Scoped patient treatment',
+            'doctor_notes' => 'Scoped patient notes',
+            'issued_at' => '2026-04-27 10:00:00',
+        ]);
+
+        Reservation::create([
+            'reservation_number' => 'RSV-PATIENT-OTHER',
+            'patient_id' => $otherPatient->id,
+            'clinic_id' => $otherClinic->id,
+            'doctor_id' => $doctor->id,
+            'doctor_clinic_schedule_id' => $otherSchedule->id,
+            'reservation_date' => '2026-04-28',
+            'window_start_time' => '09:00:00',
+            'window_end_time' => '09:30:00',
+            'window_slot_number' => 1,
+            'queue_number' => 1,
+            'queue_status' => Reservation::QUEUE_STATUS_WAITING,
+            'status' => Reservation::STATUS_APPROVED,
+            'complaint' => 'Other clinic patient complaint',
+        ]);
+
+        $walkInReservation = Reservation::create([
+            'reservation_number' => 'RSV-WALKIN-A',
+            'patient_id' => null,
+            'guest_name' => 'Walk In Same',
+            'guest_phone_number' => '+628123456789',
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => '2026-04-27',
+            'window_start_time' => '10:00:00',
+            'window_end_time' => '10:30:00',
+            'window_slot_number' => 1,
+            'queue_number' => 2,
+            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
+            'status' => Reservation::STATUS_COMPLETED,
+            'complaint' => 'Walk-in scoped complaint',
+        ]);
+        MedicalRecord::create([
+            'reservation_id' => $walkInReservation->id,
+            'patient_id' => null,
+            'guest_name' => 'walk in same',
+            'guest_phone_number' => '08123456789',
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'diagnosis' => 'Walk-in grouped diagnosis',
+            'treatment' => 'Walk-in grouped treatment',
+            'doctor_notes' => 'Walk-in grouped notes',
+            'issued_at' => '2026-04-27 11:00:00',
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/patients')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('patients/index')
+                ->where('context.role', User::ROLE_ADMIN)
+                ->where('selectedClinicId', $clinic->id)
+                ->has('patients', 1)
+                ->where('patients.0.id', $clinicPatient->id)
+                ->has('walkIns', 1)
+                ->where('walkIns.0.reservation_count', 1)
+                ->where('walkIns.0.medical_record_count', 1)
+            );
+
+        $this->actingAs($admin)
+            ->get("/patients/{$clinicPatient->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('patients/edit')
+                ->where('patientType', 'registered')
+                ->where('patient.id', $clinicPatient->id)
+                ->has('reservations', 1)
+                ->where('reservations.0.reservation_number', 'RSV-PATIENT-SCOPE')
+                ->has('medicalRecords', 1)
+                ->where('medicalRecords.0.doctor_notes', 'Scoped patient notes')
+                ->where('canEdit', false)
+            );
+
+        $this->actingAs($admin)
+            ->get("/patients/{$otherPatient->id}/edit")
+            ->assertNotFound();
+    }
+
+    public function test_superadmin_patient_pages_show_all_registered_patients_and_hide_medical_records(): void
+    {
+        $clinic = Clinic::create([
+            'name' => 'Clinic Super Patient',
+            'address' => 'Jl. Super Patient',
+            'phone_number' => '+6200013131',
+            'email' => 'super-patient@example.test',
+        ]);
+        $superadmin = User::factory()->create([
+            'role' => User::ROLE_SUPERADMIN,
+        ]);
+        $doctor = User::factory()->create([
+            'role' => User::ROLE_DOCTOR,
+        ]);
+        $schedule = DoctorClinicSchedule::create([
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 1,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+            'is_active' => true,
+        ]);
+        $patientWithRecord = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+            'name' => 'Super Patient Record',
+            'email' => 'super-patient-record@example.test',
+        ]);
+        $patientWithoutRecord = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+            'name' => 'Super Patient No Record',
+            'email' => 'super-patient-no-record@example.test',
+        ]);
+
+        $reservation = Reservation::create([
+            'reservation_number' => 'RSV-SUPER-PATIENT',
+            'patient_id' => $patientWithRecord->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'doctor_clinic_schedule_id' => $schedule->id,
+            'reservation_date' => '2026-04-27',
+            'window_start_time' => '09:00:00',
+            'window_end_time' => '09:30:00',
+            'window_slot_number' => 1,
+            'queue_number' => 1,
+            'queue_status' => Reservation::QUEUE_STATUS_COMPLETED,
+            'status' => Reservation::STATUS_COMPLETED,
+            'complaint' => 'Super patient complaint',
+        ]);
+        MedicalRecord::create([
+            'reservation_id' => $reservation->id,
+            'patient_id' => $patientWithRecord->id,
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'diagnosis' => 'Hidden superadmin diagnosis',
+            'treatment' => 'Hidden superadmin treatment',
+            'doctor_notes' => 'Hidden superadmin notes',
+            'issued_at' => '2026-04-27 10:00:00',
+        ]);
+
+        $this->actingAs($superadmin)
+            ->get('/patients')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('patients/index')
+                ->where('context.role', User::ROLE_SUPERADMIN)
+                ->has('patients', 2)
+                ->where('canCreate', true)
+            );
+
+        $this->actingAs($superadmin)
+            ->get("/patients/{$patientWithRecord->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('patients/edit')
+                ->where('patientType', 'registered')
+                ->where('patient.id', $patientWithRecord->id)
+                ->has('reservations', 1)
+                ->has('medicalRecords', 0)
+                ->where('canViewMedicalRecords', false)
+                ->where('canEdit', true)
+            );
+
+        $this->actingAs($superadmin)
+            ->patch("/patients/{$patientWithoutRecord->id}", [
+                'name' => 'Super Patient Updated',
+                'username' => 'super-patient-updated',
+                'email' => 'super-patient-updated@example.test',
+                'phone_number' => '+62811117777',
+                'date_of_birth' => '1999-01-01',
+                'gender' => User::GENDER_PEREMPUAN,
+            ])
+            ->assertRedirect(route('patients.edit', $patientWithoutRecord));
+
+        $this->assertDatabaseHas('users', [
+            'id' => $patientWithoutRecord->id,
+            'name' => 'Super Patient Updated',
+            'role' => User::ROLE_PATIENT,
+        ]);
+    }
+
     public function test_admin_can_manage_own_clinic_settings_and_doctor_schedule_from_full_stack_page(): void
     {
         Storage::fake('public');
@@ -332,12 +946,18 @@ class InertiaShellTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/clinic-settings')
+            ->assertRedirect(route('clinic-settings.show', ['clinicId' => $clinic->id]));
+
+        $this->actingAs($admin)
+            ->get("/clinic-settings/{$clinic->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('clinic-settings/index')
                 ->where('context.role', User::ROLE_ADMIN)
                 ->where('selectedClinicId', $clinic->id)
                 ->where('clinic.id', $clinic->id)
+                ->where('summary.doctor_count', 1)
+                ->where('summary.operating_day_count', 1)
                 ->has('clinic.doctors', 1)
             );
 
@@ -442,7 +1062,25 @@ class InertiaShellTest extends TestCase
         ]);
 
         $this->actingAs($superadmin)
+            ->get('/clinic-settings')
+            ->assertRedirect(route('clinics.index'));
+
+        $this->actingAs($superadmin)
+            ->get('/clinics')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('clinics/index')
+                ->where('context.role', User::ROLE_SUPERADMIN)
+                ->has('clinics', 2)
+                ->where('clinics.1.id', $clinicB->id)
+            );
+
+        $this->actingAs($superadmin)
             ->get("/clinic-settings?clinic_id={$clinicB->id}")
+            ->assertRedirect(route('clinic-settings.show', ['clinicId' => $clinicB->id]));
+
+        $this->actingAs($superadmin)
+            ->get("/clinic-settings/{$clinicB->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('clinic-settings/index')
@@ -450,6 +1088,7 @@ class InertiaShellTest extends TestCase
                 ->has('context.clinics', 2)
                 ->where('selectedClinicId', $clinicB->id)
                 ->where('clinic.id', $clinicB->id)
+                ->where('summary.medical_records_this_month', null)
             );
 
         $this->actingAs($superadmin)

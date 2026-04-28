@@ -100,6 +100,26 @@ class ReservationWebTest extends TestCase
             ->assertJsonPath('reservation.window_start_time', '09:00:00');
     }
 
+    public function test_clinic_admin_can_search_registered_patients_for_walk_in_modal(): void
+    {
+        $clinic = $this->makeClinic('clinic-admin-patient-search');
+        $admin = $this->makeUser('admin', 'admin-patient-search@example.com', $clinic->id);
+        $patient = $this->makeUser('patient', 'patient-search-target@example.com', null, '+628123450009');
+        $this->makeUser('doctor', 'doctor-patient-search@example.com');
+
+        $this->login($admin, 'Password123!');
+
+        $this->getJson('/admin/patients/search?search=target', $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('patients.0.id', $patient->id)
+            ->assertJsonPath('patients.0.name', $patient->name)
+            ->assertJsonMissingPath('patients.1');
+
+        $this->getJson('/admin/patients/search?search=doctor-patient-search', $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('patients', []);
+    }
+
     public function test_clinic_admin_can_create_walk_in_reservation_without_patient_account(): void
     {
         $reservationDate = now()->addDay()->toDateString();
@@ -657,6 +677,7 @@ class ReservationWebTest extends TestCase
             'reservation_date' => $reservationDate,
             'window_start_time' => '10:00',
             'complaint' => 'Updated complaint by admin',
+            'admin_notes' => 'Admin moved the reservation to doctor B schedule.',
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservation.patient_id', $linkedPatient->id)
@@ -668,7 +689,8 @@ class ReservationWebTest extends TestCase
             ->assertJsonPath('reservation.window_slot_number', 1)
             ->assertJsonPath('reservation.queue_summary.number', 2)
             ->assertJsonPath('reservation.reschedule_reason', null)
-            ->assertJsonPath('reservation.complaint', 'Updated complaint by admin');
+            ->assertJsonPath('reservation.complaint', 'Updated complaint by admin')
+            ->assertJsonPath('reservation.admin_notes', 'Admin moved the reservation to doctor B schedule.');
 
         $this->assertDatabaseHas('reservations', [
             'id' => $walkInReservation->id,
@@ -680,6 +702,7 @@ class ReservationWebTest extends TestCase
             'window_start_time' => '10:00:00',
             'window_slot_number' => 1,
             'queue_number' => 2,
+            'admin_notes' => 'Admin moved the reservation to doctor B schedule.',
         ]);
 
         $this->assertDatabaseHas('reservations', [
@@ -795,15 +818,18 @@ class ReservationWebTest extends TestCase
             'clinic_id' => $clinic->id,
             'status' => Reservation::STATUS_REJECTED,
             'admin_notes' => 'Rejected after validation.',
+            'cancellation_reason' => 'Patient data did not pass clinic validation.',
         ], $this->spaHeaders())
             ->assertOk()
             ->assertJsonPath('reservation.status', Reservation::STATUS_REJECTED)
+            ->assertJsonPath('reservation.cancellation_reason', 'Patient data did not pass clinic validation.')
             ->assertJsonPath('reservation.queue_summary.number', null)
             ->assertJsonPath('reservation.queue_summary.status', Reservation::QUEUE_STATUS_CANCELLED);
 
         $this->assertDatabaseHas('reservations', [
             'id' => $reservation->id,
             'status' => Reservation::STATUS_REJECTED,
+            'cancellation_reason' => 'Patient data did not pass clinic validation.',
             'queue_status' => Reservation::QUEUE_STATUS_CANCELLED,
             'queue_number' => null,
         ]);
@@ -822,7 +848,30 @@ class ReservationWebTest extends TestCase
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '+628123450003'
             && str_contains($job->message, 'rejected')
+            && str_contains($job->message, 'Patient data did not pass clinic validation.')
         );
+    }
+
+    public function test_clinic_admin_reject_requires_rejection_reason(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-reject-reason-required');
+        $doctor = $this->makeUser('doctor', 'doctor-reject-reason-required@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+
+        $admin = $this->makeUser('admin', 'admin-reject-reason-required@example.com', $clinic->id);
+        $patient = $this->makeUser('patient', 'patient-reject-reason-required@example.com');
+        $reservation = $this->createReservation($patient, $schedule, $reservationDate, '09:00:00', 1, Reservation::STATUS_PENDING);
+
+        $this->login($admin, 'Password123!');
+
+        $this->patchJson("/admin/reservations/{$reservation->id}", [
+            'clinic_id' => $clinic->id,
+            'status' => Reservation::STATUS_REJECTED,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['cancellation_reason']);
     }
 
     public function test_clinic_admin_can_list_clinic_reservations_from_general_reservations_endpoint(): void

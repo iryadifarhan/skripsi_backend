@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Clinic;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Models\User;
@@ -13,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -35,6 +37,24 @@ class MedicalRecordController extends Controller
             'reservation_date' => ['nullable', 'date'],
         ]);
         $selectedClinicId = $this->selectedFilterClinicId($request, $context, $payload);
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            if ($request->expectsJson()) {
+                abort(403, 'Superadmin cannot access medical record data.');
+            }
+
+            return Inertia::render('medical-records/index', [
+                'context' => $context,
+                'medicalRecords' => [],
+                'doctorOptions' => [],
+                'canViewMedicalRecords' => false,
+                'filters' => [
+                    'clinicId' => null,
+                    'reservationDate' => $payload['reservation_date'] ?? '',
+                ],
+            ]);
+        }
+
         $query = MedicalRecord::query()
             ->with($this->medicalRecordRelations())
             ->orderByDesc('issued_at')
@@ -46,7 +66,7 @@ class MedicalRecordController extends Controller
             if ($selectedClinicId !== null) {
                 $query->where('clinic_id', $selectedClinicId);
             }
-        } elseif (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true) && $selectedClinicId !== null) {
+        } elseif ($user->role === User::ROLE_ADMIN && $selectedClinicId !== null) {
             $query->where('clinic_id', $selectedClinicId);
         } elseif ($user->role === User::ROLE_DOCTOR && $selectedClinicId !== null) {
             $query->where('doctor_id', $user->id)
@@ -71,6 +91,8 @@ class MedicalRecordController extends Controller
         return Inertia::render('medical-records/index', [
             'context' => $context,
             'medicalRecords' => $medicalRecords,
+            'doctorOptions' => $selectedClinicId !== null ? $this->clinicDoctorOptions($selectedClinicId) : [],
+            'canViewMedicalRecords' => true,
             'filters' => [
                 'clinicId' => $selectedClinicId,
                 'reservationDate' => $payload['reservation_date'] ?? '',
@@ -105,6 +127,11 @@ class MedicalRecordController extends Controller
         }
 
         return isset($payload['clinic_id']) ? (int) $payload['clinic_id'] : null;
+    }
+
+    private function denySuperadminMedicalRecordAccess(Request $request): void
+    {
+        abort_if($request->user()->role === User::ROLE_SUPERADMIN, 403, 'Superadmin cannot access medical record data.');
     }
 
     public function patientIndex(Request $request): JsonResponse
@@ -146,6 +173,8 @@ class MedicalRecordController extends Controller
 
     public function adminIndex(Request $request): JsonResponse
     {
+        $this->denySuperadminMedicalRecordAccess($request);
+
         $payload = $request->validate([
             'clinic_id' => ['required', 'integer', 'exists:clinics,id'],
             'reservation_date' => ['nullable', 'date'],
@@ -174,6 +203,8 @@ class MedicalRecordController extends Controller
 
     public function adminShow(Request $request, MedicalRecord $medicalRecord): JsonResponse
     {
+        $this->denySuperadminMedicalRecordAccess($request);
+
         $payload = $request->validate([
             'clinic_id' => ['required', 'integer', 'exists:clinics,id'],
         ]);
@@ -231,7 +262,8 @@ class MedicalRecordController extends Controller
 
     public function store(Request $request, Reservation $reservation): JsonResponse
     {
-        $doctor = $request->user();
+        /** @var User $actor */
+        $actor = $request->user();
         $payload = $request->validate([
             'clinic_id' => ['required', 'integer', 'exists:clinics,id'],
             'diagnosis' => ['nullable', 'string', 'max:5000'],
@@ -240,15 +272,15 @@ class MedicalRecordController extends Controller
             'doctor_notes' => ['required', 'string', 'max:5000'],
         ]);
 
-        $this->assertDoctorCanIssueMedicalRecord($doctor, $reservation, (int) $payload['clinic_id']);
+        $this->responsibleDoctorIdForMedicalRecord($actor, $reservation, (int) $payload['clinic_id']);
 
-        $medicalRecord = DB::transaction(function () use ($doctor, $reservation, $payload): MedicalRecord {
+        $medicalRecord = DB::transaction(function () use ($actor, $reservation, $payload): MedicalRecord {
             $lockedReservation = Reservation::query()
                 ->with('medicalRecord')
                 ->lockForUpdate()
                 ->findOrFail($reservation->id);
 
-            $this->assertDoctorCanIssueMedicalRecord($doctor, $lockedReservation, (int) $payload['clinic_id']);
+            $responsibleDoctorId = $this->responsibleDoctorIdForMedicalRecord($actor, $lockedReservation, (int) $payload['clinic_id']);
 
             if ($lockedReservation->medicalRecord !== null) {
                 abort(422, 'A medical record already exists for this reservation.');
@@ -258,13 +290,19 @@ class MedicalRecordController extends Controller
                 abort(422, 'Only active reservations can be completed with a medical record.');
             }
 
+            if ((string) $lockedReservation->queue_status !== Reservation::QUEUE_STATUS_IN_PROGRESS) {
+                throw ValidationException::withMessages([
+                    'queue_status' => ['Only in-progress queue entries can be completed with a medical record.'],
+                ]);
+            }
+
             $medicalRecord = MedicalRecord::create([
                 'reservation_id' => $lockedReservation->id,
                 'patient_id' => $lockedReservation->patient_id,
                 'guest_name' => $lockedReservation->guest_name,
                 'guest_phone_number' => $lockedReservation->guest_phone_number,
                 'clinic_id' => $lockedReservation->clinic_id,
-                'doctor_id' => $doctor->id,
+                'doctor_id' => $responsibleDoctorId,
                 'diagnosis' => $payload['diagnosis'] ?? null,
                 'treatment' => $payload['treatment'] ?? null,
                 'prescription_notes' => $payload['prescription_notes'] ?? null,
@@ -346,6 +384,7 @@ class MedicalRecordController extends Controller
                 'window_end_time' => $medicalRecord->reservation->window_end_time,
                 'status' => $medicalRecord->reservation->status,
                 'reschedule_reason' => $medicalRecord->reservation->reschedule_reason,
+                'complaint' => $medicalRecord->reservation->complaint,
             ];
         }
 
@@ -361,8 +400,30 @@ class MedicalRecordController extends Controller
             'patient:id,name,username,email,phone_number,gender',
             'doctor:id,name,username,email,phone_number,image_path',
             'clinic:id,name,address,phone_number,email,image_path',
-            'reservation:id,reservation_number,reservation_date,window_start_time,window_end_time,status,reschedule_reason',
+            'reservation:id,reservation_number,reservation_date,window_start_time,window_end_time,status,reschedule_reason,complaint',
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function clinicDoctorOptions(int $clinicId): array
+    {
+        $clinic = Clinic::find($clinicId);
+
+        if ($clinic === null) {
+            return [];
+        }
+
+        return $clinic->doctors()
+            ->orderBy('name')
+            ->get(['users.id', 'users.name'])
+            ->map(fn (User $doctor): array => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -417,14 +478,43 @@ class MedicalRecordController extends Controller
         abort(403, 'Forbidden, you are not authorized.');
     }
 
-    private function assertDoctorCanIssueMedicalRecord(User $doctor, Reservation $reservation, int $clinicId): void
+    private function responsibleDoctorIdForMedicalRecord(User $actor, Reservation $reservation, int $clinicId): int
     {
         if ((int) $reservation->clinic_id !== $clinicId) {
             abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
         }
 
-        if ((int) $reservation->doctor_id === (int) $doctor->id) {
-            return;
+        if ($actor->role === User::ROLE_DOCTOR) {
+            if ((int) $reservation->doctor_id === (int) $actor->id) {
+                return $actor->id;
+            }
+
+            abort(403, 'Forbidden, you are not authorized.');
+        }
+
+        if ($actor->role === User::ROLE_ADMIN) {
+            if ((int) $actor->clinic_id !== $clinicId) {
+                abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
+            }
+
+            if ($reservation->doctor_id === null) {
+                throw ValidationException::withMessages([
+                    'doctor_id' => ['Selected reservation does not have an assigned doctor.'],
+                ]);
+            }
+
+            $doctorExists = User::query()
+                ->whereKey($reservation->doctor_id)
+                ->where('role', User::ROLE_DOCTOR)
+                ->exists();
+
+            if (!$doctorExists) {
+                throw ValidationException::withMessages([
+                    'doctor_id' => ['Selected reservation doctor is invalid.'],
+                ]);
+            }
+
+            return (int) $reservation->doctor_id;
         }
 
         abort(403, 'Forbidden, you are not authorized.');

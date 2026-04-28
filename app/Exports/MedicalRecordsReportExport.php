@@ -41,6 +41,7 @@ class MedicalRecordsReportExport implements WithMultipleSheets
             ['Date From', (string) $this->filters['date_from']],
             ['Date To', (string) $this->filters['date_to']],
             ['Doctor ID', (string) ($this->filters['doctor_id'] ?? 'all')],
+            ['Search', (string) ($this->filters['search'] ?? '-')],
             ['Report Type', 'medical_records'],
             ['Total Medical Records', $this->summary['total_medical_records']],
             ['Registered Records', $this->summary['registered_records']],
