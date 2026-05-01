@@ -8,6 +8,7 @@ use App\Models\ClinicOperatingHour;
 use App\Models\DoctorClinicSchedule;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\MediaImageService;
 use App\Services\Web\WorkspaceViewService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -15,7 +16,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\Password as PasswordRule;
@@ -432,9 +432,7 @@ class ClinicController extends Controller
         $this->assertCanManageClinic($request, (int) $clinicId);
         $this->assertClinicCanBeDeleted($clinic);
 
-        if (filled($clinic->image_path)) {
-            Storage::disk($this->mediaDisk())->delete($clinic->image_path);
-        }
+        MediaImageService::delete($clinic->image_path, $this->mediaDisk());
 
         $clinic->delete();
 
@@ -1135,16 +1133,16 @@ class ClinicController extends Controller
 
     private function storeImage(UploadedFile $image, string $directory): string
     {
-        return $image->storePublicly($directory, $this->mediaDisk());
+        return MediaImageService::store($image, $directory, $this->mediaDisk());
     }
 
     private function deleteStoredImage(?string $previousImagePath, string $newImagePath): void
     {
-        if (!filled($previousImagePath) || $previousImagePath === $newImagePath) {
+        if (!MediaImageService::hasValidPath($previousImagePath) || $previousImagePath === $newImagePath) {
             return;
         }
 
-        Storage::disk($this->mediaDisk())->delete($previousImagePath);
+        MediaImageService::delete($previousImagePath, $this->mediaDisk());
     }
 
     private function mediaDisk(): string
@@ -1152,5 +1150,3 @@ class ClinicController extends Controller
         return (string) config('filesystems.media_disk', 'public');
     }
 }
-
-

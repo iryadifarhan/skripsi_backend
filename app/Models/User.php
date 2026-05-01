@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\MediaImageService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -190,7 +191,7 @@ class User extends Authenticatable
     {
         $path = $this->attributes['image_path'] ?? null;
 
-        if (!filled($path)) {
+        if (!MediaImageService::hasValidPath($path)) {
             return null;
         }
 

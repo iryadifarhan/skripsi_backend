@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\MedicalRecord;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Services\MediaImageService;
 use App\Services\Web\WorkspaceViewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -209,7 +209,7 @@ class PatientController extends Controller
 
         $disk = (string) config('filesystems.media_disk', 'public');
         $previousImagePath = $patientModel->image_path;
-        $newImagePath = $payload['image']->storePublicly('patients/'.$patientModel->id, $disk);
+        $newImagePath = MediaImageService::store($payload['image'], 'patients/'.$patientModel->id, $disk);
 
         $patientModel->update([
             'image_path' => $newImagePath,
@@ -217,7 +217,7 @@ class PatientController extends Controller
         ]);
 
         if (filled($previousImagePath) && $previousImagePath !== $newImagePath) {
-            Storage::disk($disk)->delete($previousImagePath);
+            MediaImageService::delete($previousImagePath, $disk);
         }
 
         return to_route('patients.edit', $patientModel)->with('status', 'Foto pasien berhasil diunggah.');
@@ -277,11 +277,11 @@ class PatientController extends Controller
 
     private function deleteUploadedImage(User $patient): void
     {
-        if (!filled($patient->image_path)) {
+        if (!MediaImageService::hasValidPath($patient->image_path)) {
             return;
         }
 
-        Storage::disk((string) config('filesystems.media_disk', 'public'))->delete($patient->image_path);
+        MediaImageService::delete($patient->image_path);
     }
 
     private function clinicScope(Request $request, array $context): ?int

@@ -7,10 +7,10 @@ use App\Models\Clinic;
 use App\Models\DoctorClinicSchedule;
 use App\Models\MedicalRecord;
 use App\Models\User;
+use App\Services\MediaImageService;
 use App\Services\Web\WorkspaceViewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\Password as PasswordRule;
@@ -178,7 +178,7 @@ class DoctorController extends Controller
         $doctorModel = $this->findEditableDoctor($request, $clinic, $doctor);
         $disk = (string) config('filesystems.media_disk', 'public');
         $previousImagePath = $doctorModel->image_path;
-        $newImagePath = $request->file('image')->storePublicly('doctors/'.$doctorModel->id, $disk);
+        $newImagePath = MediaImageService::store($request->file('image'), 'doctors/'.$doctorModel->id, $disk);
 
         $doctorModel->update([
             'image_path' => $newImagePath,
@@ -186,7 +186,7 @@ class DoctorController extends Controller
         ]);
 
         if (filled($previousImagePath) && $previousImagePath !== $newImagePath) {
-            Storage::disk($disk)->delete($previousImagePath);
+            MediaImageService::delete($previousImagePath, $disk);
         }
 
         return to_route('doctors.edit', [
@@ -304,11 +304,11 @@ class DoctorController extends Controller
 
     private function deleteUploadedImage(User $doctor): void
     {
-        if (!filled($doctor->image_path)) {
+        if (!MediaImageService::hasValidPath($doctor->image_path)) {
             return;
         }
 
-        Storage::disk((string) config('filesystems.media_disk', 'public'))->delete($doctor->image_path);
+        MediaImageService::delete($doctor->image_path);
     }
 
     private function findEditableDoctor(Request $request, Clinic $clinic, int $doctor): User
@@ -446,5 +446,3 @@ class DoctorController extends Controller
             ->all();
     }
 }
-
-

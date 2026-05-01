@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 
 use App\Models\User;
+use App\Services\MediaImageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\Password as PasswordRule;
@@ -146,7 +146,7 @@ class ProfileController extends Controller
 
         $disk = (string) config('filesystems.media_disk', 'public');
         $previousImagePath = $user->image_path;
-        $newImagePath = $payload['image']->storePublicly('users/'.$user->id, $disk);
+        $newImagePath = MediaImageService::store($payload['image'], 'users/'.$user->id, $disk);
 
         $user->update([
             'image_path' => $newImagePath,
@@ -154,7 +154,7 @@ class ProfileController extends Controller
         ]);
 
         if (filled($previousImagePath) && $previousImagePath !== $newImagePath) {
-            Storage::disk($disk)->delete($previousImagePath);
+            MediaImageService::delete($previousImagePath, $disk);
         }
 
         if (!$request->expectsJson()) {
@@ -246,12 +246,10 @@ class ProfileController extends Controller
 
     private function deleteUploadedProfileImage(User $user): void
     {
-        if (!filled($user->image_path)) {
+        if (!MediaImageService::hasValidPath($user->image_path)) {
             return;
         }
 
-        Storage::disk((string) config('filesystems.media_disk', 'public'))->delete($user->image_path);
+        MediaImageService::delete($user->image_path);
     }
 }
-
-

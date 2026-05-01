@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\MediaImageService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -65,7 +66,7 @@ class Clinic extends Model
     {
         $path = $this->attributes['image_path'] ?? null;
 
-        if (!filled($path)) {
+        if (!MediaImageService::hasValidPath($path)) {
             return null;
         }
 

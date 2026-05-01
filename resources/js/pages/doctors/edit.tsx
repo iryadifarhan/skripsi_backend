@@ -349,7 +349,7 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
 
                         <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
                             <Panel title="Profil Dokter" subtitle="Foto identitas">
-                                <div className="flex min-h-[420px] flex-col gap-4">
+                                <div className="flex flex-col gap-4">
                                     <AvatarSelector
                                         role="doctor"
                                         name={doctor.name}
@@ -473,8 +473,8 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                                         <div className="grid grid-cols-2 gap-2">
                                             <TextField compact label="Mulai" type="time" value={scheduleForm.start_time} onChange={(value) => setScheduleForm((current) => ({ ...current, start_time: value }))} />
                                             <TextField compact label="Selesai" type="time" value={scheduleForm.end_time} onChange={(value) => setScheduleForm((current) => ({ ...current, end_time: value }))} />
-                                            <TextField compact label="Window menit" type="number" value={scheduleForm.window_minutes} onChange={(value) => setScheduleForm((current) => ({ ...current, window_minutes: value }))} />
-                                            <TextField compact label="Kapasitas/window" type="number" value={scheduleForm.max_patients_per_window} onChange={(value) => setScheduleForm((current) => ({ ...current, max_patients_per_window: value }))} />
+                                            <TextField compact label="Durasi/Window (menit)" type="number" value={scheduleForm.window_minutes} onChange={(value) => setScheduleForm((current) => ({ ...current, window_minutes: value }))} />
+                                            <TextField compact label="Kapasitas/Window" type="number" value={scheduleForm.max_patients_per_window} onChange={(value) => setScheduleForm((current) => ({ ...current, max_patients_per_window: value }))} />
                                         </div>
 
                                         <button
@@ -505,8 +505,8 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                                                     <th className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">Hari</th>
                                                     <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Mulai</th>
                                                     <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Selesai</th>
-                                                    <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Window</th>
-                                                    <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Kapasitas</th>
+                                                    <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Durasi/Window (menit)</th>
+                                                    <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Kapasitas/Window</th>
                                                     <th className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">Status</th>
                                                     <th className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">Aksi</th>
                                                 </tr>
@@ -520,8 +520,8 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                                                             <td className="px-4 py-3 text-gray-700">{dayLabels[schedule.day_of_week] ?? schedule.day_of_week}</td>
                                                             <td className="px-4 py-3"><SmallInput width="28" type="time" value={edit.start_time} onChange={(value) => updateScheduleEdit(schedule.id, { start_time: value }, setScheduleEdits)} /></td>
                                                             <td className="px-4 py-3"><SmallInput width="28" type="time" value={edit.end_time} onChange={(value) => updateScheduleEdit(schedule.id, { end_time: value }, setScheduleEdits)} /></td>
-                                                            <td className="px-2 py-3"><SmallInput width="12" type="number" value={edit.window_minutes} onChange={(value) => updateScheduleEdit(schedule.id, { window_minutes: value }, setScheduleEdits)} /></td>
-                                                            <td className="px-2 py-3"><SmallInput width="12" type="number" value={edit.max_patients_per_window} onChange={(value) => updateScheduleEdit(schedule.id, { max_patients_per_window: value }, setScheduleEdits)} /></td>
+                                                            <td className="px-2 py-3"><SmallInput width="16" type="number" value={edit.window_minutes} onChange={(value) => updateScheduleEdit(schedule.id, { window_minutes: value }, setScheduleEdits)} /></td>
+                                                            <td className="px-2 py-3"><SmallInput width="14" type="number" value={edit.max_patients_per_window} onChange={(value) => updateScheduleEdit(schedule.id, { max_patients_per_window: value }, setScheduleEdits)} /></td>
                                                             <td className="px-4 py-3">
                                                                 <label className="inline-flex items-start gap-2 text-gray-600">
                                                                     <input

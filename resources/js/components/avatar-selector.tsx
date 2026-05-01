@@ -73,7 +73,11 @@ export function AvatarSelector({
                 <UserAvatar name={name} avatarUrl={displayAvatarUrl ?? imageUrl} size="xl" />
                 <div className="min-w-0">
                     <p className="truncate text-[15px] font-medium text-[#2c2115]">{name}</p>
-                    <p className="text-[11px] text-gray-400">Pilih avatar {roleLabel.toLowerCase()} atau upload foto sendiri.</p>
+                    {canEdit ? (
+                        <p className="text-[11px] text-gray-400">Pilih avatar {roleLabel.toLowerCase()} atau upload foto sendiri.</p>
+                    ) : (
+                        <p className="text-[11px] text-gray-400">Avatar hanya dapat diubah oleh superadmin atau pasien.</p>
+                    )}
                 </div>
             </div>
 

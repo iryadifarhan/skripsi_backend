@@ -31,6 +31,12 @@ return [
         env('FILESYSTEM_DISK', 'local') === 'local' ? 'public' : env('FILESYSTEM_DISK', 'local')
     ),
 
+    'media_image' => [
+        'quality' => (int) env('MEDIA_IMAGE_QUALITY', 82),
+        'min_quality' => (int) env('MEDIA_IMAGE_MIN_QUALITY', 60),
+        'target_kb' => (int) env('MEDIA_IMAGE_TARGET_KB', 512),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
@@ -72,8 +78,8 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'throw' => false,
-            'report' => false,
+            'throw' => true,
+            'report' => true,
         ],
 
     ],
