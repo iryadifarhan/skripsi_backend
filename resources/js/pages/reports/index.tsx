@@ -85,6 +85,8 @@ export default function ReportsPage({
     const reservationPagination = useClientPagination(reservations, { initialPerPage: 10 });
     const medicalRecordPagination = useClientPagination(medicalRecords, { initialPerPage: 10 });
     const doctorRecapPagination = useClientPagination(doctorRecap, { initialPerPage: 10 });
+    const canChooseClinic = context.role === 'superadmin' || (context.role === 'doctor' && context.clinics.length > 1);
+    const canChooseDoctor = context.role !== 'doctor';
 
     const summaryCards = useMemo(() => [
         { label: 'Total Reservasi', value: reservationSummary.total_reservations ?? 0 },
@@ -134,7 +136,7 @@ export default function ReportsPage({
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                            {context.role === 'superadmin' ? (
+                            {canChooseClinic ? (
                                 <label className="flex flex-col gap-1 text-[12px] text-[#40311D]">
                                     Klinik
                                     <select
@@ -171,21 +173,30 @@ export default function ReportsPage({
                                 />
                             </label>
 
-                            <label className="flex flex-col gap-1 text-[12px] text-[#40311D]">
-                                Dokter
-                                <select
-                                    value={form.doctorId}
-                                    onChange={(event) => setForm((current) => ({ ...current, doctorId: event.target.value }))}
-                                    className="rounded-full border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
-                                >
-                                    <option value="">Semua Dokter</option>
-                                    {doctorOptions.map((doctor) => (
-                                        <option key={doctor.id} value={doctor.id}>
-                                            {doctor.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
+                            {canChooseDoctor ? (
+                                <label className="flex flex-col gap-1 text-[12px] text-[#40311D]">
+                                    Dokter
+                                    <select
+                                        value={form.doctorId}
+                                        onChange={(event) => setForm((current) => ({ ...current, doctorId: event.target.value }))}
+                                        className="rounded-full border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
+                                    >
+                                        <option value="">Semua Dokter</option>
+                                        {doctorOptions.map((doctor) => (
+                                            <option key={doctor.id} value={doctor.id}>
+                                                {doctor.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            ) : (
+                                <div className="flex flex-col gap-1 text-[12px] text-[#40311D]">
+                                    Dokter
+                                    <div className="rounded-full border border-gray-200 bg-[#faf9f7] px-3 py-2 text-[12px] text-gray-500">
+                                        {doctorOptions[0]?.name ?? 'Dokter aktif'}
+                                    </div>
+                                </div>
+                            )}
 
                             <label className="flex flex-col gap-1 text-[12px] text-[#40311D]">
                                 Status Reservasi

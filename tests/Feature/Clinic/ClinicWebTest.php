@@ -526,6 +526,26 @@ class ClinicWebTest extends TestCase
             'window_minutes' => 60,
             'max_patients_per_window' => 4,
         ]);
+
+        $this->patchJson("/clinic/schedules/{$schedule->id}", [
+            'clinic_id' => $clinic->id,
+            'start_time' => '09:00:00',
+            'end_time' => '11:00:00',
+            'window_minutes' => 61,
+            'max_patients_per_window' => 4,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['window_minutes']);
+
+        $this->patchJson("/clinic/schedules/{$schedule->id}", [
+            'clinic_id' => $clinic->id,
+            'start_time' => '09:00:00',
+            'end_time' => '10:45:00',
+            'window_minutes' => 60,
+            'max_patients_per_window' => 4,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['window_minutes']);
     }
 
     private function login(User $user, string $password): void

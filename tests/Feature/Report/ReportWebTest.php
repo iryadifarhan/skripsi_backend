@@ -172,6 +172,48 @@ class ReportWebTest extends TestCase
         $this->assertStringContainsString('application/pdf', (string) $response->headers->get('content-type'));
     }
 
+    public function test_doctor_can_open_combined_reports_page_for_assigned_clinic_only(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $issuedDate = now()->toDateString();
+        $clinicA = $this->makeClinic('clinic-combined-report-doctor-a');
+        $clinicB = $this->makeClinic('clinic-combined-report-doctor-b');
+        $forbiddenClinic = $this->makeClinic('clinic-combined-report-doctor-forbidden');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-combined-report-page@example.com');
+        $doctor->clinics()->attach($clinicA->id);
+        $doctor->clinics()->attach($clinicB->id);
+        $scheduleA = $this->makeScheduleForDate($clinicA, $doctor, $reservationDate);
+        $scheduleB = $this->makeScheduleForDate($clinicB, $doctor, $reservationDate);
+        $patientA = $this->makeUser(User::ROLE_PATIENT, 'patient-combined-report-doctor-a@example.com');
+        $patientB = $this->makeUser(User::ROLE_PATIENT, 'patient-combined-report-doctor-b@example.com');
+
+        $this->createReservation($patientA, $scheduleA, $reservationDate, '09:00:00', 1, Reservation::STATUS_COMPLETED);
+        $reservationB = $this->createReservation($patientB, $scheduleB, $reservationDate, '10:00:00', 1, Reservation::STATUS_COMPLETED);
+        $this->createMedicalRecord($reservationB, $doctor, 'Doctor page report notes.');
+
+        $this->actingAs($doctor)
+            ->get("/reports?clinic_id={$clinicB->id}&date_from={$issuedDate}&date_to={$reservationDate}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('reports/index')
+                ->where('context.role', User::ROLE_DOCTOR)
+                ->has('context.clinics', 2)
+                ->where('clinic.id', $clinicB->id)
+                ->where('canViewMedicalRecords', true)
+                ->where('reservationSummary.total_reservations', 1)
+                ->where('medicalRecordSummary.total_medical_records', 1)
+                ->where('doctorOptions.0.id', $doctor->id)
+                ->has('reservations', 1)
+                ->where('reservations.0.id', $reservationB->id)
+                ->has('medicalRecords', 1)
+                ->where('medicalRecords.0.doctor_notes', 'Doctor page report notes.')
+            );
+
+        $this->actingAs($doctor)
+            ->get("/reports?clinic_id={$forbiddenClinic->id}&date_from={$issuedDate}&date_to={$reservationDate}")
+            ->assertForbidden();
+    }
+
     public function test_admin_can_view_medical_records_report_and_export_pdf(): void
     {
         $reservationDate = now()->addDay()->toDateString();

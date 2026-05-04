@@ -88,6 +88,48 @@ class ProfileController extends Controller
         ]);
     }
 
+    public function updateClinicSpecialities(Request $request): JsonResponse|RedirectResponse
+    {
+        /** @var User $doctor */
+        $doctor = $request->user();
+        abort_unless($doctor->role === User::ROLE_DOCTOR, 403);
+
+        $payload = $request->validate([
+            'clinic_id' => ['required', 'integer', 'exists:clinics,id'],
+            'specialities' => ['present', 'array', 'max:12'],
+            'specialities.*' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $clinic = $doctor->clinics()->whereKey($payload['clinic_id'])->first();
+
+        if ($clinic === null) {
+            abort(403, 'Forbidden, you are not authorized to update speciality for this clinic.');
+        }
+
+        $specialities = collect($payload['specialities'])
+            ->map(fn ($speciality): string => trim((string) $speciality))
+            ->filter()
+            ->unique(fn (string $speciality): string => mb_strtolower($speciality))
+            ->values()
+            ->all();
+
+        $doctor->clinics()->syncWithoutDetaching([
+            (int) $payload['clinic_id'] => [
+                'speciality' => $specialities === [] ? null : $specialities,
+            ],
+        ]);
+
+        if (!$request->expectsJson()) {
+            return back()->with('status', 'Spesialisasi klinik berhasil diperbarui.');
+        }
+
+        return response()->json([
+            'message' => 'Clinic speciality update successful.',
+            'clinic_id' => (int) $payload['clinic_id'],
+            'specialities' => $specialities,
+        ]);
+    }
+
     public function profilePictureOptions(Request $request): JsonResponse
     {
         $user = $request->user();

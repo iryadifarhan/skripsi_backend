@@ -290,6 +290,10 @@ class QueueController extends Controller
             ]);
         }
 
+        if ($request->user()->role === User::ROLE_DOCTOR) {
+            $this->assertDoctorQueueUpdateAllowed($reservation, $payload);
+        }
+
         $queueNotificationStatus = null;
         $reservationNotificationEvent = null;
 
@@ -354,6 +358,36 @@ class QueueController extends Controller
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function assertDoctorQueueUpdateAllowed(Reservation $reservation, array $payload): void
+    {
+        if (isset($payload['queue_number'])) {
+            throw ValidationException::withMessages([
+                'queue_number' => ['Doctors cannot reorder queue entries.'],
+            ]);
+        }
+
+        if (($payload['queue_status'] ?? null) !== Reservation::QUEUE_STATUS_IN_PROGRESS) {
+            throw ValidationException::withMessages([
+                'queue_status' => ['Doctors can only start called queue entries.'],
+            ]);
+        }
+
+        if ((string) $reservation->status !== Reservation::STATUS_APPROVED) {
+            throw ValidationException::withMessages([
+                'queue_status' => ['Only approved reservations can be started by the doctor.'],
+            ]);
+        }
+
+        if ((string) $reservation->queue_status !== Reservation::QUEUE_STATUS_CALLED) {
+            throw ValidationException::withMessages([
+                'queue_status' => ['Only called queue entries can be started by the doctor.'],
+            ]);
+        }
+    }
+
     private function applyQueueStateChange(Request $request, Reservation $reservation, string $queueStatus): void
     {
         if (
@@ -406,7 +440,22 @@ class QueueController extends Controller
 
     private function assertReservationBelongsToRequestedClinic(Request $request, Reservation $reservation): void
     {
-        if ((int) $reservation->clinic_id === (int) $request->input('clinic_id')) {
+        $user = $request->user();
+        $clinicId = (int) $request->input('clinic_id');
+
+        if ((int) $reservation->clinic_id !== $clinicId) {
+            abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
+        }
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            return;
+        }
+
+        if ($user->role === User::ROLE_ADMIN && (int) $user->clinic_id === $clinicId) {
+            return;
+        }
+
+        if ($user->role === User::ROLE_DOCTOR && (int) $reservation->doctor_id === (int) $user->id) {
             return;
         }
 

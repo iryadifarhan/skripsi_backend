@@ -127,6 +127,55 @@ class AuthWebTest extends TestCase
             ->assertJsonPath('user.clinic_specialities.0.specialities.1', 'Immunology');
     }
 
+    public function test_doctor_can_update_own_clinic_specialities_from_profile(): void
+    {
+        $clinic = \App\Models\Clinic::create([
+            'name' => 'clinic-profile-speciality-update',
+            'address' => 'Profile speciality update address',
+            'phone_number' => '089999999992',
+            'email' => 'clinic-profile-speciality-update@example.test',
+        ]);
+        $otherClinic = \App\Models\Clinic::create([
+            'name' => 'clinic-profile-speciality-forbidden',
+            'address' => 'Profile speciality forbidden address',
+            'phone_number' => '089999999993',
+            'email' => 'clinic-profile-speciality-forbidden@example.test',
+        ]);
+
+        $doctor = User::factory()->create([
+            'username' => 'doctor_update_speciality',
+            'email' => 'doctor-update-speciality@example.com',
+            'role' => User::ROLE_DOCTOR,
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['General'])]);
+
+        $this->postJson('/login', [
+            'email' => $doctor->email,
+            'password' => 'Password123!',
+        ], $this->spaHeaders())->assertOk();
+
+        $this->patchJson('/profile/clinic-specialities', [
+            'clinic_id' => $clinic->id,
+            'specialities' => ['Cardiology', ' cardiology ', 'Orthology', ''],
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('clinic_id', $clinic->id)
+            ->assertJsonPath('specialities.0', 'Cardiology')
+            ->assertJsonPath('specialities.1', 'Orthology');
+
+        $this->assertSame(
+            ['Cardiology', 'Orthology'],
+            $doctor->fresh()->clinics()->whereKey($clinic->id)->first()->pivot->speciality
+        );
+
+        $this->patchJson('/profile/clinic-specialities', [
+            'clinic_id' => $otherClinic->id,
+            'specialities' => ['Neurology'],
+        ], $this->spaHeaders())->assertForbidden();
+    }
+
     public function test_login_fails_with_invalid_credentials(): void
     {
         User::factory()->create([

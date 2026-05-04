@@ -24,6 +24,8 @@ use Inertia\Response;
 
 class ClinicController extends Controller
 {
+    private const DOCTOR_WINDOW_MINUTE_PRESETS = [15, 30, 45, 60];
+
     public function __construct(
         private readonly WorkspaceViewService $workspace,
     ) {}
@@ -549,6 +551,7 @@ class ClinicController extends Controller
         ]);
 
         $this->assertCanManageScheduleRequest($request, (int) $request->clinic_id, (int) $request->doctor_id);
+        $this->validateDoctorScheduleWindowRules($request, $request->start_time, $request->end_time, (int) $request->window_minutes);
 
         $user = User::find($request->doctor_id);
         $clinic = Clinic::find($request->clinic_id);
@@ -651,6 +654,9 @@ class ClinicController extends Controller
         $clinicSchedule = $schedule->clinic->operatingHours()->where('day_of_week', $schedule->day_of_week)->first();
         $startTime = $request->input('start_time', $schedule->start_time);
         $endTime = $request->input('end_time', $schedule->end_time);
+        $windowMinutes = (int) $request->input('window_minutes', $schedule->window_minutes);
+
+        $this->validateDoctorScheduleWindowRules($request, $startTime, $endTime, $windowMinutes);
 
         if ($clinicSchedule === null || (bool) $clinicSchedule->is_closed || $startTime < $clinicSchedule->open_time || $endTime > $clinicSchedule->close_time) {
             if ($request->expectsJson()) {
@@ -701,6 +707,33 @@ class ClinicController extends Controller
         return $this->jsonOrRedirect($request, [
             'message' => 'Doctor clinic schedule deleted successfully.',
         ], flashMessage: 'Jadwal dokter berhasil dihapus.');
+    }
+
+    private function validateDoctorScheduleWindowRules(Request $request, string $startTime, string $endTime, int $windowMinutes): void
+    {
+        if ($request->user()?->role !== User::ROLE_DOCTOR) {
+            return;
+        }
+
+        if (!in_array($windowMinutes, self::DOCTOR_WINDOW_MINUTE_PRESETS, true)) {
+            throw ValidationException::withMessages([
+                'window_minutes' => [
+                    'Dokter hanya dapat memilih durasi window 15, 30, 45, atau 60 menit.',
+                ],
+            ]);
+        }
+
+        $start = Carbon::createFromFormat('H:i:s', $startTime);
+        $end = Carbon::createFromFormat('H:i:s', $endTime);
+        $durationMinutes = (int) $start->diffInMinutes($end, false);
+
+        if ($durationMinutes <= 0 || $durationMinutes % $windowMinutes !== 0) {
+            throw ValidationException::withMessages([
+                'window_minutes' => [
+                    'Durasi praktik harus habis dibagi durasi window agar tidak ada sisa waktu tidak terpakai.',
+                ],
+            ]);
+        }
     }
 
     private function syncOperatingHours(Clinic $clinic, ?array $operatingHours, bool $seedDefaultsOnCreate): void

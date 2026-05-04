@@ -99,6 +99,76 @@ class InertiaShellTest extends TestCase
             );
     }
 
+    public function test_doctor_schedule_page_is_scoped_to_assigned_clinic_and_own_schedules(): void
+    {
+        $clinic = Clinic::create([
+            'name' => 'Clinic Doctor Schedule Page',
+            'address' => 'Jl. Doctor Schedule Page',
+            'phone_number' => '+6200011123',
+            'email' => 'doctor-schedule-page@example.test',
+        ]);
+        $otherClinic = Clinic::create([
+            'name' => 'Clinic Doctor Schedule Forbidden',
+            'address' => 'Jl. Doctor Schedule Forbidden',
+            'phone_number' => '+6200011124',
+            'email' => 'doctor-schedule-forbidden@example.test',
+        ]);
+        ClinicOperatingHour::create([
+            'clinic_id' => $clinic->id,
+            'day_of_week' => 1,
+            'open_time' => '08:00:00',
+            'close_time' => '17:00:00',
+            'is_closed' => false,
+        ]);
+        $doctor = User::factory()->create([
+            'role' => User::ROLE_DOCTOR,
+        ]);
+        $otherDoctor = User::factory()->create([
+            'role' => User::ROLE_DOCTOR,
+        ]);
+        $doctor->clinics()->attach($clinic->id, ['speciality' => json_encode(['General'])]);
+        $otherDoctor->clinics()->attach($clinic->id, ['speciality' => null]);
+
+        $ownSchedule = DoctorClinicSchedule::create([
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'day_of_week' => 1,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+            'is_active' => true,
+        ]);
+        DoctorClinicSchedule::create([
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $otherDoctor->id,
+            'day_of_week' => 1,
+            'start_time' => '13:00:00',
+            'end_time' => '16:00:00',
+            'window_minutes' => 30,
+            'max_patients_per_window' => 4,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($doctor)
+            ->get("/doctor-schedules?clinic_id={$clinic->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('doctor-schedules/index')
+                ->where('context.role', User::ROLE_DOCTOR)
+                ->where('doctorId', $doctor->id)
+                ->where('selectedClinicId', $clinic->id)
+                ->where('clinic.id', $clinic->id)
+                ->has('schedules', 1)
+                ->where('schedules.0.id', $ownSchedule->id)
+                ->where('schedules.0.doctor_id', $doctor->id)
+            );
+
+        $this->actingAs($doctor)
+            ->get("/doctor-schedules?clinic_id={$otherClinic->id}")
+            ->assertForbidden();
+    }
+
     public function test_admin_workspace_pages_include_clinic_context(): void
     {
         $clinic = Clinic::create([
@@ -160,7 +230,7 @@ class InertiaShellTest extends TestCase
             $tuesdayDoctor->clinics()->attach($clinic->id, ['speciality' => null]);
             $wednesdayDoctor->clinics()->attach($clinic->id, ['speciality' => null]);
 
-            DoctorClinicSchedule::create([
+            $tuesdaySchedule = DoctorClinicSchedule::create([
                 'clinic_id' => $clinic->id,
                 'doctor_id' => $tuesdayDoctor->id,
                 'day_of_week' => 2,
@@ -169,6 +239,23 @@ class InertiaShellTest extends TestCase
                 'window_minutes' => 30,
                 'max_patients_per_window' => 4,
                 'is_active' => true,
+            ]);
+            Reservation::create([
+                'reservation_number' => 'RSV-DASHBOARD-SLOT-001',
+                'queue_number' => 1,
+                'queue_status' => Reservation::QUEUE_STATUS_WAITING,
+                'patient_id' => null,
+                'guest_name' => 'Dashboard Slot Patient',
+                'guest_phone_number' => '+628111111111',
+                'clinic_id' => $clinic->id,
+                'doctor_id' => $tuesdayDoctor->id,
+                'doctor_clinic_schedule_id' => $tuesdaySchedule->id,
+                'reservation_date' => '2026-04-07',
+                'window_start_time' => '09:00:00',
+                'window_end_time' => '09:30:00',
+                'window_slot_number' => 1,
+                'status' => Reservation::STATUS_APPROVED,
+                'complaint' => 'Dashboard slot test',
             ]);
             DoctorClinicSchedule::create([
                 'clinic_id' => $clinic->id,
@@ -188,8 +275,17 @@ class InertiaShellTest extends TestCase
                     ->component('dashboard')
                     ->where('dashboardData.selectedScheduleDay', 2)
                     ->where('dashboardData.selectedScheduleDayLabel', 'Selasa')
+                    ->where('dashboardData.selectedScheduleMonth', '2026-04')
+                    ->where('dashboardData.selectedScheduleWeek', 1)
+                    ->where('dashboardData.selectedScheduleDate', '2026-04-07')
                     ->has('dashboardData.schedules', 1)
                     ->where('dashboardData.schedules.0.doctor_id', $tuesdayDoctor->id)
+                    ->where('dashboardData.schedules.0.slot_summary.total_windows', 6)
+                    ->where('dashboardData.schedules.0.slot_summary.total_capacity', 24)
+                    ->where('dashboardData.schedules.0.slot_summary.booked_slots', 1)
+                    ->where('dashboardData.schedules.0.slot_summary.available_slots', 23)
+                    ->where('dashboardData.schedules.0.windows.0.booked_slots', 1)
+                    ->where('dashboardData.schedules.0.windows.0.available_slots', 3)
                 );
 
             $this->actingAs($admin)
@@ -199,6 +295,8 @@ class InertiaShellTest extends TestCase
                     ->component('dashboard')
                     ->where('dashboardData.selectedScheduleDay', 3)
                     ->where('dashboardData.selectedScheduleDayLabel', 'Rabu')
+                    ->where('dashboardData.selectedScheduleWeek', 5)
+                    ->where('dashboardData.selectedScheduleDate', '2026-04-29')
                     ->has('dashboardData.schedules', 1)
                     ->where('dashboardData.schedules.0.doctor_id', $wednesdayDoctor->id)
                 );

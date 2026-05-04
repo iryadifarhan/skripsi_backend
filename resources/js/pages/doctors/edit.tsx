@@ -1,9 +1,16 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { AvatarSelector } from '@/components/avatar-selector';
+import {
+    ScheduleWindowCompactSummary,
+    ScheduleWindowPresetControl,
+    ScheduleWindowPreviewPanel,
+    ScheduleWindowSettingsModal,
+} from '@/components/schedule-window';
 import AppLayout from '@/layouts/app-layout';
 import { PaginationControls, useClientPagination } from '@/lib/client-pagination';
+import { buildScheduleWindowPreview, type ScheduleWindowForm } from '@/lib/schedule-window';
 import type { ClinicDetail, DoctorClinicScheduleEntry, DoctorEntry, MedicalRecordEntry, SharedData, ValidationErrors, WorkspaceContext } from '@/types';
 
 type DoctorEditPageProps = {
@@ -88,6 +95,11 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
     const [scheduleEdits, setScheduleEdits] = useState<Record<number, ScheduleEditForm>>(() =>
         Object.fromEntries(schedules.map((schedule) => [schedule.id, scheduleToEditForm(schedule)])),
     );
+    const [windowModalScheduleId, setWindowModalScheduleId] = useState<number | null>(null);
+    const [windowModalForm, setWindowModalForm] = useState<ScheduleWindowForm>({
+        window_minutes: '30',
+        max_patients_per_window: '4',
+    });
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [error, setError] = useState<string | null>(null);
     const [processing, setProcessing] = useState(false);
@@ -95,11 +107,21 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
     const [scheduleSaving, setScheduleSaving] = useState(false);
     const [deletingDoctor, setDeletingDoctor] = useState(false);
     const medicalRecordPagination = useClientPagination(medicalRecords);
+    const createWindowPreview = useMemo(
+        () => buildScheduleWindowPreview(scheduleForm.start_time, scheduleForm.end_time, scheduleForm.window_minutes, scheduleForm.max_patients_per_window),
+        [scheduleForm.start_time, scheduleForm.end_time, scheduleForm.window_minutes, scheduleForm.max_patients_per_window],
+    );
+    const windowModalSchedule = schedules.find((schedule) => schedule.id === windowModalScheduleId) ?? null;
+    const windowModalEdit = windowModalSchedule === null ? null : (scheduleEdits[windowModalSchedule.id] ?? scheduleToEditForm(windowModalSchedule));
+    const windowModalPreview = windowModalEdit === null
+        ? null
+        : buildScheduleWindowPreview(windowModalEdit.start_time, windowModalEdit.end_time, windowModalForm.window_minutes, windowModalForm.max_patients_per_window);
 
     useEffect(() => {
         const usedDays = new Set(schedules.map((schedule) => String(schedule.day_of_week)));
 
         setScheduleEdits(Object.fromEntries(schedules.map((schedule) => [schedule.id, scheduleToEditForm(schedule)])));
+        setWindowModalScheduleId((current) => (current !== null && schedules.some((schedule) => schedule.id === current) ? current : null));
         setScheduleForm((current) => {
             const availableDays = current.day_of_week.filter((day) => !usedDays.has(day));
 
@@ -251,6 +273,12 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
             return;
         }
 
+        if (!createWindowPreview.isValid) {
+            setErrors({ window_minutes: [createWindowPreview.message ?? 'Window jadwal tidak valid.'] });
+            setError('Window jadwal tidak valid.');
+            return;
+        }
+
         setScheduleSaving(true);
         setErrors({});
         setError(null);
@@ -279,6 +307,13 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
 
     const updateSchedule = async (schedule: DoctorClinicScheduleEntry) => {
         const edit = scheduleEdits[schedule.id] ?? scheduleToEditForm(schedule);
+        const preview = buildScheduleWindowPreview(edit.start_time, edit.end_time, edit.window_minutes, edit.max_patients_per_window);
+
+        if (!preview.isValid) {
+            setErrors({ window_minutes: [preview.message ?? 'Window jadwal tidak valid.'] });
+            setError('Window jadwal tidak valid.');
+            return;
+        }
 
         setScheduleSaving(true);
         setErrors({});
@@ -326,6 +361,32 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
         }
 
         router.reload({ preserveScroll: true });
+    };
+
+    const openWindowModal = (schedule: DoctorClinicScheduleEntry) => {
+        const edit = scheduleEdits[schedule.id] ?? scheduleToEditForm(schedule);
+
+        setWindowModalScheduleId(schedule.id);
+        setWindowModalForm({
+            window_minutes: edit.window_minutes,
+            max_patients_per_window: edit.max_patients_per_window,
+        });
+    };
+
+    const closeWindowModal = () => {
+        setWindowModalScheduleId(null);
+    };
+
+    const applyWindowSettings = () => {
+        if (windowModalScheduleId === null || windowModalPreview === null || !windowModalPreview.isValid) {
+            return;
+        }
+
+        updateScheduleEdit(windowModalScheduleId, {
+            window_minutes: windowModalForm.window_minutes,
+            max_patients_per_window: windowModalForm.max_patients_per_window,
+        }, setScheduleEdits);
+        setWindowModalScheduleId(null);
     };
 
     return (
@@ -473,13 +534,16 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                                         <div className="grid grid-cols-2 gap-2">
                                             <TextField compact label="Mulai" type="time" value={scheduleForm.start_time} onChange={(value) => setScheduleForm((current) => ({ ...current, start_time: value }))} />
                                             <TextField compact label="Selesai" type="time" value={scheduleForm.end_time} onChange={(value) => setScheduleForm((current) => ({ ...current, end_time: value }))} />
-                                            <TextField compact label="Durasi/Window (menit)" type="number" value={scheduleForm.window_minutes} onChange={(value) => setScheduleForm((current) => ({ ...current, window_minutes: value }))} />
+                                            <ScheduleWindowPresetControl value={scheduleForm.window_minutes} onChange={(value) => setScheduleForm((current) => ({ ...current, window_minutes: value }))} />
                                             <TextField compact label="Kapasitas/Window" type="number" value={scheduleForm.max_patients_per_window} onChange={(value) => setScheduleForm((current) => ({ ...current, max_patients_per_window: value }))} />
                                         </div>
+                                        <FieldError errors={errors} field="window_minutes" />
+
+                                        <ScheduleWindowPreviewPanel preview={createWindowPreview} />
 
                                         <button
                                             type="submit"
-                                            disabled={scheduleSaving || scheduleForm.day_of_week.length === 0}
+                                            disabled={scheduleSaving || scheduleForm.day_of_week.length === 0 || !createWindowPreview.isValid}
                                             className="w-full rounded-lg bg-[#40311D] px-4 py-2.5 text-[12px] font-medium text-white transition-colors hover:bg-[#2c2115] disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             {scheduleSaving ? 'Menyimpan...' : 'Buat Jadwal'}
@@ -505,8 +569,7 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                                                     <th className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">Hari</th>
                                                     <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Mulai</th>
                                                     <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Selesai</th>
-                                                    <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Durasi/Window (menit)</th>
-                                                    <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Kapasitas/Window</th>
+                                                    <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-400">Window</th>
                                                     <th className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">Status</th>
                                                     <th className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">Aksi</th>
                                                 </tr>
@@ -514,14 +577,26 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                                             <tbody>
                                                 {schedules.map((schedule) => {
                                                     const edit = scheduleEdits[schedule.id] ?? scheduleToEditForm(schedule);
+                                                    const rowPreview = buildScheduleWindowPreview(edit.start_time, edit.end_time, edit.window_minutes, edit.max_patients_per_window);
 
                                                     return (
-                                                        <tr key={schedule.id} className="border-b border-[#ede8e2] last:border-0">
-                                                            <td className="px-4 py-3 text-gray-700">{dayLabels[schedule.day_of_week] ?? schedule.day_of_week}</td>
+                                                        <tr key={schedule.id} className={`border-b border-[#ede8e2] last:border-0 ${rowPreview.isValid ? '' : 'bg-red-50/40'}`}>
+                                                            <td className="px-4 py-3 text-gray-700">
+                                                                <div className="flex items-center gap-2">
+                                                                    {dayLabels[schedule.day_of_week] ?? schedule.day_of_week}
+                                                                    {!rowPreview.isValid ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Perlu cek</span> : null}
+                                                                </div>
+                                                            </td>
                                                             <td className="px-4 py-3"><SmallInput width="28" type="time" value={edit.start_time} onChange={(value) => updateScheduleEdit(schedule.id, { start_time: value }, setScheduleEdits)} /></td>
                                                             <td className="px-4 py-3"><SmallInput width="28" type="time" value={edit.end_time} onChange={(value) => updateScheduleEdit(schedule.id, { end_time: value }, setScheduleEdits)} /></td>
-                                                            <td className="px-2 py-3"><SmallInput width="16" type="number" value={edit.window_minutes} onChange={(value) => updateScheduleEdit(schedule.id, { window_minutes: value }, setScheduleEdits)} /></td>
-                                                            <td className="px-2 py-3"><SmallInput width="14" type="number" value={edit.max_patients_per_window} onChange={(value) => updateScheduleEdit(schedule.id, { max_patients_per_window: value }, setScheduleEdits)} /></td>
+                                                            <td className="px-2 py-3">
+                                                                <ScheduleWindowCompactSummary
+                                                                    windowMinutes={edit.window_minutes}
+                                                                    capacity={edit.max_patients_per_window}
+                                                                    preview={rowPreview}
+                                                                    onOpen={() => openWindowModal(schedule)}
+                                                                />
+                                                            </td>
                                                             <td className="px-4 py-3">
                                                                 <label className="inline-flex items-start gap-2 text-gray-600">
                                                                     <input
@@ -537,7 +612,7 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => updateSchedule(schedule)}
-                                                                        disabled={scheduleSaving}
+                                                                        disabled={scheduleSaving || !rowPreview.isValid}
                                                                         className="rounded-lg bg-[#40311D] px-3 py-1.5 text-[12px] text-white transition-colors hover:bg-[#2c2115] disabled:cursor-not-allowed disabled:opacity-60"
                                                                     >
                                                                         Simpan
@@ -632,6 +707,17 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                     </div>
                 </div>
             </section>
+
+            {windowModalSchedule !== null && windowModalEdit !== null && windowModalPreview !== null ? (
+                <ScheduleWindowSettingsModal
+                    subtitle={`${dayLabels[windowModalSchedule.day_of_week] ?? windowModalSchedule.day_of_week}, ${windowModalEdit.start_time} - ${windowModalEdit.end_time}`}
+                    form={windowModalForm}
+                    preview={windowModalPreview}
+                    onChange={setWindowModalForm}
+                    onClose={closeWindowModal}
+                    onApply={applyWindowSettings}
+                />
+            ) : null}
         </AppLayout>
     );
 }

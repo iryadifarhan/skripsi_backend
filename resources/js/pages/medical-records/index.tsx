@@ -24,6 +24,7 @@ type MedicalRecordsPageProps = {
 export default function MedicalRecordsPage({ context, medicalRecords, doctorOptions, canViewMedicalRecords, filters }: MedicalRecordsPageProps) {
     const canView = canViewMedicalRecords;
     const canFilterByDoctor = canView && context.role === 'admin';
+    const canChooseClinic = canView && context.role === 'doctor' && context.clinics.length > 1;
     const [search, setSearch] = useState('');
     const [doctorFilter, setDoctorFilter] = useState('');
 
@@ -71,7 +72,7 @@ export default function MedicalRecordsPage({ context, medicalRecords, doctorOpti
             <section className="h-full overflow-y-auto bg-[#DFE0DF]">
                 <div className="flex flex-col gap-4 p-5">
                     
-                    {canView && context.role === 'superadmin' && context.clinics.length > 0 ? (
+                    {canChooseClinic ? (
                         <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
                             <label className="flex w-full flex-col gap-2 text-[12px] font-medium text-[#40311D] md:w-80">
                                 Klinik

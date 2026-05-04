@@ -34,7 +34,7 @@ class ReportController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        abort_unless(in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true), 403);
+        abort_unless(in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN, User::ROLE_DOCTOR], true), 403);
 
         $context = $this->workspace->context($request);
         $payload = $request->validate($this->pageReportRules());
@@ -45,7 +45,7 @@ class ReportController extends Controller
             ? $this->reportService->reservations($user, $filters)
             : $this->emptyReservationReport($filters);
 
-        $canViewMedicalRecords = $user->role === User::ROLE_ADMIN && $selectedClinic !== null;
+        $canViewMedicalRecords = in_array($user->role, [User::ROLE_ADMIN, User::ROLE_DOCTOR], true) && $selectedClinic !== null;
         $medicalRecordReport = $canViewMedicalRecords
             ? $this->reportService->medicalRecords($user, $this->medicalRecordFiltersFromPage($filters))
             : $this->emptyMedicalRecordReport($this->medicalRecordFiltersFromPage($filters));
@@ -67,7 +67,7 @@ class ReportController extends Controller
                 'status' => $filters['status'],
                 'search' => $filters['search'],
             ],
-            'doctorOptions' => $selectedClinic === null ? [] : $this->doctorOptions($selectedClinic),
+            'doctorOptions' => $selectedClinic === null ? [] : $this->doctorOptions($selectedClinic, $user),
             'canViewMedicalRecords' => $canViewMedicalRecords,
             'reservationSummary' => $reservationReport['summary'],
             'medicalRecordSummary' => $medicalRecordReport['summary'],
@@ -81,7 +81,7 @@ class ReportController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        abort_unless(in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true), 403);
+        abort_unless(in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN, User::ROLE_DOCTOR], true), 403);
 
         $context = $this->workspace->context($request);
         $payload = $request->validate(array_merge($this->pageReportRules(), [
@@ -92,7 +92,7 @@ class ReportController extends Controller
 
         $filters = $this->normalizedPageFilters($payload, $selectedClinic->id);
         $reservationReport = $this->reportService->reservations($user, $filters);
-        $canViewMedicalRecords = $user->role === User::ROLE_ADMIN;
+        $canViewMedicalRecords = in_array($user->role, [User::ROLE_ADMIN, User::ROLE_DOCTOR], true);
         $medicalRecordReport = $canViewMedicalRecords
             ? $this->reportService->medicalRecords($user, $this->medicalRecordFiltersFromPage($filters))
             : $this->emptyMedicalRecordReport($this->medicalRecordFiltersFromPage($filters));
@@ -271,6 +271,24 @@ class ReportController extends Controller
             return $clinicId !== null ? Clinic::find($clinicId) : null;
         }
 
+        if ($user->role === User::ROLE_DOCTOR) {
+            $clinicIds = collect($context['clinics'])->pluck('id')->map(fn ($id): int => (int) $id);
+
+            if ($clinicIds->isEmpty()) {
+                return null;
+            }
+
+            $clinicId = isset($payload['clinic_id'])
+                ? (int) $payload['clinic_id']
+                : (int) $clinicIds->first();
+
+            if (!$clinicIds->contains($clinicId)) {
+                abort(403, 'Forbidden, you are not authorized to access this clinic report.');
+            }
+
+            return Clinic::find($clinicId);
+        }
+
         return null;
     }
 
@@ -356,8 +374,15 @@ class ReportController extends Controller
     /**
      * @return array<int, array{id: int, name: string}>
      */
-    private function doctorOptions(Clinic $clinic): array
+    private function doctorOptions(Clinic $clinic, User $actor): array
     {
+        if ($actor->role === User::ROLE_DOCTOR) {
+            return [[
+                'id' => $actor->id,
+                'name' => $actor->name,
+            ]];
+        }
+
         return $clinic->doctors()
             ->select(['users.id', 'users.name'])
             ->orderBy('users.name')

@@ -286,6 +286,66 @@ class QueueWebTest extends TestCase
             ->assertJsonPath('queues.0.queue.is_current', true);
     }
 
+    public function test_doctor_can_only_start_called_owned_queue_entry(): void
+    {
+        $reservationDate = now()->addDay()->toDateString();
+        $clinic = $this->makeClinic('clinic-queue-doctor-start-only');
+        $doctor = $this->makeUser(User::ROLE_DOCTOR, 'doctor-queue-start-only@example.com');
+        $doctor->clinics()->attach($clinic->id);
+        $schedule = $this->makeScheduleForDate($clinic, $doctor, $reservationDate);
+
+        $calledPatient = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-called-start@example.com');
+        $waitingPatient = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-waiting-start@example.com');
+        $reorderPatient = $this->makeUser(User::ROLE_PATIENT, 'patient-queue-reorder-start@example.com');
+
+        $calledReservation = $this->createReservation($calledPatient, $schedule, $reservationDate, '09:00:00', 1, 1, Reservation::QUEUE_STATUS_CALLED);
+        $waitingReservation = $this->createReservation($waitingPatient, $schedule, $reservationDate, '10:00:00', 1, 2, Reservation::QUEUE_STATUS_WAITING);
+        $reorderReservation = $this->createReservation($reorderPatient, $schedule, $reservationDate, '11:00:00', 1, 3, Reservation::QUEUE_STATUS_CALLED);
+
+        foreach ([$calledReservation, $waitingReservation, $reorderReservation] as $reservation) {
+            $reservation->update(['status' => Reservation::STATUS_APPROVED]);
+        }
+
+        $this->login($doctor, 'Password123!');
+
+        $this->patchJson("/queue/{$calledReservation->id}", [
+            'clinic_id' => $clinic->id,
+            'queue_status' => Reservation::QUEUE_STATUS_IN_PROGRESS,
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('queue.reservation_id', $calledReservation->id)
+            ->assertJsonPath('queue.queue.status', Reservation::QUEUE_STATUS_IN_PROGRESS);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $calledReservation->id,
+            'queue_status' => Reservation::QUEUE_STATUS_IN_PROGRESS,
+        ]);
+
+        $this->patchJson("/queue/{$waitingReservation->id}", [
+            'clinic_id' => $clinic->id,
+            'queue_status' => Reservation::QUEUE_STATUS_IN_PROGRESS,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['queue_status']);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $waitingReservation->id,
+            'queue_status' => Reservation::QUEUE_STATUS_WAITING,
+        ]);
+
+        $this->patchJson("/queue/{$reorderReservation->id}", [
+            'clinic_id' => $clinic->id,
+            'queue_number' => 1,
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['queue_number']);
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reorderReservation->id,
+            'queue_number' => 3,
+        ]);
+    }
+
     public function test_admin_sends_queue_progress_notification_for_called_only(): void
     {
         Notification::fake();

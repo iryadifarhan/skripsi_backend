@@ -6,6 +6,7 @@ use App\Http\Controllers\Web\AdminReservationController;
 use App\Http\Controllers\Web\ClinicController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DoctorController;
+use App\Http\Controllers\Web\DoctorScheduleController;
 use App\Http\Controllers\Web\MedicalRecordController;
 use App\Http\Controllers\Web\PatientController;
 use App\Http\Controllers\Web\ProfileController;
@@ -42,11 +43,14 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/medical-records', [MedicalRecordController::class, 'page'])->name('medical-records.page');
     Route::get('/medical_record', [MedicalRecordController::class, 'redirectLegacy'])->name('medical-records.legacy');
+    Route::get('/doctor-schedules', [DoctorScheduleController::class, 'page'])
+        ->middleware('authorize:doctor')
+        ->name('doctor-schedules.page');
     Route::get('/reports', [ReportController::class, 'page'])
-        ->middleware('authorize:admin,superadmin')
+        ->middleware('authorize:admin,superadmin,doctor')
         ->name('reports.page');
     Route::get('/reports/export', [ReportController::class, 'export'])
-        ->middleware('authorize:admin,superadmin')
+        ->middleware('authorize:admin,superadmin,doctor')
         ->name('reports.export');
 
     Route::get('/doctors', [DoctorController::class, 'index'])->name('doctors.index');
@@ -147,6 +151,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::patch('/profile', [ProfileController::class, 'update']);
     Route::patch('/profile/password', [ProfileController::class, 'updatePassword']);
+    Route::patch('/profile/clinic-specialities', [ProfileController::class, 'updateClinicSpecialities']);
     Route::get('/profile/picture-options', [ProfileController::class, 'profilePictureOptions']);
     Route::patch('/profile/picture', [ProfileController::class, 'updateProfilePicture']);
     Route::post('/profile/image', [ProfileController::class, 'uploadImage']);

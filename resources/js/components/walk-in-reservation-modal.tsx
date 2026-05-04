@@ -1,6 +1,8 @@
 import { router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
+import { ScheduleWindowCompactSummary } from '@/components/schedule-window';
+import { buildScheduleWindowPreview } from '@/lib/schedule-window';
 import type { ClinicDetail, ReservationEntry } from '@/types';
 
 type WalkInReservationModalProps = {
@@ -211,6 +213,7 @@ export function WalkInReservationModal({ clinic, today, initialDate, onClose }: 
     }, [reservationDate, scheduleId, windowStart]);
 
     const activeWindows = windows.filter((window) => window.is_available);
+    const selectedSchedule = schedules.find((schedule) => String(schedule.id) === scheduleId) ?? null;
     const selectedPatient = patients.find((patient) => String(patient.id) === patientId);
     const isGuestValid = patientMode === 'guest' && guestName.trim() !== '';
     const isRegisteredValid = patientMode === 'registered' && patientId !== '';
@@ -382,6 +385,21 @@ export function WalkInReservationModal({ clinic, today, initialDate, onClose }: 
                             </select>
                         </label>
                     </div>
+
+                    {selectedSchedule ? (
+                        <div className="rounded-xl border border-[#e4ddd4] bg-[#faf9f7] px-4 py-3">
+                            <ScheduleWindowCompactSummary
+                                windowMinutes={selectedSchedule.window_minutes}
+                                capacity={selectedSchedule.max_patients_per_window}
+                                preview={buildScheduleWindowPreview(
+                                    selectedSchedule.start_time,
+                                    selectedSchedule.end_time,
+                                    String(selectedSchedule.window_minutes),
+                                    String(selectedSchedule.max_patients_per_window),
+                                )}
+                            />
+                        </div>
+                    ) : null}
 
                     <RegisteredPatientReservationCue
                         conflict={patientReservationConflict}

@@ -51,6 +51,10 @@ export default function QueuePage({ context, clinic, today, queues, filters }: Q
         return <AdminQueuePage context={context} clinic={clinic} today={today} queues={queues} filters={filters} page={page} />;
     }
 
+    if (context.role === 'doctor') {
+        return <DoctorQueuePage context={context} clinic={clinic} queues={queues} filters={filters} page={page} />;
+    }
+
     return <ReadOnlyQueuePage context={context} queues={queues} filters={filters} page={page} />;
 }
 
@@ -443,6 +447,273 @@ function AdminQueuePage({
     );
 }
 
+function DoctorQueuePage({
+    context,
+    clinic,
+    queues,
+    filters,
+    page,
+}: {
+    context: WorkspaceContext;
+    clinic: ClinicDetail | null;
+    queues: QueueEntry[];
+    filters: QueuePageProps['filters'];
+    page: ReturnType<typeof usePage<SharedData & { errors?: ValidationErrors }>>;
+}) {
+    const [selectedReservationId, setSelectedReservationId] = useState<number | null>(queues[0]?.reservation_id ?? null);
+    const [completionQueue, setCompletionQueue] = useState<QueueEntry | null>(null);
+    const [completionForm, setCompletionForm] = useState<MedicalRecordCompletionForm>({
+        diagnosis: '',
+        treatment: '',
+        prescription_notes: '',
+        doctor_notes: '',
+    });
+    const [completionError, setCompletionError] = useState<string | null>(null);
+    const [completionErrors, setCompletionErrors] = useState<ValidationErrors>({});
+    const [completionSubmitting, setCompletionSubmitting] = useState(false);
+    const queuePrefixes = useMemo(() => buildQueuePrefixes(buildDoctorOptions(queues)), [queues]);
+    const queuePagination = useClientPagination(queues);
+    const selectedQueue = queuePagination.paginatedItems.find((entry) => entry.reservation_id === selectedReservationId)
+        ?? queuePagination.paginatedItems[0]
+        ?? null;
+
+    useEffect(() => {
+        if (selectedReservationId !== null && queuePagination.paginatedItems.some((entry) => entry.reservation_id === selectedReservationId)) {
+            return;
+        }
+
+        setSelectedReservationId(queuePagination.paginatedItems[0]?.reservation_id ?? null);
+    }, [queuePagination.paginatedItems, selectedReservationId]);
+
+    const updateFilters = (updates: Partial<QueuePageProps['filters']>) => {
+        const nextFilters = { ...filters, ...updates };
+
+        router.get('/queue', cleanQuery({
+            clinic_id: nextFilters.clinicId,
+            reservation_date: nextFilters.reservationDate,
+            queue_status: nextFilters.queueStatus,
+        }), {
+            preserveScroll: true,
+        });
+    };
+
+    const startQueue = (entry: QueueEntry) => {
+        const clinicId = filters.clinicId ?? entry.clinic?.id;
+
+        if (!clinicId) {
+            return;
+        }
+
+        router.patch(`/queue/${entry.reservation_id}`, {
+            clinic_id: clinicId,
+            queue_status: 'in_progress',
+        }, {
+            preserveScroll: true,
+        });
+    };
+
+    const openCompletionModal = (entry: QueueEntry) => {
+        setCompletionQueue(entry);
+        setCompletionForm({
+            diagnosis: '',
+            treatment: '',
+            prescription_notes: '',
+            doctor_notes: '',
+        });
+        setCompletionError(null);
+        setCompletionErrors({});
+    };
+
+    const closeCompletionModal = () => {
+        if (completionSubmitting) {
+            return;
+        }
+
+        setCompletionQueue(null);
+        setCompletionError(null);
+        setCompletionErrors({});
+    };
+
+    const submitCompletion = async () => {
+        if (!completionQueue) {
+            return;
+        }
+
+        const clinicId = filters.clinicId ?? completionQueue.clinic?.id;
+
+        if (!clinicId) {
+            setCompletionError('Clinic context is missing for this queue entry.');
+            return;
+        }
+
+        setCompletionSubmitting(true);
+        setCompletionError(null);
+        setCompletionErrors({});
+
+        const result = await requestJson(`/doctor/reservations/${completionQueue.reservation_id}/medical-records`, 'POST', {
+            clinic_id: clinicId,
+            diagnosis: completionForm.diagnosis.trim() === '' ? null : completionForm.diagnosis.trim(),
+            treatment: completionForm.treatment.trim() === '' ? null : completionForm.treatment.trim(),
+            prescription_notes: completionForm.prescription_notes.trim() === '' ? null : completionForm.prescription_notes.trim(),
+            doctor_notes: completionForm.doctor_notes.trim(),
+        });
+
+        setCompletionSubmitting(false);
+
+        if (!result.ok) {
+            setCompletionError(result.message ?? 'Gagal menyelesaikan antrean.');
+            setCompletionErrors(result.errors ?? {});
+            return;
+        }
+
+        setCompletionQueue(null);
+        router.reload({ preserveScroll: true });
+    };
+
+    const canStart = selectedQueue !== null && selectedQueue.queue.status === 'called';
+    const canComplete = selectedQueue !== null && selectedQueue.queue.status === 'in_progress' && selectedQueue.reservation_status === 'approved';
+    const startDisabledHint = canStart ? undefined : doctorQueueActionHint(selectedQueue, 'start');
+    const completeDisabledHint = canComplete ? undefined : doctorQueueActionHint(selectedQueue, 'complete');
+
+    return (
+        <AppLayout>
+            <Head title="Antrean Saya" />
+
+            <section className="h-full overflow-y-auto bg-[#DFE0DF]">
+                <div className="flex flex-col gap-4 p-5">
+                    <FlashAndErrors page={page} />
+
+                    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                        <p className="mb-2 text-[12px] font-medium text-[#40311D]">Filter Antrean Saya</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {context.clinics.length > 1 ? (
+                                <label className="flex min-w-56 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1 text-[12px] text-gray-600 transition focus-within:border-[#40311D]">
+                                    <span className="whitespace-nowrap text-gray-400">Klinik</span>
+                                    <select
+                                        value={filters.clinicId ?? ''}
+                                        onChange={(event) => updateFilters({ clinicId: event.target.value === '' ? null : Number(event.target.value) })}
+                                        className="min-w-0 flex-1 bg-transparent text-[12px] text-gray-700 outline-none"
+                                    >
+                                        {context.clinics.map((clinicOption) => (
+                                            <option key={clinicOption.id} value={clinicOption.id}>
+                                                {clinicOption.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            ) : null}
+                            <label className="flex min-w-48 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1 text-[12px] text-gray-600 transition focus-within:border-[#40311D]">
+                                <span className="whitespace-nowrap text-gray-400">Tanggal</span>
+                                <input
+                                    type="date"
+                                    value={filters.reservationDate}
+                                    onChange={(event) => updateFilters({ reservationDate: event.target.value })}
+                                    className="min-w-0 flex-1 bg-transparent text-[12px] text-gray-700 outline-none"
+                                />
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+                        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                            <CardHeader title="Daftar Antrean Saya" subtitle={`Antrean approved ${clinic?.name ?? 'klinik terpilih'}`} />
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[860px] border-collapse text-[12px]">
+                                    <thead>
+                                        <tr className="border-b border-[#e4ddd4] bg-[#faf9f7]">
+                                            {['No', 'Kode Reservasi', 'Queue', 'Pasien', 'Tanggal', 'Window', 'Status Queue'].map((header) => (
+                                                <th key={header} className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">
+                                                    {header}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {queues.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="px-4 py-8 text-center text-[12px] italic text-gray-400">
+                                                    Tidak ada antrean yang sesuai filter.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            queuePagination.paginatedItems.map((entry, index) => (
+                                                <tr
+                                                    key={entry.reservation_id}
+                                                    onClick={() => setSelectedReservationId(entry.reservation_id)}
+                                                    className={`cursor-pointer border-b border-[#ede8e2] transition-colors last:border-0 hover:bg-[#faf9f7] ${selectedQueue?.reservation_id === entry.reservation_id ? 'bg-[#faf9f7]' : ''}`}
+                                                >
+                                                    <td className="px-4 py-2.5 text-gray-700">{String(queuePagination.startItem + index).padStart(3, '0')}</td>
+                                                    <td className="px-4 py-2.5 text-gray-700">{entry.reservation_number}</td>
+                                                    <td className="py-2.5 text-gray-700">
+                                                        <QueueCodeBadge>{formatQueueCode(entry, entry.queue.number, queuePrefixes)}</QueueCodeBadge>
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-gray-700">{queuePatientName(entry)}</td>
+                                                    <td className="px-4 py-2.5 text-gray-700">{formatDateLabel(entry.reservation_date)}</td>
+                                                    <td className="px-4 py-2.5 text-gray-700">{entry.window.start_time} - {entry.window.end_time}</td>
+                                                    <td className="px-4 py-2.5 text-gray-700"><QueueStatusBadge status={entry.queue.status} /></td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <PaginationControls
+                                page={queuePagination.page}
+                                perPage={queuePagination.perPage}
+                                total={queuePagination.total}
+                                pageCount={queuePagination.pageCount}
+                                startItem={queuePagination.startItem}
+                                endItem={queuePagination.endItem}
+                                perPageOptions={queuePagination.perPageOptions}
+                                onPageChange={queuePagination.setPage}
+                                onPerPageChange={queuePagination.setPerPage}
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                                <CardHeader title="Aksi Dokter" subtitle="Operasi antrean terpilih" />
+                                <div className="grid gap-2 p-4">
+                                    <ActionButton disabled={!canStart} variant="primary" tooltip={startDisabledHint} onClick={() => selectedQueue && startQueue(selectedQueue)}>
+                                        Start/In Progress
+                                    </ActionButton>
+                                    <ActionButton disabled={!canComplete} variant="primary" tooltip={completeDisabledHint} onClick={() => selectedQueue && openCompletionModal(selectedQueue)}>
+                                        Selesaikan & Isi Rekam Medis
+                                    </ActionButton>
+                                </div>
+                            </div>
+
+                            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                                <CardHeader title="Antrean Terpilih" subtitle="Preview data utama" />
+                                <div className="min-h-[160px] space-y-2 p-4 text-[12px] text-gray-600">
+                                    {selectedQueue ? (
+                                        <SelectedQueuePreview entry={selectedQueue} prefixes={queuePrefixes} />
+                                    ) : (
+                                        <p className="italic text-gray-400">Pilih antrean untuk melihat detail</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {completionQueue ? (
+                <CompleteQueueModal
+                    entry={completionQueue}
+                    form={completionForm}
+                    errors={completionErrors}
+                    error={completionError}
+                    submitting={completionSubmitting}
+                    onChange={(updates) => setCompletionForm((current) => ({ ...current, ...updates }))}
+                    onClose={closeCompletionModal}
+                    onSubmit={submitCompletion}
+                />
+            ) : null}
+        </AppLayout>
+    );
+}
+
 function ReadOnlyQueuePage({ context, queues, filters, page }: { context: WorkspaceContext; queues: QueueEntry[]; filters: QueuePageProps['filters']; page: ReturnType<typeof usePage<SharedData & { errors?: ValidationErrors }>> }) {
     const queuePrefixes = useMemo(() => buildQueuePrefixes(buildDoctorOptions(queues)), [queues]);
     const canView = context.role === 'patient' || context.role === 'admin' || context.role === 'superadmin' || context.role === 'doctor';
@@ -685,7 +956,25 @@ function FilterChip({ active, children, onClick }: { active: boolean; children: 
     );
 }
 
-function ActionButton({ children, disabled, onClick, variant = 'secondary', danger = false, className = '', walkinClass = '' }: { children: string; disabled: boolean; onClick: () => void; variant?: 'primary' | 'secondary'; danger?: boolean; className?: string, walkinClass?: string }) {
+function ActionButton({
+    children,
+    disabled,
+    onClick,
+    variant = 'secondary',
+    danger = false,
+    className = '',
+    walkinClass = '',
+    tooltip,
+}: {
+    children: string;
+    disabled: boolean;
+    onClick: () => void;
+    variant?: 'primary' | 'secondary';
+    danger?: boolean;
+    className?: string;
+    walkinClass?: string;
+    tooltip?: string;
+}) {
     const enabledClasses = danger
         ? 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
         : variant === 'primary'
@@ -693,14 +982,26 @@ function ActionButton({ children, disabled, onClick, variant = 'secondary', dang
             : 'border border-gray-200 bg-white text-[#40311D] hover:bg-[#DFE0DF]';
 
     const button = (
-        <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className={`cursor-pointer rounded-lg px-3 py-1.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-gray-100 disabled:text-gray-400 ${enabledClasses} ${className}`}
-        >
-        {children}
-        </button>
+        <span className="group relative block">
+            <button
+                type="button"
+                onClick={onClick}
+                disabled={disabled}
+                aria-describedby={disabled && tooltip ? `${children.replace(/\W+/g, '-').toLowerCase()}-hint` : undefined}
+                className={`w-full cursor-pointer rounded-lg px-3 py-1.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-gray-100 disabled:text-gray-400 ${enabledClasses} ${className}`}
+            >
+                {children}
+            </button>
+            {disabled && tooltip ? (
+                <span
+                    id={`${children.replace(/\W+/g, '-').toLowerCase()}-hint`}
+                    role="tooltip"
+                    className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-lg border border-[#e4ddd4] bg-[#2c2115] px-3 py-2 text-center text-[11px] leading-4 text-white shadow-lg group-hover:block group-focus-within:block"
+                >
+                    {tooltip}
+                </span>
+            ) : null}
+        </span>
     );
 
     return walkinClass ? (
@@ -725,6 +1026,38 @@ function QueueStatusBadge({ status }: { status: string }) {
     };
 
     return <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${styles[status] ?? 'bg-gray-100 text-gray-500'}`}>{formatQueueStatus(status)}</span>;
+}
+
+function doctorQueueActionHint(entry: QueueEntry | null, action: 'start' | 'complete'): string {
+    if (entry === null) {
+        return 'Pilih antrean terlebih dahulu untuk menjalankan aksi ini.';
+    }
+
+    if (action === 'start') {
+        if (entry.queue.status === 'waiting') {
+            return 'Antrean harus dipanggil oleh admin terlebih dahulu sebelum dokter bisa memulai pemeriksaan.';
+        }
+
+        if (entry.queue.status === 'in_progress') {
+            return 'Antrean ini sudah dalam proses pemeriksaan.';
+        }
+
+        return `Aksi Start hanya tersedia untuk antrean berstatus Called. Status saat ini: ${formatQueueStatus(entry.queue.status)}.`;
+    }
+
+    if (entry.reservation_status !== 'approved') {
+        return 'Rekam medis hanya bisa dibuat untuk reservasi yang masih berstatus Approved.';
+    }
+
+    if (entry.queue.status === 'called') {
+        return 'Klik Start/In Progress terlebih dahulu sebelum menyelesaikan antrean dan mengisi rekam medis.';
+    }
+
+    if (entry.queue.status === 'waiting') {
+        return 'Antrean belum dipanggil dan belum dimulai, sehingga belum bisa diselesaikan.';
+    }
+
+    return `Aksi selesai hanya tersedia untuk antrean berstatus In Progress. Status saat ini: ${formatQueueStatus(entry.queue.status)}.`;
 }
 
 function ReservationStatusBadge({ status }: { status: string }) {

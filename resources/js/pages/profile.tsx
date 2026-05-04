@@ -34,11 +34,23 @@ type PasswordForm = {
     password_confirmation: string;
 };
 
+type ClinicSpecialityForm = {
+    clinic_id: string;
+    specialities: string[];
+};
+
 export default function ProfilePage({ user, profilePictureOptions, canManageAvatar }: ProfilePageProps) {
     const page = usePage<PageProps>();
     const [savingProfile, setSavingProfile] = useState(false);
     const [savingPassword, setSavingPassword] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const initialClinicSpecialities = user.clinic_specialities ?? [];
+    const [savingSpecialities, setSavingSpecialities] = useState(false);
+    const [specialityDraft, setSpecialityDraft] = useState('');
+    const [clinicSpecialityForm, setClinicSpecialityForm] = useState<ClinicSpecialityForm>({
+        clinic_id: initialClinicSpecialities[0]?.clinic_id ? String(initialClinicSpecialities[0].clinic_id) : '',
+        specialities: initialClinicSpecialities[0]?.specialities ?? [],
+    });
     const [profileForm, setProfileForm] = useState<ProfileForm>({
         name: user.name,
         username: user.username,
@@ -99,11 +111,63 @@ export default function ProfilePage({ user, profilePictureOptions, canManageAvat
         router.delete('/profile/image', { preserveScroll: true });
     };
 
+    const selectClinicSpeciality = (clinicId: string) => {
+        const selectedClinic = initialClinicSpecialities.find((clinic) => String(clinic.clinic_id) === clinicId);
+
+        setClinicSpecialityForm({
+            clinic_id: clinicId,
+            specialities: selectedClinic?.specialities ?? [],
+        });
+        setSpecialityDraft('');
+    };
+
+    const addSpeciality = () => {
+        const nextSpeciality = specialityDraft.trim();
+
+        if (nextSpeciality === '') {
+            return;
+        }
+
+        setClinicSpecialityForm((current) => {
+            const alreadyExists = current.specialities.some((speciality) => speciality.toLowerCase() === nextSpeciality.toLowerCase());
+
+            return alreadyExists
+                ? current
+                : { ...current, specialities: [...current.specialities, nextSpeciality] };
+        });
+        setSpecialityDraft('');
+    };
+
+    const removeSpeciality = (target: string) => {
+        setClinicSpecialityForm((current) => ({
+            ...current,
+            specialities: current.specialities.filter((speciality) => speciality !== target),
+        }));
+    };
+
+    const updateClinicSpecialities = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (user.role !== 'doctor' || clinicSpecialityForm.clinic_id === '') {
+            return;
+        }
+
+        setSavingSpecialities(true);
+
+        router.patch('/profile/clinic-specialities', {
+            clinic_id: Number(clinicSpecialityForm.clinic_id),
+            specialities: clinicSpecialityForm.specialities,
+        }, {
+            preserveScroll: true,
+            onFinish: () => setSavingSpecialities(false),
+        });
+    };
+
     return (
         <AppLayout>
             <Head title="Profil Saya" />
 
-            <section className="grid gap-4">
+            <section className="space-y-4 h-full overflow-y-auto bg-[#DFE0DF] p-5">
                 <FlashAndErrors page={page} />
 
                 <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
@@ -187,6 +251,87 @@ export default function ProfilePage({ user, profilePictureOptions, canManageAvat
                         </div>
                     </form>
                 </Panel>
+
+                {user.role === 'doctor' ? (
+                    <Panel title="Spesialisasi Klinik" subtitle="Kelola spesialisasi dokter per klinik">
+                        {initialClinicSpecialities.length === 0 ? (
+                            <p className="text-[12px] italic text-gray-400">Belum ada klinik yang terhubung ke akun dokter ini.</p>
+                        ) : (
+                            <form onSubmit={updateClinicSpecialities} className="grid gap-4">
+                                <label className="flex max-w-md flex-col gap-1 text-[11px] text-[#40311D]">
+                                    Klinik
+                                    <select
+                                        value={clinicSpecialityForm.clinic_id}
+                                        onChange={(event) => selectClinicSpeciality(event.target.value)}
+                                        className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
+                                    >
+                                        {initialClinicSpecialities.map((clinic) => (
+                                            <option key={clinic.clinic_id} value={clinic.clinic_id}>
+                                                {clinic.clinic_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <div className="rounded-xl border border-[#e4ddd4] bg-[#faf9f7] p-4">
+                                    <p className="mb-3 text-[12px] font-medium text-[#40311D]">Daftar spesialisasi</p>
+                                    <div className="mb-3 flex flex-wrap gap-2">
+                                        {clinicSpecialityForm.specialities.length === 0 ? (
+                                            <span className="text-[12px] italic text-gray-400">Belum ada spesialisasi untuk klinik ini.</span>
+                                        ) : (
+                                            clinicSpecialityForm.specialities.map((speciality) => (
+                                                <span key={speciality} className="inline-flex items-center gap-2 rounded-full bg-[#40311D] px-3 py-1 text-[12px] font-medium text-white">
+                                                    {speciality}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeSpeciality(speciality)}
+                                                        className="text-white/70 transition hover:text-white"
+                                                        aria-label={`Hapus ${speciality}`}
+                                                    >
+                                                        x
+                                                    </button>
+                                                </span>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-col gap-2 sm:flex-row">
+                                        <input
+                                            type="text"
+                                            value={specialityDraft}
+                                            onChange={(event) => setSpecialityDraft(event.target.value)}
+                                            onKeyDown={(event) => {
+                                                if (event.key === 'Enter') {
+                                                    event.preventDefault();
+                                                    addSpeciality();
+                                                }
+                                            }}
+                                            placeholder="Contoh: Cardiology"
+                                            className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={addSpeciality}
+                                            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[12px] font-medium text-[#40311D] transition hover:bg-[#DFE0DF]"
+                                        >
+                                            Tambah
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        type="submit"
+                                        disabled={savingSpecialities}
+                                        className="rounded-lg bg-[#40311D] px-4 py-2.5 text-[12px] font-medium text-white transition hover:bg-[#2c2115] disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {savingSpecialities ? 'Menyimpan...' : 'Simpan Spesialisasi'}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+                    </Panel>
+                ) : null}
             </section>
         </AppLayout>
     );
