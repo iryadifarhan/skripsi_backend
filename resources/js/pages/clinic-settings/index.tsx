@@ -8,7 +8,13 @@ type ClinicSettingsPageProps = {
     context: WorkspaceContext;
     selectedClinicId: number | null;
     clinic: ClinicDetail | null;
+    clinicCities: ClinicCityOption[];
     summary: ClinicSettingsSummary;
+};
+
+type ClinicCityOption = {
+    id: number;
+    name: string;
 };
 
 type ClinicSettingsSummary = {
@@ -23,6 +29,7 @@ type ClinicSettingsSummary = {
 type ClinicForm = {
     name: string;
     address: string;
+    city_id: string;
     phone_number: string;
     email: string;
 };
@@ -70,7 +77,7 @@ const emptyAdminForm: AdminForm = {
     password_confirmation: '',
 };
 
-export default function ClinicSettingsPage({ context, clinic, summary }: ClinicSettingsPageProps) {
+export default function ClinicSettingsPage({ context, clinic, clinicCities, summary }: ClinicSettingsPageProps) {
     const { flash } = usePage<SharedData>().props;
     const fileInput = useRef<HTMLInputElement | null>(null);
     const [errors, setErrors] = useState<ValidationErrors>({});
@@ -78,6 +85,9 @@ export default function ClinicSettingsPage({ context, clinic, summary }: ClinicS
     const [savingClinic, setSavingClinic] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [clinicForm, setClinicForm] = useState<ClinicForm>(() => clinicToForm(clinic));
+    const [cityName, setCityName] = useState('');
+    const [pendingCityName, setPendingCityName] = useState<string | null>(null);
+    const [savingCity, setSavingCity] = useState(false);
     const [operatingHours, setOperatingHours] = useState<OperatingHourForm[]>(() => buildOperatingHours(clinic));
     const [localImagePreviewUrl, setLocalImagePreviewUrl] = useState<string | null>(null);
     const [bulkDays, setBulkDays] = useState<number[]>([1, 2, 3, 4, 5]);
@@ -94,6 +104,9 @@ export default function ClinicSettingsPage({ context, clinic, summary }: ClinicS
 
     useEffect(() => {
         setClinicForm(clinicToForm(clinic));
+        setCityName('');
+        setPendingCityName(null);
+        setSavingCity(false);
         setOperatingHours(buildOperatingHours(clinic));
         setErrors({});
         setError(null);
@@ -113,6 +126,21 @@ export default function ClinicSettingsPage({ context, clinic, summary }: ClinicS
         setDeletingAdmin(null);
         setDeletingClinic(false);
     }, [clinic?.id]);
+
+    useEffect(() => {
+        if (pendingCityName === null) {
+            return;
+        }
+
+        const newCity = clinicCities.find((city) => city.name.toLowerCase() === pendingCityName.toLowerCase());
+
+        if (!newCity) {
+            return;
+        }
+
+        setClinicForm((current) => ({ ...current, city_id: String(newCity.id) }));
+        setPendingCityName(null);
+    }, [clinicCities, pendingCityName]);
 
     const summaryCards = [
         {
@@ -177,6 +205,33 @@ export default function ClinicSettingsPage({ context, clinic, summary }: ClinicS
                     setError('Gagal memperbarui data klinik.');
                 },
                 onFinish: () => setSavingClinic(false),
+            },
+        );
+    };
+
+    const submitCity = () => {
+        const normalizedCityName = cityName.trim().replace(/\s+/g, ' ');
+
+        if (normalizedCityName === '') {
+            return;
+        }
+
+        setSavingCity(true);
+        setPendingCityName(normalizedCityName);
+
+        router.post(
+            '/clinic-cities',
+            { name: normalizedCityName },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setCityName(''),
+                onError: (validationErrors) => {
+                    setPendingCityName(null);
+                    setErrors(normalizeInertiaErrors(validationErrors));
+                    setError('Gagal menambahkan kota klinik.');
+                },
+                onFinish: () => setSavingCity(false),
             },
         );
     };
@@ -488,7 +543,41 @@ export default function ClinicSettingsPage({ context, clinic, summary }: ClinicS
                                             <TextField label="Nama Klinik" value={clinicForm.name} error={errors.name?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, name: value }))} />
                                             <TextField label="Email" type="email" value={clinicForm.email} error={errors.email?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, email: value }))} />
                                             <TextField label="Nomor Telepon" value={clinicForm.phone_number} error={errors.phone_number?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, phone_number: value }))} />
+                                            <CitySelect
+                                                value={clinicForm.city_id}
+                                                cities={clinicCities}
+                                                error={errors.city_id?.[0]}
+                                                onChange={(value) => setClinicForm((current) => ({ ...current, city_id: value }))}
+                                            />
                                             <TextField label="Alamat" value={clinicForm.address} error={errors.address?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, address: value }))} />
+                                            <div className="md:col-span-2 rounded-xl border border-[#e4ddd4] bg-[#faf9f7] p-4">
+                                                <p className="text-[12px] font-medium text-[#40311D]">Tambah pilihan kota</p>
+                                                <p className="mt-1 text-[11px] text-gray-400">Tambahkan master kota baru jika belum tersedia di dropdown.</p>
+                                                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                                    <input
+                                                        type="text"
+                                                        value={cityName}
+                                                        onChange={(event) => setCityName(event.target.value)}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key === 'Enter') {
+                                                                event.preventDefault();
+                                                                submitCity();
+                                                            }
+                                                        }}
+                                                        placeholder="Contoh: Jakarta Pusat"
+                                                        className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none placeholder:italic placeholder:text-gray-400 focus:border-[#40311D]"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={submitCity}
+                                                        disabled={savingCity || cityName.trim() === ''}
+                                                        className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-[12px] font-medium text-[#40311D] transition hover:bg-[#DFE0DF] disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        {savingCity ? 'Menambah...' : 'Tambah Kota'}
+                                                    </button>
+                                                </div>
+                                                {errors.city_name?.[0] ? <span className="mt-2 block text-[11px] font-medium text-red-600">{errors.city_name[0]}</span> : null}
+                                            </div>
                                         </div>
                                     </Panel>
                                 </div>
@@ -963,10 +1052,32 @@ function TextField({
     );
 }
 
+function CitySelect({ value, cities, onChange, error }: { value: string; cities: ClinicCityOption[]; onChange: (value: string) => void; error?: string }) {
+    return (
+        <label className="flex flex-col gap-2 text-[12px] font-medium text-[#40311D]">
+            Kota
+            <select
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
+            >
+                <option value="">Pilih kota</option>
+                {cities.map((city) => (
+                    <option key={city.id} value={city.id}>
+                        {city.name}
+                    </option>
+                ))}
+            </select>
+            {error ? <span className="text-[11px] font-medium text-red-600">{error}</span> : null}
+        </label>
+    );
+}
+
 function clinicToForm(clinic: ClinicDetail | null): ClinicForm {
     return {
         name: clinic?.name ?? '',
         address: clinic?.address ?? '',
+        city_id: clinic?.city_id ? String(clinic.city_id) : '',
         phone_number: clinic?.phone_number ?? '',
         email: clinic?.email ?? '',
     };

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Clinic;
 
 use App\Models\Clinic;
+use App\Models\ClinicCity;
 use App\Models\ClinicOperatingHour;
 use App\Models\DoctorClinicSchedule;
 use App\Models\User;
@@ -32,10 +33,12 @@ class ClinicWebTest extends TestCase
     {
         $superadmin = $this->makeUser(User::ROLE_SUPERADMIN, 'superadmin-clinic@example.com');
         $this->login($superadmin, 'Password123!');
+        $city = ClinicCity::query()->firstOrCreate(['name' => 'Kota Bekasi']);
 
         $this->postJson('/superadmin/clinic/create', [
             'name' => 'Klinik Superadmin',
             'address' => 'Address Klinik Superadmin',
+            'city_id' => $city->id,
             'phone_number' => '081111111111',
             'email' => 'superadmin-clinic@example.test',
             'operating_hours' => [
@@ -81,6 +84,7 @@ class ClinicWebTest extends TestCase
 
         $this->assertDatabaseHas('clinics', [
             'id' => $clinic->id,
+            'city_id' => $city->id,
             'name' => 'Klinik Superadmin Updated',
             'email' => 'superadmin-clinic-updated@example.test',
         ]);
@@ -98,6 +102,28 @@ class ClinicWebTest extends TestCase
         $this->assertDatabaseMissing('clinics', [
             'id' => $clinic->id,
         ]);
+    }
+
+    public function test_superadmin_can_create_clinic_city_master_data(): void
+    {
+        $superadmin = $this->makeUser(User::ROLE_SUPERADMIN, 'superadmin-city@example.com');
+        $this->login($superadmin, 'Password123!');
+
+        $this->postJson('/clinic-cities', [
+            'name' => 'Bekasi Utara',
+        ], $this->spaHeaders())
+            ->assertCreated()
+            ->assertJsonPath('city.name', 'Bekasi Utara');
+
+        $this->assertDatabaseHas('clinic_cities', [
+            'name' => 'Bekasi Utara',
+        ]);
+
+        $this->postJson('/clinic-cities', [
+            'name' => 'bekasi utara',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('city_name');
     }
 
     public function test_admin_can_assign_and_remove_doctor_from_own_clinic(): void

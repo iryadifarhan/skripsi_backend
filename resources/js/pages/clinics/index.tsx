@@ -8,12 +8,21 @@ import type { SharedData, ValidationErrors, WorkspaceContext } from '@/types';
 type ClinicsPageProps = {
     context: WorkspaceContext;
     clinics: ClinicIndexEntry[];
+    clinicCities: ClinicCityOption[];
+};
+
+type ClinicCityOption = {
+    id: number;
+    name: string;
 };
 
 type ClinicIndexEntry = {
     id: number;
     name: string;
     address: string;
+    city_id: number;
+    city?: ClinicCityOption | null;
+    city_name?: string | null;
     phone_number: string;
     email: string;
     image_url?: string | null;
@@ -29,6 +38,7 @@ type ClinicIndexEntry = {
 type ClinicForm = {
     name: string;
     address: string;
+    city_id: string;
     phone_number: string;
     email: string;
 };
@@ -40,16 +50,20 @@ type PageProps = SharedData & {
 const emptyClinicForm: ClinicForm = {
     name: '',
     address: '',
+    city_id: '',
     phone_number: '',
     email: '',
 };
 
-export default function ClinicsPage({ context, clinics }: ClinicsPageProps) {
+export default function ClinicsPage({ context, clinics, clinicCities }: ClinicsPageProps) {
     const page = usePage<PageProps>();
     const [search, setSearch] = useState('');
     const [selectedClinicId, setSelectedClinicId] = useState<number | null>(clinics[0]?.id ?? null);
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [form, setForm] = useState<ClinicForm>(emptyClinicForm);
+    const [form, setForm] = useState<ClinicForm>(() => createEmptyClinicForm(clinicCities));
+    const [cityName, setCityName] = useState('');
+    const [pendingCityName, setPendingCityName] = useState<string | null>(null);
+    const [savingCity, setSavingCity] = useState(false);
     const [saving, setSaving] = useState(false);
 
     const filteredClinics = useMemo(() => {
@@ -60,7 +74,7 @@ export default function ClinicsPage({ context, clinics }: ClinicsPageProps) {
         }
 
         return clinics.filter((clinic) =>
-            [clinic.name, clinic.email, clinic.phone_number, clinic.address, ...clinic.specialities]
+            [clinic.name, clinic.email, clinic.phone_number, clinic.address, clinic.city_name, clinic.city?.name, ...clinic.specialities]
                 .filter(Boolean)
                 .some((value) => String(value).toLowerCase().includes(keyword)),
         );
@@ -77,8 +91,23 @@ export default function ClinicsPage({ context, clinics }: ClinicsPageProps) {
         setSelectedClinicId(clinicPagination.paginatedItems[0]?.id ?? null);
     }, [clinicPagination.paginatedItems, selectedClinicId]);
 
+    useEffect(() => {
+        if (pendingCityName === null) {
+            return;
+        }
+
+        const newCity = clinicCities.find((city) => city.name.toLowerCase() === pendingCityName.toLowerCase());
+
+        if (!newCity) {
+            return;
+        }
+
+        setForm((current) => ({ ...current, city_id: String(newCity.id) }));
+        setPendingCityName(null);
+    }, [clinicCities, pendingCityName]);
+
     const openCreateModal = () => {
-        setForm(emptyClinicForm);
+        setForm(createEmptyClinicForm(clinicCities));
         setShowCreateModal(true);
     };
 
@@ -98,6 +127,29 @@ export default function ClinicsPage({ context, clinics }: ClinicsPageProps) {
         router.post('/superadmin/clinic/create', form, options);
     };
 
+    const submitCity = () => {
+        const normalizedCityName = cityName.trim().replace(/\s+/g, ' ');
+
+        if (normalizedCityName === '') {
+            return;
+        }
+
+        setSavingCity(true);
+        setPendingCityName(normalizedCityName);
+
+        router.post(
+            '/clinic-cities',
+            { name: normalizedCityName },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setCityName(''),
+                onError: () => setPendingCityName(null),
+                onFinish: () => setSavingCity(false),
+            },
+        );
+    };
+
     return (
         <AppLayout>
             <Head title="Data Klinik" />
@@ -114,7 +166,7 @@ export default function ClinicsPage({ context, clinics }: ClinicsPageProps) {
                                     type="search"
                                     value={search}
                                     onChange={(event) => setSearch(event.target.value)}
-                                    placeholder="Nama, email, telepon, alamat, spesialisasi..."
+                                    placeholder="Nama, email, telepon, kota, alamat, spesialisasi..."
                                     className="rounded-full border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none placeholder:italic placeholder:text-gray-400 focus:border-[#40311D]"
                                 />
                             </label>
@@ -165,6 +217,7 @@ export default function ClinicsPage({ context, clinics }: ClinicsPageProps) {
                                                             <ClinicAvatar clinic={clinic} />
                                                             <div className="min-w-0">
                                                                 <p className="truncate font-medium text-[#2c2115]">{clinic.name}</p>
+                                                                <p className="truncate text-[11px] text-gray-400">{clinic.city_name ?? clinic.city?.name ?? '-'}</p>
                                                                 <p className="truncate text-[11px] text-gray-400">{clinic.address}</p>
                                                             </div>
                                                         </div>
@@ -213,6 +266,7 @@ export default function ClinicsPage({ context, clinics }: ClinicsPageProps) {
                                             </div>
                                         </div>
                                         <InfoLine label="Telepon" value={selectedClinic.phone_number} />
+                                        <InfoLine label="Kota" value={selectedClinic.city_name ?? selectedClinic.city?.name ?? '-'} />
                                         <InfoLine label="Alamat" value={selectedClinic.address} />
                                         <InfoLine label="Dokter" value={String(selectedClinic.doctor_count)} />
                                         <InfoLine label="Admin" value={String(selectedClinic.admin_count)} />
@@ -239,13 +293,19 @@ export default function ClinicsPage({ context, clinics }: ClinicsPageProps) {
                     title="Tambah Data Klinik"
                     subtitle="Buat klinik baru dengan data utama lengkap."
                     form={form}
+                    clinicCities={clinicCities}
                     errors={errors}
+                    cityName={cityName}
+                    savingCity={savingCity}
                     saving={saving}
                     submitLabel="Simpan Klinik"
                     onChange={setForm}
+                    onCityNameChange={setCityName}
+                    onCitySubmit={submitCity}
                     onClose={() => {
                         setShowCreateModal(false);
-                        setForm(emptyClinicForm);
+                        setForm(createEmptyClinicForm(clinicCities));
+                        setCityName('');
                     }}
                     onSubmit={submitClinic}
                 />
@@ -259,20 +319,30 @@ function ClinicFormModal({
     title,
     subtitle,
     form,
+    clinicCities,
     errors,
+    cityName,
+    savingCity,
     saving,
     submitLabel,
     onChange,
+    onCityNameChange,
+    onCitySubmit,
     onClose,
     onSubmit,
 }: {
     title: string;
     subtitle: string;
     form: ClinicForm;
+    clinicCities: ClinicCityOption[];
     errors: ValidationErrors;
+    cityName: string;
+    savingCity: boolean;
     saving: boolean;
     submitLabel: string;
     onChange: (form: ClinicForm) => void;
+    onCityNameChange: (value: string) => void;
+    onCitySubmit: () => void;
     onClose: () => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -288,7 +358,43 @@ function ClinicFormModal({
                     <TextInput label="Nama Klinik" value={form.name} error={errors.name?.[0]} onChange={(value) => onChange({ ...form, name: value })} />
                     <TextInput label="Email" type="email" value={form.email} error={errors.email?.[0]} onChange={(value) => onChange({ ...form, email: value })} />
                     <TextInput label="Nomor Telepon" value={form.phone_number} error={errors.phone_number?.[0]} onChange={(value) => onChange({ ...form, phone_number: value })} />
+                    <CitySelect
+                        value={form.city_id}
+                        cities={clinicCities}
+                        error={errors.city_id?.[0]}
+                        onChange={(value) => onChange({ ...form, city_id: value })}
+                    />
                     <TextInput label="Alamat" value={form.address} error={errors.address?.[0]} onChange={(value) => onChange({ ...form, address: value })} />
+                </div>
+
+                <div className="mx-5 mb-4 rounded-xl border border-[#e4ddd4] bg-[#faf9f7] p-4">
+                    <p className="text-[12px] font-medium text-[#40311D]">Tambah pilihan kota</p>
+                    <p className="mt-1 text-[11px] text-gray-400">Gunakan ini jika kota belum tersedia di dropdown.</p>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <input
+                            type="text"
+                            value={cityName}
+                            onChange={(event) => onCityNameChange(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    onCitySubmit();
+                                }
+                            }}
+                            placeholder="Contoh: Kota Depok"
+                            className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none placeholder:italic placeholder:text-gray-400 focus:border-[#40311D]"
+                        />
+                        <button
+                            type="button"
+                            onClick={onCitySubmit}
+                            disabled={savingCity || cityName.trim() === ''}
+                            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-[12px] font-medium text-[#40311D] transition-colors hover:bg-[#DFE0DF] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {savingCity ? 'Menambah...' : 'Tambah Kota'}
+                        </button>
+                    </div>
+                    {errors.city_name?.[0] ? <span className="mt-2 block text-[11px] font-medium text-red-600">{errors.city_name[0]}</span> : null}
+                    {errors.name?.[0] && cityName.trim() !== '' ? <span className="mt-2 block text-[11px] font-medium text-red-600">{errors.name[0]}</span> : null}
                 </div>
 
                 {errors.clinic?.[0] ? (
@@ -315,6 +421,27 @@ function ClinicFormModal({
                 </div>
             </form>
         </div>
+    );
+}
+
+function CitySelect({ value, cities, onChange, error }: { value: string; cities: ClinicCityOption[]; onChange: (value: string) => void; error?: string }) {
+    return (
+        <label className="flex flex-col gap-1 text-[11px] text-[#40311D]">
+            Kota
+            <select
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none focus:border-[#40311D]"
+            >
+                <option value="">Pilih kota</option>
+                {cities.map((city) => (
+                    <option key={city.id} value={city.id}>
+                        {city.name}
+                    </option>
+                ))}
+            </select>
+            {error ? <span className="text-[11px] font-medium text-red-600">{error}</span> : null}
+        </label>
     );
 }
 
@@ -394,4 +521,11 @@ function Alert({ tone, children }: { tone: 'success' | 'danger'; children: React
 
 function normalizePageErrors(errors: Record<string, string>): ValidationErrors {
     return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
+}
+
+function createEmptyClinicForm(cities: ClinicCityOption[]): ClinicForm {
+    return {
+        ...emptyClinicForm,
+        city_id: cities[0] ? String(cities[0].id) : '',
+    };
 }

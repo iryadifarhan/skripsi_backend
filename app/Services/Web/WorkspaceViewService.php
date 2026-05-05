@@ -121,6 +121,7 @@ class WorkspaceViewService
     public function serializeClinicDetail(Clinic $clinic): array
     {
         $clinic->loadMissing([
+            'city:id,name',
             'doctors:id,name,username,email,phone_number,date_of_birth,gender,profile_picture,image_path,role',
             'users:id,clinic_id,name,username,email,phone_number,date_of_birth,gender,role,email_verified_at,created_at',
             'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
@@ -130,6 +131,12 @@ class WorkspaceViewService
             'id' => $clinic->id,
             'name' => $clinic->name,
             'address' => $clinic->address,
+            'city_id' => $clinic->city_id,
+            'city' => $clinic->city !== null ? [
+                'id' => $clinic->city->id,
+                'name' => $clinic->city->name,
+            ] : null,
+            'city_name' => $clinic->city?->name,
             'phone_number' => $clinic->phone_number,
             'email' => $clinic->email,
             'image_path' => $clinic->image_path,

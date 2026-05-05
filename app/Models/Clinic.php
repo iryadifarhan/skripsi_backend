@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\MediaImageService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
@@ -16,6 +17,7 @@ class Clinic extends Model
     protected $fillable = [
         'name',
         'address',
+        'city_id',
         'phone_number',
         'email',
         'image_path',
@@ -31,6 +33,11 @@ class Clinic extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(ClinicCity::class, 'city_id');
     }
 
     public function doctors(): BelongsToMany

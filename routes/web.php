@@ -74,6 +74,7 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('authorize:admin,superadmin')->group(function (): void {
         Route::get('/admin/patients/search', [AdminController::class, 'searchPatients'])->name('admin.patients.search');
+        Route::post('/clinic-cities', [ClinicController::class, 'storeCity'])->name('clinic-cities.store');
         Route::get('/clinic-settings', [ClinicController::class, 'settings'])->name('clinic-settings.index');
         Route::get('/clinic-settings/{clinicId}', [ClinicController::class, 'settings'])->name('clinic-settings.show');
         Route::patch('/clinic-settings/{clinicId}', [ClinicController::class, 'update'])->name('clinic-settings.update');

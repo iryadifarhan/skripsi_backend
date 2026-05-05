@@ -753,8 +753,8 @@ function ScheduleSlotCell({
     onToggle: () => void;
 }) {
     return (
-        <div className="flex min-w-0 flex-col gap-8 py-1 2xl:flex-row">
-            <div className="flex flex-col shrink-0 items-center gap-2">
+        <div className="flex min-w-0 flex-col gap-4 2xl:gap-8 py-1 2xl:flex-row">
+            <div className="flex flex-col shrink-0 items-start gap-2">
                 <div className="grid min-w-[150px] gap-1 text-[11px] text-gray-600">
                     <p className="truncate"><strong>Durasi:</strong> {schedule.window_minutes} menit/window</p>
                     <p className="truncate"><strong>Kapasitas:</strong> {schedule.max_patients_per_window} pasien/window</p>
@@ -801,15 +801,12 @@ function ScheduleSlotPreview({ windows }: { windows: ScheduleWindowSlot[] }) {
                 <p className="px-3 py-4 text-[12px] italic text-gray-400">Window belum bisa ditampilkan.</p>
             ) : (
                 <div className="max-h-56 overflow-auto">
-                    <table className="w-full min-w-[440px] border-collapse text-[12px]">
+                    <table className="w-full min-w-[300px] border-collapse text-[12px]">
                         <thead>
                             <tr className="border-b border-[#e4ddd4] bg-white/60">
                                 <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-400">No</th>
                                 <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-400">Window</th>
-                                <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-400">Kapasitas</th>
-                                <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-400">Terisi</th>
-                                <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-400">Tersisa</th>
-                                <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-400">Status</th>
+                                <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-400">Slot</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -817,11 +814,8 @@ function ScheduleSlotPreview({ windows }: { windows: ScheduleWindowSlot[] }) {
                                 <tr key={window.window_start_time} className="border-b border-[#ede8e2] last:border-0">
                                     <td className="px-3 py-2 text-gray-700">{String(index + 1).padStart(2, '0')}</td>
                                     <td className="px-3 py-2 text-gray-700">{formatTime(window.window_start_time)} - {formatTime(window.window_end_time)}</td>
-                                    <td className="px-3 py-2 text-gray-700">{window.max_slots} pasien</td>
-                                    <td className="px-3 py-2 text-gray-700">{window.booked_slots}</td>
-                                    <td className="px-3 py-2 text-gray-700">{window.available_slots}</td>
                                     <td className="px-3 py-2">
-                                        <StatusBadge status={window.is_available ? 'Tersedia' : 'Penuh'} />
+                                        <SlotFillBadge filled={window.booked_slots} capacity={window.max_slots} available={window.available_slots} />
                                     </td>
                                 </tr>
                             ))}
@@ -830,6 +824,28 @@ function ScheduleSlotPreview({ windows }: { windows: ScheduleWindowSlot[] }) {
                 </div>
             )}
         </div>
+    );
+}
+
+function SlotFillBadge({ filled, capacity, available }: { filled: number; capacity: number; available: number }) {
+    const safeCapacity = Math.max(capacity, 0);
+    const safeFilled = Math.max(filled, 0);
+    const safeAvailable = Math.max(available, 0);
+    const availabilityRatio = safeCapacity > 0 ? safeAvailable / safeCapacity : 0;
+    const isFull = safeCapacity > 0 && safeFilled >= safeCapacity;
+
+    const colorClass = isFull
+        ? 'bg-red-50 text-red-600'
+        : availabilityRatio <= 0.5
+            ? 'bg-orange-50 text-orange-700'
+            : availabilityRatio <= 0.75
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-teal-50 text-teal-700';
+
+    return (
+        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${colorClass}`}>
+            {safeFilled}/{safeCapacity}
+        </span>
     );
 }
 

@@ -222,6 +222,12 @@ export type ClinicDetail = {
     id: number;
     name: string;
     address: string;
+    city_id: number;
+    city?: {
+        id: number;
+        name: string;
+    } | null;
+    city_name?: string | null;
     phone_number: string;
     email: string;
     image_url?: string | null;

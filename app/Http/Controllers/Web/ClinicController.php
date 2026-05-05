@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Clinic;
+use App\Models\ClinicCity;
 use App\Models\ClinicOperatingHour;
 use App\Models\DoctorClinicSchedule;
 use App\Models\Reservation;
@@ -16,6 +17,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\Password as PasswordRule;
@@ -62,6 +64,7 @@ class ClinicController extends Controller
 
         if ($clinic !== null) {
             $clinic->load([
+                'city:id,name',
                 'doctors:id,name,username,email,phone_number,date_of_birth,gender,profile_picture,image_path,role',
                 'users:id,clinic_id,name,username,email,phone_number,date_of_birth,gender,role,email_verified_at,created_at',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
@@ -72,6 +75,7 @@ class ClinicController extends Controller
             'context' => $context,
             'selectedClinicId' => $clinic?->id,
             'clinic' => $clinic !== null ? $this->workspace->serializeClinicDetail($clinic) : null,
+            'clinicCities' => $this->clinicCityOptions(),
             'summary' => $clinic !== null ? $this->settingsSummary($clinic, $request->user()) : $this->emptySettingsSummary($request->user()),
         ]);
     }
@@ -87,8 +91,9 @@ class ClinicController extends Controller
         }
 
         $clinics = Clinic::query()
-            ->select(['id', 'name', 'address', 'phone_number', 'email', 'image_path'])
+            ->select(['id', 'name', 'address', 'city_id', 'phone_number', 'email', 'image_path'])
             ->with([
+                'city:id,name',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
                 'doctors:id,name,username,email,phone_number,profile_picture,image_path,role',
             ])
@@ -109,6 +114,7 @@ class ClinicController extends Controller
             return Inertia::render('clinics/index', [
                 'context' => $this->workspace->context($request),
                 'clinics' => $clinics->map(fn (Clinic $clinic): array => $this->serializeClinicIndexEntry($clinic))->values()->all(),
+                'clinicCities' => $this->clinicCityOptions(),
             ]);
         }
 
@@ -128,10 +134,47 @@ class ClinicController extends Controller
 
         return response()->json(
             $this->serializeClinicDetail($clinic->load([
+                'city:id,name',
                 'doctors:id,name,username,email,phone_number,profile_picture,image_path,role',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
             ]))
         );
+    }
+
+    public function storeCity(Request $request): JsonResponse|RedirectResponse
+    {
+        abort_unless(in_array($request->user()?->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true), 403);
+
+        $payload = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+        ]);
+
+        $name = $this->normalizeCityName($payload['name']);
+
+        if ($name === '') {
+            throw ValidationException::withMessages([
+                'city_name' => ['Nama kota wajib diisi.'],
+            ]);
+        }
+
+        $existingCity = ClinicCity::query()
+            ->whereRaw('LOWER(name) = ?', [Str::lower($name)])
+            ->first();
+
+        if ($existingCity !== null) {
+            throw ValidationException::withMessages([
+                'city_name' => ['Kota sudah tersedia di daftar pilihan.'],
+            ]);
+        }
+
+        $city = ClinicCity::query()->create([
+            'name' => $name,
+        ]);
+
+        return $this->jsonOrRedirect($request, [
+            'message' => 'Clinic city created successfully.',
+            'city' => $this->serializeClinicCity($city),
+        ], 201, 'Kota klinik berhasil ditambahkan.');
     }
 
     public function uploadClinicImage(Request $request, $clinicId)
@@ -162,6 +205,7 @@ class ClinicController extends Controller
         return $this->jsonOrRedirect($request, [
             'message' => 'Clinic image uploaded successfully.',
             'clinic' => $this->serializeClinicDetail($clinic->fresh()->load([
+                'city:id,name',
                 'doctors:id,name,username,email,phone_number,profile_picture,image_path,role',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
             ])),
@@ -235,6 +279,7 @@ class ClinicController extends Controller
         $payload = $request->validate([
             'name' => 'required|string|max:255|unique:clinics,name',
             'address' => 'required|string|max:255',
+            'city_id' => 'required|integer|exists:clinic_cities,id',
             'phone_number' => 'required|string|max:20|unique:clinics,phone_number',
             'email' => 'required|email|max:255|unique:clinics,email',
             'operating_hours' => 'nullable|array',
@@ -247,6 +292,7 @@ class ClinicController extends Controller
         $clinic = Clinic::create([
             'name' => $payload['name'],
             'address' => $payload['address'],
+            'city_id' => $payload['city_id'],
             'phone_number' => $payload['phone_number'],
             'email' => $payload['email'],
         ]);
@@ -256,6 +302,7 @@ class ClinicController extends Controller
         return $this->jsonOrRedirect($request, [
             'message' => 'Clinic created successfully.',
             'clinic' => $this->serializeClinicDetail($clinic->fresh()->load([
+                'city:id,name',
                 'doctors:id,name,username,email,phone_number,profile_picture,image_path,role',
                 'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
             ])),
@@ -274,6 +321,7 @@ class ClinicController extends Controller
         $request->validate([
             'name' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:255',
+            'city_id' => 'sometimes|required|integer|exists:clinic_cities,id',
             'phone_number' => ['nullable', 'string', 'max:20', Rule::unique('clinics', 'phone_number')->ignore($clinicId)],
             'email' => ['nullable', 'email', 'max:255', Rule::unique('clinics', 'email')->ignore($clinicId)],
             'operating_hours' => 'nullable|array',
@@ -283,7 +331,7 @@ class ClinicController extends Controller
             'operating_hours.*.is_closed' => 'nullable|boolean',
         ]);
 
-        $clinic->update($request->only(['name', 'address', 'phone_number', 'email']));
+        $clinic->update($request->only(['name', 'address', 'city_id', 'phone_number', 'email']));
         $this->syncOperatingHours($clinic, $request->input('operating_hours'), false);
 
         return $this->jsonOrRedirect($request, [
@@ -835,6 +883,9 @@ class ClinicController extends Controller
             'id' => $clinic->id,
             'name' => $clinic->name,
             'address' => $clinic->address,
+            'city_id' => $clinic->city_id,
+            'city' => $this->serializeClinicCity($clinic->city),
+            'city_name' => $clinic->city?->name,
             'phone_number' => $clinic->phone_number,
             'email' => $clinic->email,
             'image_path' => $clinic->image_path,
@@ -853,6 +904,9 @@ class ClinicController extends Controller
             'id' => $clinic->id,
             'name' => $clinic->name,
             'address' => $clinic->address,
+            'city_id' => $clinic->city_id,
+            'city' => $this->serializeClinicCity($clinic->city),
+            'city_name' => $clinic->city?->name,
             'phone_number' => $clinic->phone_number,
             'email' => $clinic->email,
             'image_path' => $clinic->image_path,
@@ -876,6 +930,9 @@ class ClinicController extends Controller
             'id' => $clinic->id,
             'name' => $clinic->name,
             'address' => $clinic->address,
+            'city_id' => $clinic->city_id,
+            'city' => $this->serializeClinicCity($clinic->city),
+            'city_name' => $clinic->city?->name,
             'phone_number' => $clinic->phone_number,
             'email' => $clinic->email,
             'image_path' => $clinic->image_path,
@@ -904,6 +961,40 @@ class ClinicController extends Controller
                 ->map(fn (User $admin): array => $this->serializeClinicAdmin($admin))
                 ->all(),
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function clinicCityOptions(): array
+    {
+        return ClinicCity::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ClinicCity $city): array => $this->serializeClinicCity($city))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array{id: int, name: string}|null
+     */
+    private function serializeClinicCity(?ClinicCity $city): ?array
+    {
+        if ($city === null) {
+            return null;
+        }
+
+        return [
+            'id' => $city->id,
+            'name' => $city->name,
+        ];
+    }
+
+    private function normalizeCityName(string $name): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', $name));
     }
 
     /**
