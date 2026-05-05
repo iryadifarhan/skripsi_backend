@@ -1,7 +1,16 @@
-import { Link, router, usePage } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { type FormEvent, useState } from 'react';
 
-import GuestLayout from '@/layouts/guest-layout';
+import {
+    AuthFooter,
+    AuthLink,
+    AuthPageShell,
+    BrandHeader,
+    normalizeInertiaErrors,
+    PasswordInput,
+    PrimaryButton,
+    TextInput,
+} from '@/components/auth/auth-ui';
 import type { SharedData, ValidationErrors } from '@/types';
 
 export default function Login() {
@@ -14,7 +23,7 @@ export default function Login() {
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [processing, setProcessing] = useState(false);
 
-    const submit = async (event: FormEvent<HTMLFormElement>) => {
+    const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setProcessing(true);
         setErrors({});
@@ -26,88 +35,59 @@ export default function Login() {
     };
 
     return (
-        <GuestLayout
-            title="Access the operational workspace"
-            subtitle="Sign in using the existing Laravel session-based authentication flow while the new React workspace is phased in."
-        >
-            <form className="space-y-5" onSubmit={submit}>
-                {flash?.status ? <p className="rounded-2xl bg-clinic-100 px-4 py-3 text-sm text-clinic-700">{flash.status}</p> : null}
+        <>
+            <Head title="Masuk" />
+            <AuthPageShell>
+                <BrandHeader title="Masuk" showBack />
 
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="email">
-                        Email
-                    </label>
-                    <input
+                <form className="space-y-5" onSubmit={submit}>
+                    {flash?.status ? (
+                        <p className="rounded-xl bg-[#00917B]/10 px-4 py-3 text-sm font-medium text-[#00917B]">{flash.status}</p>
+                    ) : null}
+
+                    <TextInput
                         id="email"
+                        label="Email*"
                         type="email"
+                        placeholder="CliniQ@gmail.co.id"
                         value={form.email}
-                        onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
-                        placeholder="user@example.com"
                         required
+                        errors={errors.email}
+                        onChange={(value) => setForm((current) => ({ ...current, email: value }))}
                     />
-                    {errors.email?.map((error) => (
-                        <p key={error} className="mt-2 text-sm text-alert-500">
-                            {error}
-                        </p>
-                    ))}
-                </div>
 
-                <div>
-                    <div className="mb-2 flex items-center justify-between">
-                        <label className="block text-sm font-semibold text-night-900" htmlFor="password">
-                            Password
-                        </label>
-                        <Link href="/forgot-password" className="text-sm font-medium text-clinic-700 transition hover:text-clinic-500">
-                            Forgot password?
-                        </Link>
-                    </div>
-                    <input
+                    <PasswordInput
                         id="password"
-                        type="password"
+                        label="Kata Sandi*"
+                        placeholder="Kata Sandi"
                         value={form.password}
-                        onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
-                        placeholder="Enter your password"
                         required
+                        errors={errors.password}
+                        onChange={(value) => setForm((current) => ({ ...current, password: value }))}
                     />
-                    {errors.password?.map((error) => (
-                        <p key={error} className="mt-2 text-sm text-alert-500">
-                            {error}
-                        </p>
-                    ))}
-                </div>
 
-                <label className="flex items-center gap-3 text-sm text-ink-700">
-                    <input
-                        type="checkbox"
-                        checked={form.remember}
-                        onChange={(event) => setForm((current) => ({ ...current, remember: event.target.checked }))}
-                        className="h-4 w-4 rounded border-night-900/20 text-clinic-500 focus:ring-clinic-500"
-                    />
-                    Remember this session
-                </label>
+                    <label className="flex items-center gap-2 text-sm text-[#40311D]">
+                        <input
+                            type="checkbox"
+                            checked={form.remember}
+                            onChange={(event) => setForm((current) => ({ ...current, remember: event.target.checked }))}
+                            className="h-4 w-4 rounded border-[#40311D] text-[#40311D] accent-[#40311D]"
+                        />
+                        Ingat kembali data login?
+                    </label>
 
-                <button
-                    type="submit"
-                    disabled={processing}
-                    className="w-full rounded-2xl bg-night-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-night-700 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                    {processing ? 'Signing in...' : 'Login'}
-                </button>
-            </form>
+                    <PrimaryButton processing={processing}>{processing ? 'Memuat...' : 'Masuk'}</PrimaryButton>
+                </form>
 
-            <p className="mt-6 text-sm text-ink-700">
-                Need a patient account?{' '}
-                <Link href="/register" className="font-semibold text-clinic-700 transition hover:text-clinic-500">
-                    Create one here
-                </Link>
-                .
-            </p>
-        </GuestLayout>
+                <AuthFooter>
+                    <p>
+                        Lupa <AuthLink href="/forgot-password">Kata Sandi?</AuthLink>
+                    </p>
+                    <p className="mt-1">
+                        Belum punya akun? <AuthLink href="/register">Daftar</AuthLink>
+                    </p>
+                </AuthFooter>
+            </AuthPageShell>
+        </>
     );
-}
-
-function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
-    return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }

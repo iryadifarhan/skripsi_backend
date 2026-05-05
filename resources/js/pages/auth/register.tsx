@@ -1,25 +1,41 @@
-import { Link, router } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { type FormEvent, useState } from 'react';
 
-import GuestLayout from '@/layouts/guest-layout';
+import {
+    AuthFooter,
+    AuthLink,
+    AuthPageShell,
+    BrandHeader,
+    ConfirmModal,
+    FieldErrors,
+    normalizeInertiaErrors,
+    PasswordInput,
+    PrimaryButton,
+    TextInput,
+} from '@/components/auth/auth-ui';
 import type { ValidationErrors } from '@/types';
 
 export default function Register() {
     const [form, setForm] = useState({
         name: '',
         username: '',
-        email: '',
         phone_number: '',
+        email: '',
         date_of_birth: '',
-        gender: '',
+        gender: 'Laki',
         password: '',
         password_confirmation: '',
     });
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [processing, setProcessing] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-    const submit = async (event: FormEvent<HTMLFormElement>) => {
+    const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        setShowConfirmModal(true);
+    };
+
+    const confirmSubmit = () => {
         setProcessing(true);
         setErrors({});
 
@@ -32,127 +48,138 @@ export default function Register() {
                 gender: form.gender || null,
             },
             {
-                onError: (validationErrors) => setErrors(normalizeInertiaErrors(validationErrors)),
+                onError: (validationErrors) => {
+                    setErrors(normalizeInertiaErrors(validationErrors));
+                    setShowConfirmModal(false);
+                },
                 onFinish: () => setProcessing(false),
             },
         );
     };
 
     return (
-        <GuestLayout
-            title="Create a patient account"
-            subtitle="This first migration step keeps the existing patient registration contract while shifting the user experience into the React web shell."
-        >
-            <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
-                {[
-                    ['name', 'Full name', 'text'],
-                    ['username', 'Username', 'text'],
-                    ['email', 'Email', 'email'],
-                    ['phone_number', 'Phone number', 'text'],
-                    ['date_of_birth', 'Date of birth', 'date'],
-                ].map(([field, label, type]) => (
-                    <div key={field} className={field === 'name' ? 'md:col-span-2' : ''}>
-                        <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor={field}>
-                            {label}
-                        </label>
-                        <input
-                            id={field}
-                            type={type}
-                            value={form[field as keyof typeof form] as string}
-                            onChange={(event) =>
-                                setForm((current) => ({
-                                    ...current,
-                                    [field]: event.target.value,
-                                }))
-                            }
-                            className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
+        <>
+            <Head title="Daftar" />
+            <AuthPageShell>
+                <BrandHeader title="Daftar" showBack />
+
+                <form className="space-y-4 sm:space-y-5" onSubmit={submit}>
+                    <TextInput
+                        id="name"
+                        label="Nama*"
+                        placeholder="Pasien Satu"
+                        value={form.name}
+                        required
+                        errors={errors.name}
+                        onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+                    />
+
+                    <TextInput
+                        id="username"
+                        label="Nama User*"
+                        placeholder="Pasien_Satu"
+                        value={form.username}
+                        required
+                        errors={errors.username}
+                        onChange={(value) => setForm((current) => ({ ...current, username: value }))}
+                    />
+
+                    <TextInput
+                        id="phone_number"
+                        label="Nomor Telepon"
+                        type="tel"
+                        placeholder="+628111111111"
+                        value={form.phone_number}
+                        errors={errors.phone_number}
+                        onChange={(value) => setForm((current) => ({ ...current, phone_number: value }))}
+                    />
+
+                    <TextInput
+                        id="email"
+                        label="Email*"
+                        type="email"
+                        placeholder="CliniQ@gmail.co.id"
+                        value={form.email}
+                        required
+                        errors={errors.email}
+                        onChange={(value) => setForm((current) => ({ ...current, email: value }))}
+                    />
+
+                    <div className="grid gap-4 sm:gap-5 md:grid-cols-2 md:items-end">
+                        <TextInput
+                            id="date_of_birth"
+                            label="Tanggal Lahir"
+                            type="date"
+                            value={form.date_of_birth}
+                            errors={errors.date_of_birth}
+                            onChange={(value) => setForm((current) => ({ ...current, date_of_birth: value }))}
                         />
-                        {errors[field]?.map((error) => (
-                            <p key={error} className="mt-2 text-sm text-alert-500">
-                                {error}
-                            </p>
-                        ))}
+
+                        <div>
+                            <p className="mb-1.5 text-[clamp(0.9rem,2.5vw,1.25rem)] font-medium text-[#40311D]">Gender</p>
+                            <div className="grid gap-2 min-[420px]:grid-cols-2">
+                                {[
+                                    { value: 'Laki', label: 'Laki-laki' },
+                                    { value: 'Perempuan', label: 'Perempuan' },
+                                ].map((option) => (
+                                    <label
+                                        key={option.value}
+                                        className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border-[1.5px] border-[#40311D] px-3 py-2.5 text-xs font-medium transition sm:py-3 ${
+                                            form.gender === option.value ? 'bg-[#40311D] text-[#DED0B6]' : 'text-[#40311D]'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="gender"
+                                            value={option.value}
+                                            checked={form.gender === option.value}
+                                            onChange={() => setForm((current) => ({ ...current, gender: option.value }))}
+                                            className="accent-[#40311D]"
+                                        />
+                                        {option.label}
+                                    </label>
+                                ))}
+                            </div>
+                            <FieldErrors errors={errors.gender} />
+                        </div>
                     </div>
-                ))}
 
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="gender">
-                        Gender
-                    </label>
-                    <select
-                        id="gender"
-                        value={form.gender}
-                        onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value }))}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
-                    >
-                        <option value="">Select gender</option>
-                        <option value="Laki">Laki</option>
-                        <option value="Perempuan">Perempuan</option>
-                    </select>
-                    {errors.gender?.map((error) => (
-                        <p key={error} className="mt-2 text-sm text-alert-500">
-                            {error}
-                        </p>
-                    ))}
-                </div>
-
-                <div />
-
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="password">
-                        Password
-                    </label>
-                    <input
+                    <PasswordInput
                         id="password"
-                        type="password"
+                        label="Kata Sandi*"
+                        placeholder="Clin123!!"
                         value={form.password}
-                        onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                         required
+                        errors={errors.password}
+                        onChange={(value) => setForm((current) => ({ ...current, password: value }))}
                     />
-                    {errors.password?.map((error) => (
-                        <p key={error} className="mt-2 text-sm text-alert-500">
-                            {error}
-                        </p>
-                    ))}
-                </div>
 
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="password_confirmation">
-                        Confirm password
-                    </label>
-                    <input
+                    <PasswordInput
                         id="password_confirmation"
-                        type="password"
+                        label="Konfirmasi Kata Sandi*"
+                        placeholder="Clin123!!"
                         value={form.password_confirmation}
-                        onChange={(event) => setForm((current) => ({ ...current, password_confirmation: event.target.value }))}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                         required
+                        onChange={(value) => setForm((current) => ({ ...current, password_confirmation: value }))}
                     />
-                </div>
 
-                <div className="md:col-span-2">
-                    <button
-                        type="submit"
-                        disabled={processing}
-                        className="w-full rounded-2xl bg-night-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-night-700 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                        {processing ? 'Creating account...' : 'Register'}
-                    </button>
-                </div>
-            </form>
+                    <PrimaryButton processing={processing}>{processing ? 'Menyimpan...' : 'Daftar'}</PrimaryButton>
+                </form>
 
-            <p className="mt-6 text-sm text-ink-700">
-                Already have an account?{' '}
-                <Link href="/login" className="font-semibold text-clinic-700 transition hover:text-clinic-500">
-                    Sign in here
-                </Link>
-                .
-            </p>
-        </GuestLayout>
+                <AuthFooter>
+                    Sudah punya akun? <AuthLink href="/login">Masuk</AuthLink>
+                </AuthFooter>
+            </AuthPageShell>
+
+            {showConfirmModal ? (
+                <ConfirmModal
+                    title="Pastikan data diri yang anda isi sesuai!"
+                    confirmLabel={processing ? 'Memproses...' : 'Lanjut'}
+                    processing={processing}
+                    onCancel={() => setShowConfirmModal(false)}
+                    onConfirm={confirmSubmit}
+                />
+            ) : null}
+        </>
     );
-}
-
-function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
-    return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }

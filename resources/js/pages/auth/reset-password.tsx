@@ -1,7 +1,14 @@
-import { Link, router } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { type FormEvent, useState } from 'react';
 
-import GuestLayout from '@/layouts/guest-layout';
+import {
+    AuthPageShell,
+    BrandHeader,
+    normalizeInertiaErrors,
+    PasswordInput,
+    PrimaryButton,
+    TextInput,
+} from '@/components/auth/auth-ui';
 import type { ValidationErrors } from '@/types';
 
 type ResetPasswordProps = {
@@ -19,7 +26,7 @@ export default function ResetPassword({ token, email: initialEmail }: ResetPassw
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [processing, setProcessing] = useState(false);
 
-    const submit = async (event: FormEvent<HTMLFormElement>) => {
+    const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setProcessing(true);
         setErrors({});
@@ -31,83 +38,45 @@ export default function ResetPassword({ token, email: initialEmail }: ResetPassw
     };
 
     return (
-        <GuestLayout
-            title="Set a new password"
-            subtitle="Use the reset token from your email. This form still hands off to the existing Laravel password reset backend."
-        >
-            <form className="space-y-5" onSubmit={submit}>
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="email">
-                        Email
-                    </label>
-                    <input
+        <>
+            <Head title="Reset Kata Sandi" />
+            <AuthPageShell>
+                <BrandHeader title="Reset Kata Sandi" />
+
+                <form className="space-y-5" onSubmit={submit}>
+                    <TextInput
                         id="email"
+                        label="Email*"
                         type="email"
+                        placeholder="CliniQ@gmail.co.id"
                         value={form.email}
-                        onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                         required
+                        errors={errors.email}
+                        onChange={(value) => setForm((current) => ({ ...current, email: value }))}
                     />
-                    {errors.email?.map((error) => (
-                        <p key={error} className="mt-2 text-sm text-alert-500">
-                            {error}
-                        </p>
-                    ))}
-                </div>
 
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="password">
-                        New password
-                    </label>
-                    <input
+                    <PasswordInput
                         id="password"
-                        type="password"
+                        label="Kata Sandi*"
+                        placeholder="Clin123!!"
                         value={form.password}
-                        onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                         required
+                        errors={errors.password}
+                        onChange={(value) => setForm((current) => ({ ...current, password: value }))}
                     />
-                    {errors.password?.map((error) => (
-                        <p key={error} className="mt-2 text-sm text-alert-500">
-                            {error}
-                        </p>
-                    ))}
-                </div>
 
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="password_confirmation">
-                        Confirm password
-                    </label>
-                    <input
+                    <PasswordInput
                         id="password_confirmation"
-                        type="password"
+                        label="Konfirmasi Kata Sandi*"
+                        placeholder="Clin123!!"
                         value={form.password_confirmation}
-                        onChange={(event) => setForm((current) => ({ ...current, password_confirmation: event.target.value }))}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
                         required
+                        onChange={(value) => setForm((current) => ({ ...current, password_confirmation: value }))}
                     />
-                </div>
 
-                <button
-                    type="submit"
-                    disabled={processing}
-                    className="w-full rounded-2xl bg-night-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-night-700 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                    {processing ? 'Updating password...' : 'Reset password'}
-                </button>
-            </form>
-
-            <p className="mt-6 text-sm text-ink-700">
-                Back to{' '}
-                <Link href="/login" className="font-semibold text-clinic-700 transition hover:text-clinic-500">
-                    login
-                </Link>
-                .
-            </p>
-        </GuestLayout>
+                    <PrimaryButton processing={processing}>{processing ? 'Menyimpan...' : 'Lanjut'}</PrimaryButton>
+                </form>
+            </AuthPageShell>
+        </>
     );
-}
-
-function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
-    return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }

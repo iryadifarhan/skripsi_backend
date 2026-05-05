@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=Work+Sans:wght@300;400;500;600;700;800;900&display=swap');
 @import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -30,5 +30,15 @@
 @layer base {
     body {
         @apply bg-[linear-gradient(135deg,#f6f2e8_0%,#f8fafc_45%,#dff2ea_100%)] text-ink-900 antialiased;
+    }
+
+    button:not(:disabled),
+    [role='button']:not(:disabled) {
+        cursor: pointer;
+    }
+
+    button:disabled,
+    [role='button'][aria-disabled='true'] {
+        cursor: not-allowed;
     }
 }

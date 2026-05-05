@@ -1,74 +1,102 @@
-import { Link, router, usePage } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { type FormEvent, useEffect, useState } from 'react';
 
-import GuestLayout from '@/layouts/guest-layout';
+import {
+    AuthFooter,
+    AuthLink,
+    AuthPageShell,
+    BrandHeader,
+    normalizeInertiaErrors,
+    PrimaryButton,
+    TextInput,
+} from '@/components/auth/auth-ui';
 import type { SharedData, ValidationErrors } from '@/types';
 
 export default function ForgotPassword() {
     const { flash } = usePage<SharedData>().props;
     const [email, setEmail] = useState('');
+    const [sent, setSent] = useState(false);
+    const [countdown, setCountdown] = useState(60);
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [processing, setProcessing] = useState(false);
 
-    const submit = async (event: FormEvent<HTMLFormElement>) => {
+    useEffect(() => {
+        if (!sent || countdown <= 0) {
+            return;
+        }
+
+        const timer = window.setInterval(() => {
+            setCountdown((current) => Math.max(current - 1, 0));
+        }, 1000);
+
+        return () => window.clearInterval(timer);
+    }, [sent, countdown]);
+
+    const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        sendResetLink();
+    };
+
+    const sendResetLink = () => {
         setProcessing(true);
         setErrors({});
 
         router.post('/forgot-password', { email }, {
             preserveScroll: true,
+            onSuccess: () => {
+                setSent(true);
+                setCountdown(60);
+            },
             onError: (validationErrors) => setErrors(normalizeInertiaErrors(validationErrors)),
             onFinish: () => setProcessing(false),
         });
     };
 
     return (
-        <GuestLayout
-            title="Reset password access"
-            subtitle="The password reset transport still uses Laravel's existing backend logic. This page only replaces the presentation layer."
-        >
-            <form className="space-y-5" onSubmit={submit}>
-                <div>
-                    <label className="mb-2 block text-sm font-semibold text-night-900" htmlFor="email">
-                        Email
-                    </label>
-                    <input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        className="w-full rounded-2xl border border-night-900/10 bg-white px-4 py-3 text-sm text-night-900 outline-none transition focus:border-clinic-500 focus:ring-4 focus:ring-clinic-100"
-                        required
-                    />
-                    {errors.email?.map((error) => (
-                        <p key={error} className="mt-2 text-sm text-alert-500">
-                            {error}
+        <>
+            <Head title="Lupa Sandi" />
+            <AuthPageShell>
+                <BrandHeader title="Lupa Sandi" showBack />
+
+                <form className="space-y-5" onSubmit={submit}>
+                    <div>
+                        <TextInput
+                            id="email"
+                            label="Email*"
+                            type="email"
+                            placeholder="CliniQ@gmail.co.id"
+                            value={email}
+                            required
+                            errors={errors.email}
+                            onChange={setEmail}
+                        />
+                        <p className="mt-1.5 text-xs italic leading-relaxed text-[#40311D]/65">
+                            *Pastikan email aktif dan dapat mendapatkan link untuk melakukan reset password
                         </p>
-                    ))}
-                </div>
+                    </div>
 
-                {flash?.status ? <p className="rounded-2xl bg-clinic-100 px-4 py-3 text-sm text-clinic-700">{flash.status}</p> : null}
+                    {flash?.status ? (
+                        <p className="rounded-xl bg-[#00917B]/10 px-4 py-3 text-sm font-medium text-[#00917B]">{flash.status}</p>
+                    ) : null}
 
-                <button
-                    type="submit"
-                    disabled={processing}
-                    className="w-full rounded-2xl bg-night-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-night-700 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                    {processing ? 'Sending...' : 'Send reset link'}
-                </button>
-            </form>
+                    <PrimaryButton processing={processing || sent}>{processing ? 'Mengirim...' : 'Kirim'}</PrimaryButton>
+                </form>
 
-            <p className="mt-6 text-sm text-ink-700">
-                Return to{' '}
-                <Link href="/login" className="font-semibold text-clinic-700 transition hover:text-clinic-500">
-                    login
-                </Link>
-                .
-            </p>
-        </GuestLayout>
+                <AuthFooter>
+                    <span>Tidak terima email? </span>
+                    <button
+                        type="button"
+                        onClick={sendResetLink}
+                        disabled={!sent || countdown > 0 || processing}
+                        className="font-semibold text-[#40311D] underline transition hover:text-[#00917B] disabled:cursor-not-allowed disabled:opacity-45 disabled:no-underline"
+                    >
+                        {sent && countdown > 0 ? `Kirim lagi dalam (${countdown} detik)` : 'Kirim ulang'}
+                    </button>
+                    <p className="mt-2">
+                        Kembali ke <AuthLink href="/login">Masuk</AuthLink>
+                    </p>
+                </AuthFooter>
+            </AuthPageShell>
+        </>
     );
-}
-
-function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
-    return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }
