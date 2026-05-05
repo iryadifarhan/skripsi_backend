@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 
+import { CitySelectWithCreate, type ClinicCityOption } from '@/components/city-select-with-create';
 import AppLayout from '@/layouts/app-layout';
 import { PaginationControls, useClientPagination } from '@/lib/client-pagination';
 import type { SharedData, ValidationErrors, WorkspaceContext } from '@/types';
@@ -9,11 +10,6 @@ type ClinicsPageProps = {
     context: WorkspaceContext;
     clinics: ClinicIndexEntry[];
     clinicCities: ClinicCityOption[];
-};
-
-type ClinicCityOption = {
-    id: number;
-    name: string;
 };
 
 type ClinicIndexEntry = {
@@ -358,43 +354,18 @@ function ClinicFormModal({
                     <TextInput label="Nama Klinik" value={form.name} error={errors.name?.[0]} onChange={(value) => onChange({ ...form, name: value })} />
                     <TextInput label="Email" type="email" value={form.email} error={errors.email?.[0]} onChange={(value) => onChange({ ...form, email: value })} />
                     <TextInput label="Nomor Telepon" value={form.phone_number} error={errors.phone_number?.[0]} onChange={(value) => onChange({ ...form, phone_number: value })} />
-                    <CitySelect
+                    <CitySelectWithCreate
                         value={form.city_id}
                         cities={clinicCities}
                         error={errors.city_id?.[0]}
+                        cityName={cityName}
+                        cityError={errors.city_name?.[0] ?? (cityName.trim() !== '' ? errors.name?.[0] : undefined)}
+                        savingCity={savingCity}
                         onChange={(value) => onChange({ ...form, city_id: value })}
+                        onCityNameChange={onCityNameChange}
+                        onCitySubmit={onCitySubmit}
                     />
                     <TextInput label="Alamat" value={form.address} error={errors.address?.[0]} onChange={(value) => onChange({ ...form, address: value })} />
-                </div>
-
-                <div className="mx-5 mb-4 rounded-xl border border-[#e4ddd4] bg-[#faf9f7] p-4">
-                    <p className="text-[12px] font-medium text-[#40311D]">Tambah pilihan kota</p>
-                    <p className="mt-1 text-[11px] text-gray-400">Gunakan ini jika kota belum tersedia di dropdown.</p>
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                        <input
-                            type="text"
-                            value={cityName}
-                            onChange={(event) => onCityNameChange(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                    event.preventDefault();
-                                    onCitySubmit();
-                                }
-                            }}
-                            placeholder="Contoh: Kota Depok"
-                            className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none placeholder:italic placeholder:text-gray-400 focus:border-[#40311D]"
-                        />
-                        <button
-                            type="button"
-                            onClick={onCitySubmit}
-                            disabled={savingCity || cityName.trim() === ''}
-                            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-[12px] font-medium text-[#40311D] transition-colors hover:bg-[#DFE0DF] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {savingCity ? 'Menambah...' : 'Tambah Kota'}
-                        </button>
-                    </div>
-                    {errors.city_name?.[0] ? <span className="mt-2 block text-[11px] font-medium text-red-600">{errors.city_name[0]}</span> : null}
-                    {errors.name?.[0] && cityName.trim() !== '' ? <span className="mt-2 block text-[11px] font-medium text-red-600">{errors.name[0]}</span> : null}
                 </div>
 
                 {errors.clinic?.[0] ? (
@@ -421,27 +392,6 @@ function ClinicFormModal({
                 </div>
             </form>
         </div>
-    );
-}
-
-function CitySelect({ value, cities, onChange, error }: { value: string; cities: ClinicCityOption[]; onChange: (value: string) => void; error?: string }) {
-    return (
-        <label className="flex flex-col gap-1 text-[11px] text-[#40311D]">
-            Kota
-            <select
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none focus:border-[#40311D]"
-            >
-                <option value="">Pilih kota</option>
-                {cities.map((city) => (
-                    <option key={city.id} value={city.id}>
-                        {city.name}
-                    </option>
-                ))}
-            </select>
-            {error ? <span className="text-[11px] font-medium text-red-600">{error}</span> : null}
-        </label>
     );
 }
 

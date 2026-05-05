@@ -85,20 +85,22 @@ export function ScheduleWindowCompactSummary({
     preview,
     onOpen,
     actionLabel = 'Atur Window',
+    displayTotal = true,
 }: {
     windowMinutes: string | number;
     capacity: string | number;
     preview: ScheduleWindowPreview;
     onOpen?: () => void;
     actionLabel?: string;
+    displayTotal?: boolean;
 }) {
     return (
         <div className="flex min-w-44 flex-col gap-1 text-[11px]">
             <p className="text-gray-600"><strong>Durasi:</strong> {windowMinutes} menit/window</p>
             <p className="text-gray-600"><strong>Kapasitas:</strong> {capacity} pasien/window</p>
-            <p className={preview.isValid ? 'text-teal-700' : 'text-red-600'}>
+            {displayTotal ? <p className={preview.isValid ? 'text-teal-700' : 'text-red-600'}>
                 Total: {preview.windows.length} window, {preview.totalCapacity} pasien
-            </p>
+            </p> : null}
             {preview.message ? <p className="max-w-56 text-[10px] text-red-600">{preview.message}</p> : null}
             {onOpen ? (
                 <button
@@ -183,6 +185,88 @@ export function ScheduleWindowSettingsModal({
                         className="rounded-lg bg-[#40311D] px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-[#2c2115] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                     >
                         Terapkan
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function ScheduleWindowReadonlyModal({
+    title = 'Preview Window Jadwal',
+    subtitle,
+    windowMinutes,
+    capacity,
+    preview,
+    onClose,
+}: {
+    title?: string;
+    subtitle?: ReactNode;
+    windowMinutes: string | number;
+    capacity: string | number;
+    preview: ScheduleWindowPreview;
+    onClose: () => void;
+}) {
+    const selectedWindowMinutes = String(windowMinutes);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div role="dialog" aria-modal="true" className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+                <div className="border-b border-[#e4ddd4] bg-[#faf9f7] px-5 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <p className="text-[15px] font-medium text-[#40311D]">{title}</p>
+                            {subtitle ? <p className="mt-1 text-[12px] text-gray-400">{subtitle}</p> : null}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[12px] text-gray-500 transition-colors hover:bg-[#DFE0DF]"
+                        >
+                            x
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                    <div className="flex flex-col gap-1 text-[11px] text-[#40311D]">
+                        Durasi/window
+                        <div className="grid grid-cols-4 gap-2">
+                            {scheduleWindowMinutePresets.map((preset) => (
+                                <div
+                                    key={preset}
+                                    className={`rounded-lg border px-3 py-2 text-center text-[12px] ${
+                                        selectedWindowMinutes === preset
+                                            ? 'border-[#40311D] bg-[#40311D] font-medium text-white'
+                                            : 'border-gray-300 bg-white text-gray-500'
+                                    }`}
+                                >
+                                    {preset} menit
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <label className="flex flex-col gap-1 text-[11px] text-[#40311D]">
+                        Kapasitas/window
+                        <input
+                            type="text"
+                            value={capacity}
+                            readOnly
+                            className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[12px] text-gray-700 outline-none"
+                        />
+                    </label>
+
+                    <ScheduleWindowPreviewPanel preview={preview} />
+                </div>
+
+                <div className="flex justify-end border-t border-[#e4ddd4] bg-[#faf9f7] px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg bg-[#40311D] px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-[#2c2115]"
+                    >
+                        Tutup
                     </button>
                 </div>
             </div>

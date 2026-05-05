@@ -297,7 +297,7 @@ class ClinicController extends Controller
             'email' => $payload['email'],
         ]);
 
-        $this->syncOperatingHours($clinic, $payload['operating_hours'] ?? null, true);
+        $this->syncOperatingHours($clinic, $payload['operating_hours'] ?? null);
 
         return $this->jsonOrRedirect($request, [
             'message' => 'Clinic created successfully.',
@@ -332,7 +332,7 @@ class ClinicController extends Controller
         ]);
 
         $clinic->update($request->only(['name', 'address', 'city_id', 'phone_number', 'email']));
-        $this->syncOperatingHours($clinic, $request->input('operating_hours'), false);
+        $this->syncOperatingHours($clinic, $request->input('operating_hours'));
 
         return $this->jsonOrRedirect($request, [
             'message' => 'Clinic updated successfully.',
@@ -784,12 +784,9 @@ class ClinicController extends Controller
         }
     }
 
-    private function syncOperatingHours(Clinic $clinic, ?array $operatingHours, bool $seedDefaultsOnCreate): void
+    private function syncOperatingHours(Clinic $clinic, ?array $operatingHours): void
     {
         if ($operatingHours === null) {
-            if ($seedDefaultsOnCreate) {
-                $this->seedDefaultOperatingHours($clinic);
-            }
             return;
         }
 
@@ -815,26 +812,6 @@ class ClinicController extends Controller
             ['clinic_id', 'day_of_week'],
             ['open_time', 'close_time', 'is_closed', 'updated_at']
         );
-    }
-
-    private function seedDefaultOperatingHours(Clinic $clinic): void
-    {
-        $now = now();
-        $records = [];
-
-        for ($day = 0; $day <= 6; $day++) {
-            $records[] = [
-                'clinic_id' => $clinic->id,
-                'day_of_week' => $day,
-                'open_time' => '08:00:00',
-                'close_time' => '17:00:00',
-                'is_closed' => false,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-
-        ClinicOperatingHour::insert($records);
     }
 
     private function validateOperatingHours(array $operatingHours): void

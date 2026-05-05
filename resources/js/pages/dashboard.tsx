@@ -3,7 +3,7 @@ import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
 
 import AppLayout from '@/layouts/app-layout';
 import { WalkInReservationModal } from '@/components/walk-in-reservation-modal';
-import { ScheduleWindowCompactSummary } from '@/components/schedule-window';
+import { ScheduleWindowCompactSummary, ScheduleWindowReadonlyModal } from '@/components/schedule-window';
 import { buildScheduleWindowPreview } from '@/lib/schedule-window';
 import type { ClinicDetail, MedicalRecordEntry, QueueEntry, ReservationEntry, SharedData, ValidationErrors, WorkspaceContext } from '@/types';
 
@@ -382,7 +382,16 @@ function DoctorDashboard({ context, dashboardData }: { context: WorkspaceContext
     const currentPatient = dashboardData?.currentPatient ?? null;
     const latestMedicalRecords = dashboardData?.latestMedicalRecords ?? [];
     const schedules = dashboardData?.schedules ?? [];
+    const [previewSchedule, setPreviewSchedule] = useState<DoctorScheduleEntry | null>(null);
     const queuePrefixes = useMemo(() => ({ doctor: 'A' }), []);
+    const previewScheduleData = previewSchedule
+        ? buildScheduleWindowPreview(
+            previewSchedule.start_time,
+            previewSchedule.end_time,
+            String(previewSchedule.window_minutes),
+            String(previewSchedule.max_patients_per_window),
+        )
+        : null;
 
     const visitDashboard = (overrides: Record<string, string | number>) => {
         router.get('/dashboard', overrides, { preserveScroll: true, preserveState: true });
@@ -588,6 +597,9 @@ function DoctorDashboard({ context, dashboardData }: { context: WorkspaceContext
                                             String(schedule.window_minutes),
                                             String(schedule.max_patients_per_window),
                                         )}
+                                        displayTotal={false}
+                                        actionLabel="Preview Window"
+                                        onOpen={() => setPreviewSchedule(schedule)}
                                     />,
                                     <StatusBadge key={`${schedule.id}-status`} status={schedule.is_active ? 'Aktif' : 'Belum Buka'} />,
                                 ])}
@@ -596,6 +608,17 @@ function DoctorDashboard({ context, dashboardData }: { context: WorkspaceContext
                         </Card>
                     </div>
                 </div>
+
+                {previewSchedule && previewScheduleData ? (
+                    <ScheduleWindowReadonlyModal
+                        title="Preview Window Jadwal"
+                        subtitle={`${previewSchedule.day_label}, ${formatTime(previewSchedule.start_time)} - ${formatTime(previewSchedule.end_time)}`}
+                        windowMinutes={previewSchedule.window_minutes}
+                        capacity={previewSchedule.max_patients_per_window}
+                        preview={previewScheduleData}
+                        onClose={() => setPreviewSchedule(null)}
+                    />
+                ) : null}
 
                 {completionQueue ? (
                     <CompleteQueueModal

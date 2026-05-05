@@ -104,6 +104,27 @@ class ClinicWebTest extends TestCase
         ]);
     }
 
+    public function test_superadmin_can_create_clinic_without_default_operating_hours(): void
+    {
+        $superadmin = $this->makeUser(User::ROLE_SUPERADMIN, 'superadmin-clean-clinic@example.com');
+        $this->login($superadmin, 'Password123!');
+        $city = ClinicCity::query()->firstOrCreate(['name' => 'Kota Bekasi']);
+
+        $this->postJson('/superadmin/clinic/create', [
+            'name' => 'Klinik Tanpa Jam Default',
+            'address' => 'Address Klinik Tanpa Jam Default',
+            'city_id' => $city->id,
+            'phone_number' => '081111111112',
+            'email' => 'clean-clinic@example.test',
+        ], $this->spaHeaders())
+            ->assertCreated();
+
+        $clinic = Clinic::where('email', 'clean-clinic@example.test')->firstOrFail();
+
+        $this->assertDatabaseCount('clinic_operating_hours', 0);
+        $this->assertSame(0, $clinic->operatingHours()->count());
+    }
+
     public function test_superadmin_can_create_clinic_city_master_data(): void
     {
         $superadmin = $this->makeUser(User::ROLE_SUPERADMIN, 'superadmin-city@example.com');

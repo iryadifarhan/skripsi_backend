@@ -594,6 +594,7 @@ export default function DoctorEditPage({ context, clinicId, clinic, doctor: init
                                                                     windowMinutes={edit.window_minutes}
                                                                     capacity={edit.max_patients_per_window}
                                                                     preview={rowPreview}
+                                                                    displayTotal={false}
                                                                     onOpen={() => openWindowModal(schedule)}
                                                                 />
                                                             </td>
