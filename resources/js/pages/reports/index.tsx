@@ -2,6 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
 
 import AppLayout from '@/layouts/app-layout';
+import { ClinicSelector } from '@/components/clinic-selector';
 import { PaginationControls, useClientPagination } from '@/lib/client-pagination';
 import type { MedicalRecordEntry, ReservationEntry, WorkspaceContext } from '@/types';
 
@@ -114,6 +115,13 @@ export default function ReportsPage({
 
             <section className="h-full overflow-y-auto bg-[#DFE0DF]">
                 <div className="flex flex-col gap-4 p-5">
+                    {canChooseClinic ? (
+                        <ClinicSelector
+                            clinics={context.clinics}
+                            value={form.clinicId}
+                            onChange={(clinicId) => setForm((current) => ({ ...current, clinicId, doctorId: '' }))}
+                        />
+                    ) : null}
                     <form onSubmit={submit} className="rounded-xl border border-gray-200 bg-white px-4 py-3">
                         <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
@@ -136,23 +144,6 @@ export default function ReportsPage({
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                            {canChooseClinic ? (
-                                <label className="flex flex-col gap-1 text-[12px] text-[#40311D]">
-                                    Klinik
-                                    <select
-                                        value={form.clinicId}
-                                        onChange={(event) => setForm((current) => ({ ...current, clinicId: event.target.value, doctorId: '' }))}
-                                        className="rounded-full border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
-                                    >
-                                        {context.clinics.map((clinicOption) => (
-                                            <option key={clinicOption.id} value={clinicOption.id}>
-                                                {clinicOption.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            ) : null}
-
                             <label className="flex flex-col gap-1 text-[12px] text-[#40311D]">
                                 Dari Tanggal
                                 <input

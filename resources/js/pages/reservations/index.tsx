@@ -1,6 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
+import { ClinicSelector } from '@/components/clinic-selector';
 import AppLayout from '@/layouts/app-layout';
 import { PaginationControls, useClientPagination } from '@/lib/client-pagination';
 import type { ReservationEntry, SharedData, ValidationErrors, WorkspaceContext } from '@/types';
@@ -435,22 +436,11 @@ function AdminReservationsPage({
                     <FlashAndErrors page={page} />
                     
                     {context.role === 'superadmin' && context.clinics.length > 0 ? (
-                        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-                            <label className="flex w-full flex-col gap-2 text-[12px] font-medium text-[#40311D] md:w-80">
-                                Klinik
-                                <select
-                                    value={filters.clinicId ?? ''}
-                                    onChange={(event) => updateFilters({ clinicId: event.target.value === '' ? null : Number(event.target.value) })}
-                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
-                                >
-                                    {context.clinics.map((clinic) => (
-                                        <option key={clinic.id} value={clinic.id}>
-                                            {clinic.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
+                        <ClinicSelector
+                                clinics={context.clinics}
+                                value={filters.clinicId}
+                                onChange={(clinicId) => updateFilters({ clinicId: clinicId === '' ? null : Number(clinicId) })}
+                            />
                     ) : null}
 
                     <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
@@ -1241,3 +1231,5 @@ function capitalize(value: string): string {
 function cleanQuery(query: Record<string, string | number | boolean | null | undefined>) {
     return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== '' && value !== null && value !== undefined));
 }
+
+

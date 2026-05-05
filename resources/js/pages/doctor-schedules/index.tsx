@@ -7,6 +7,7 @@ import {
     ScheduleWindowPreviewPanel,
     ScheduleWindowSettingsModal,
 } from '@/components/schedule-window';
+import { ClinicSelector } from '@/components/clinic-selector';
 import AppLayout from '@/layouts/app-layout';
 import { buildScheduleWindowPreview, estimateScheduleCapacity, type ScheduleWindowForm } from '@/lib/schedule-window';
 import type { ClinicDetail, DoctorClinicScheduleEntry, SharedData, ValidationErrors, WorkspaceContext } from '@/types';
@@ -233,26 +234,13 @@ export default function DoctorSchedulesPage({ context, doctorId, selectedClinicI
                     <div className="flex flex-col gap-4 p-5">
                         <FlashAndErrors page={page} localStatus={localStatus} localErrors={errors} />
 
-                        <Panel title="Klinik Praktik" subtitle="Pilih klinik tempat dokter mengelola jadwal praktik">
-                            {context.clinics.length === 0 ? (
-                                <EmptyState>Akun dokter ini belum terhubung dengan klinik mana pun.</EmptyState>
-                            ) : (
-                                <label className="flex flex-col gap-1 text-[12px] text-[#40311D]">
-                                    Klinik
-                                    <select
-                                        value={selectedClinicId ?? ''}
-                                        onChange={(event) => selectClinic(event.target.value)}
-                                        className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-[12px] text-gray-700 outline-none focus:border-[#40311D]"
-                                    >
-                                        {context.clinics.map((clinicOption) => (
-                                            <option key={clinicOption.id} value={clinicOption.id}>
-                                                {clinicOption.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
-                        </Panel>
+                        {context.clinics.length > 1 ? (
+                            <ClinicSelector
+                                clinics={context.clinics}
+                                value={selectedClinicId}
+                                onChange={selectClinic}
+                            />
+                        ) : null}
 
                         {clinic !== null ? (
                             <>
@@ -628,3 +616,5 @@ function normalizeJsonErrors(errors: Record<string, unknown>): ValidationErrors 
         ]),
     );
 }
+
+

@@ -2,6 +2,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
 
 import AppLayout from '@/layouts/app-layout';
+import { ClinicSelector } from '@/components/clinic-selector';
 import { WalkInReservationModal } from '@/components/walk-in-reservation-modal';
 import { ScheduleWindowCompactSummary, ScheduleWindowReadonlyModal } from '@/components/schedule-window';
 import { buildScheduleWindowPreview } from '@/lib/schedule-window';
@@ -212,22 +213,11 @@ function AdminDashboard({ context, dashboardData }: { context: WorkspaceContext;
             <section className="h-full overflow-y-auto bg-[#DFE0DF]">
                 <div className="flex flex-col gap-4 p-5">
                     {context.role === 'superadmin' ? (
-                        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-                            <label className="flex w-full flex-col gap-2 text-[12px] font-medium text-[#40311D] md:w-80">
-                                Klinik
-                                <select
-                                    value={dashboardData?.selectedClinicId ?? ''}
-                                    onChange={(event) => visitDashboard({ clinic_id: event.target.value })}
-                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
-                                >
-                                    {context.clinics.map((clinic) => (
-                                        <option key={clinic.id} value={clinic.id}>
-                                            {clinic.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
+                        <ClinicSelector
+                                clinics={context.clinics}
+                                value={dashboardData?.selectedClinicId}
+                                onChange={(clinicId) => visitDashboard({ clinic_id: clinicId })}
+                            />
                     ) : null}
 
                     {dashboardData === null ? (
@@ -485,22 +475,11 @@ function DoctorDashboard({ context, dashboardData }: { context: WorkspaceContext
             <section className="h-full overflow-y-auto bg-[#DFE0DF]">
                 <div className="flex flex-col gap-4 p-5">
                     {context.clinics.length > 1 ? (
-                        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-                            <label className="flex w-full flex-col gap-2 text-[12px] font-medium text-[#40311D] md:w-80">
-                                Klinik
-                                <select
-                                    value={dashboardData?.selectedClinicId ?? ''}
-                                    onChange={(event) => visitDashboard({ clinic_id: event.target.value })}
-                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
-                                >
-                                    {context.clinics.map((clinic) => (
-                                        <option key={clinic.id} value={clinic.id}>
-                                            {clinic.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
+                        <ClinicSelector
+                                clinics={context.clinics}
+                                value={dashboardData?.selectedClinicId}
+                                onChange={(clinicId) => visitDashboard({ clinic_id: clinicId })}
+                            />
                     ) : null}
 
                     {dashboardData === null ? (
@@ -1190,3 +1169,5 @@ function DefaultDashboard({ modules }: { modules: Module[] }) {
         </AppLayout>
     );
 }
+
+

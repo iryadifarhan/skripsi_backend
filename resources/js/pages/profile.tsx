@@ -2,6 +2,7 @@
 import { type FormEvent, type ReactNode, useState } from 'react';
 
 import { AvatarSelector } from '@/components/avatar-selector';
+import { ClinicSelector } from '@/components/clinic-selector';
 import AppLayout from '@/layouts/app-layout';
 import type { AuthUser, SharedData } from '@/types';
 
@@ -258,20 +259,11 @@ export default function ProfilePage({ user, profilePictureOptions, canManageAvat
                             <p className="text-[12px] italic text-gray-400">Belum ada klinik yang terhubung ke akun dokter ini.</p>
                         ) : (
                             <form onSubmit={updateClinicSpecialities} className="grid gap-4">
-                                <label className="flex max-w-md flex-col gap-1 text-[11px] text-[#40311D]">
-                                    Klinik
-                                    <select
-                                        value={clinicSpecialityForm.clinic_id}
-                                        onChange={(event) => selectClinicSpeciality(event.target.value)}
-                                        className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
-                                    >
-                                        {initialClinicSpecialities.map((clinic) => (
-                                            <option key={clinic.clinic_id} value={clinic.clinic_id}>
-                                                {clinic.clinic_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
+                                <ClinicSelector
+                                    clinics={initialClinicSpecialities.map((clinic) => ({ id: clinic.clinic_id, name: clinic.clinic_name }))}
+                                    value={clinicSpecialityForm.clinic_id}
+                                    onChange={selectClinicSpeciality}
+                                />
 
                                 <div className="rounded-xl border border-[#e4ddd4] bg-[#faf9f7] p-4">
                                     <p className="mb-3 text-[12px] font-medium text-[#40311D]">Daftar spesialisasi</p>

@@ -2,6 +2,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { UserAvatar } from '@/components/avatar-selector';
+import { ClinicSelector } from '@/components/clinic-selector';
 import AppLayout from '@/layouts/app-layout';
 import { PaginationControls, useClientPagination } from '@/lib/client-pagination';
 import type { ClinicDetail, DoctorClinicScheduleEntry, DoctorEntry, SharedData, ValidationErrors, WorkspaceContext } from '@/types';
@@ -185,22 +186,11 @@ export default function DoctorsPage({ context, selectedClinicId, clinic, unassig
                         {message ? <Alert tone="danger">{message}</Alert> : null}
 
                         {context.role === 'superadmin' ? (
-                            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-                                <label className="flex w-full flex-col gap-2 text-[12px] font-medium text-[#40311D] md:w-80">
-                                    Klinik
-                                    <select
-                                        value={selectedClinicId ?? ''}
-                                        onChange={(event) => router.get('/doctors', { clinic_id: event.target.value }, { preserveScroll: true })}
-                                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
-                                    >
-                                        {context.clinics.map((clinic) => (
-                                            <option key={clinic.id} value={clinic.id}>
-                                                {clinic.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            </div>
+                        <ClinicSelector
+                                    clinics={context.clinics}
+                                    value={selectedClinicId}
+                                    onChange={(clinicId) => router.get('/doctors', { clinic_id: clinicId }, { preserveScroll: true })}
+                                />
                         ) : null}
 
                         <section className="rounded-xl border border-gray-200 bg-white px-4 py-3">
@@ -583,3 +573,5 @@ function normalizeJsonErrors(errors: Record<string, unknown>): ValidationErrors 
 function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
     return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }
+
+

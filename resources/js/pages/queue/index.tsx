@@ -1,6 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 
+import { ClinicSelector } from '@/components/clinic-selector';
 import { WalkInReservationModal } from '@/components/walk-in-reservation-modal';
 import AppLayout from '@/layouts/app-layout';
 import { PaginationControls, useClientPagination } from '@/lib/client-pagination';
@@ -238,22 +239,11 @@ function AdminQueuePage({
                     <FlashAndErrors page={page} />
 
                     {context.role === 'superadmin' && context.clinics.length > 0 ? (
-                        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-                            <label className="flex w-full flex-col gap-2 text-[12px] font-medium text-[#40311D] md:w-80">
-                                Klinik
-                                <select
-                                    value={filters.clinicId ?? ''}
-                                    onChange={(event) => updateFilters({ clinicId: event.target.value === '' ? null : Number(event.target.value) })}
-                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-[12px] text-gray-700 outline-none transition focus:border-[#40311D]"
-                                >
-                                    {context.clinics.map((clinic) => (
-                                        <option key={clinic.id} value={clinic.id}>
-                                            {clinic.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
+                        <ClinicSelector
+                                clinics={context.clinics}
+                                value={filters.clinicId}
+                                onChange={(clinicId) => updateFilters({ clinicId: clinicId === '' ? null : Number(clinicId) })}
+                            />
                     ) : null}
 
                     <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
@@ -305,7 +295,7 @@ function AdminQueuePage({
                         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
                             <div className='flex flex-row'>
                                 <CardHeader title="Daftar Antrean" subtitle="Antrean aktif clinic-scoped hari ini" />
-                                <ActionButton  walkinClass='border-b border-[#e4ddd4] bg-[#faf9f7] px-4 py-2 content-center' disabled={clinic === null} variant="primary" onClick={() => setIsWalkInModalOpen(true)}>
+                                <ActionButton  walkinClass='border-b border-[#e4ddd4] bg-[#faf9f7] px-4 py-2 content-center' className='min-w-[100px]' disabled={clinic === null} variant="primary" onClick={() => setIsWalkInModalOpen(true)}>
                                     Buat Walk-In
                                 </ActionButton>
                             </div>
@@ -583,25 +573,17 @@ function DoctorQueuePage({
                 <div className="flex flex-col gap-4 p-5">
                     <FlashAndErrors page={page} />
 
+                    {context.clinics.length > 1 ? (
+                        <ClinicSelector
+                            clinics={context.clinics}
+                            value={filters.clinicId}
+                            onChange={(clinicId) => updateFilters({ clinicId: clinicId === '' ? null : Number(clinicId) })}
+                        />
+                    ) : null}
+
                     <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
                         <p className="mb-2 text-[12px] font-medium text-[#40311D]">Filter Antrean Saya</p>
                         <div className="flex flex-wrap items-center gap-2">
-                            {context.clinics.length > 1 ? (
-                                <label className="flex min-w-56 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1 text-[12px] text-gray-600 transition focus-within:border-[#40311D]">
-                                    <span className="whitespace-nowrap text-gray-400">Klinik</span>
-                                    <select
-                                        value={filters.clinicId ?? ''}
-                                        onChange={(event) => updateFilters({ clinicId: event.target.value === '' ? null : Number(event.target.value) })}
-                                        className="min-w-0 flex-1 bg-transparent text-[12px] text-gray-700 outline-none"
-                                    >
-                                        {context.clinics.map((clinicOption) => (
-                                            <option key={clinicOption.id} value={clinicOption.id}>
-                                                {clinicOption.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            ) : null}
                             <label className="flex min-w-48 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1 text-[12px] text-gray-600 transition focus-within:border-[#40311D]">
                                 <span className="whitespace-nowrap text-gray-400">Tanggal</span>
                                 <input
@@ -1214,3 +1196,5 @@ function normalizeJsonErrors(errors: Record<string, unknown>): ValidationErrors 
         ]),
     );
 }
+
+
