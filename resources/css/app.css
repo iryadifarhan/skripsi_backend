@@ -9,7 +9,7 @@
 @source '../**/*.tsx';
 
 @theme {
-    --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Work Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
     --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
     --color-ink-50: #f7f5ef;

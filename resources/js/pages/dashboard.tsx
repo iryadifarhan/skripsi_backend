@@ -755,7 +755,7 @@ function ActionButton({ children, onClick, variant = 'secondary', disabled = fal
             type="button"
             onClick={onClick}
             disabled={disabled}
-            className={`cursor-pointer rounded-lg px-3 py-2 text-[12px] transition-colors disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 ${variants[variant]}`}
+            className={`cursor-pointer rounded-lg p-2 text-[12px] transition-colors disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 ${variants[variant]}`}
         >
             {children}
         </button>

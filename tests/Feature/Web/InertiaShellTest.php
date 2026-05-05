@@ -1220,7 +1220,7 @@ class InertiaShellTest extends TestCase
                 'clinic_id' => $clinic->id,
                 'start_time' => '10:30:00',
                 'end_time' => '12:30:00',
-                'window_minutes' => 45,
+                'window_minutes' => 60,
                 'max_patients_per_window' => 3,
                 'is_active' => false,
             ])
@@ -1231,7 +1231,7 @@ class InertiaShellTest extends TestCase
             'id' => $schedule->id,
             'start_time' => '10:30:00',
             'end_time' => '12:30:00',
-            'window_minutes' => 45,
+            'window_minutes' => 60,
             'max_patients_per_window' => 3,
             'is_active' => false,
         ]);

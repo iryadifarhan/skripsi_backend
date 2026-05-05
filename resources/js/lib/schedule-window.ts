@@ -18,7 +18,7 @@ export type ScheduleWindowPreview = {
     message: string | null;
 };
 
-export const scheduleWindowMinutePresets = ['15', '30', '45', '60'];
+export const scheduleWindowMinutePresets = ['15', '30', '60'];
 
 export function buildScheduleWindowPreview(
     startTime: string,
@@ -37,7 +37,7 @@ export function buildScheduleWindowPreview(
             totalCapacity: 0,
             remainderMinutes: 0,
             isValid: false,
-            message: 'Durasi window harus menggunakan preset 15, 30, 45, atau 60 menit.',
+            message: 'Durasi window harus menggunakan preset 15, 30, atau 60 menit.',
         };
     }
 

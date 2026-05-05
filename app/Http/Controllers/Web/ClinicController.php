@@ -26,7 +26,7 @@ use Inertia\Response;
 
 class ClinicController extends Controller
 {
-    private const DOCTOR_WINDOW_MINUTE_PRESETS = [15, 30, 45, 60];
+    private const DOCTOR_WINDOW_MINUTE_PRESETS = [15, 30, 60];
 
     public function __construct(
         private readonly WorkspaceViewService $workspace,
@@ -766,7 +766,7 @@ class ClinicController extends Controller
         if (!in_array($windowMinutes, self::DOCTOR_WINDOW_MINUTE_PRESETS, true)) {
             throw ValidationException::withMessages([
                 'window_minutes' => [
-                    'Dokter hanya dapat memilih durasi window 15, 30, 45, atau 60 menit.',
+                    'Dokter hanya dapat memilih durasi window 15, 30, atau 60 menit.',
                 ],
             ]);
         }
