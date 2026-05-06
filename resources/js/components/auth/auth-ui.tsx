@@ -120,9 +120,9 @@ export function PasswordInput({
                 <button
                     type="button"
                     onClick={() => setShow((current) => !current)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#40311D]/60 transition hover:text-[#40311D]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#40311D]/60 opacity-50 transition-opacity duration-200 hover:text-[#40311D]"
                 >
-                    {show ? 'Sembunyi' : 'Lihat'}
+                    {show ? '👁' : '⌣'}
                 </button>
             </div>
             <FieldErrors errors={errors} />
