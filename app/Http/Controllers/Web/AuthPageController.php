@@ -51,10 +51,11 @@ class AuthPageController extends Controller
             return response()->json([
                 'message' => 'Login successful.',
                 'user' => $request->user(),
+                'redirect' => $this->redirectTargetAfterLogin($request),
             ]);
         }
 
-        return to_route('dashboard');
+        return redirect($this->redirectTargetAfterLogin($request));
     }
 
     public function register(): Response
@@ -93,10 +94,11 @@ class AuthPageController extends Controller
             return response()->json([
                 'message' => 'Registration successful.',
                 'user' => $user,
+                'redirect' => '/beranda',
             ], 201);
         }
 
-        return to_route('dashboard');
+        return redirect('/beranda');
     }
 
     public function forgotPassword(): Response
@@ -183,6 +185,36 @@ class AuthPageController extends Controller
         }
 
         return to_route('login')->with('status', __($status));
+    }
+
+    private function redirectTargetAfterLogin(Request $request): string
+    {
+        $next = $this->safeNextPath($request->input('next') ?? $request->query('next'));
+
+        if ($next !== null) {
+            return $next;
+        }
+
+        return $request->user()?->role === User::ROLE_PATIENT
+            ? '/beranda'
+            : '/dashboard';
+    }
+
+    private function safeNextPath(mixed $next): ?string
+    {
+        if (!is_string($next) || $next === '') {
+            return null;
+        }
+
+        if (!str_starts_with($next, '/') || str_starts_with($next, '//')) {
+            return null;
+        }
+
+        if (preg_match('/[\r\n]/', $next) === 1) {
+            return null;
+        }
+
+        return $next;
     }
 }
 

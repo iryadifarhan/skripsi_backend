@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DoctorController;
 use App\Http\Controllers\Web\DoctorScheduleController;
 use App\Http\Controllers\Web\MedicalRecordController;
+use App\Http\Controllers\Web\PatientHomeController;
 use App\Http\Controllers\Web\PatientController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\QueueController;
@@ -17,11 +18,16 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [DashboardController::class, 'home'])->name('home');
 
+Route::redirect('/login', '/masuk');
+Route::redirect('/register', '/daftar');
+
 Route::middleware('guest')->group(function (): void {
-    Route::get('/login', [AuthPageController::class, 'login'])->name('login');
-    Route::post('/login', [AuthPageController::class, 'authenticate'])->name('login.store');
-    Route::get('/register', [AuthPageController::class, 'register'])->name('register');
-    Route::post('/register', [AuthPageController::class, 'storeRegister'])->name('register.store');
+    Route::get('/masuk', [AuthPageController::class, 'login'])->name('login');
+    Route::post('/masuk', [AuthPageController::class, 'authenticate'])->name('login.store');
+    Route::post('/login', [AuthPageController::class, 'authenticate']);
+    Route::get('/daftar', [AuthPageController::class, 'register'])->name('register');
+    Route::post('/daftar', [AuthPageController::class, 'storeRegister'])->name('register.store');
+    Route::post('/register', [AuthPageController::class, 'storeRegister']);
     Route::get('/forgot-password', [AuthPageController::class, 'forgotPassword'])->name('password.request');
     Route::post('/forgot-password', [AuthPageController::class, 'sendResetLink'])->name('password.email');
     Route::get('/reset-password', [AuthPageController::class, 'redirectResetPassword']);
@@ -31,6 +37,11 @@ Route::middleware('guest')->group(function (): void {
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
+    Route::get('/beranda', [PatientHomeController::class, 'index'])->name('patient.home');
+    Route::get('/klinik', [PatientHomeController::class, 'clinicsRedirect'])->name('patient.clinics');
+    Route::get('/dokter', [PatientHomeController::class, 'doctorsRedirect'])->name('patient.doctors');
+    Route::get('/reservasi', [ReservationController::class, 'index'])->name('patient.reservations');
+    Route::get('/rekam-medis', [MedicalRecordController::class, 'page'])->name('patient.medical-records');
     Route::post('/logout', [DashboardController::class, 'logout'])->name('logout');
 
     Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.page');

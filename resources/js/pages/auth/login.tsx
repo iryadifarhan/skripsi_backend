@@ -14,7 +14,9 @@ import {
 import type { SharedData, ValidationErrors } from '@/types';
 
 export default function Login() {
-    const { flash } = usePage<SharedData>().props;
+    const page = usePage<SharedData>();
+    const { flash } = page.props;
+    const next = new URLSearchParams(page.url.split('?')[1] ?? '').get('next');
     const [form, setForm] = useState({
         email: '',
         password: '',
@@ -28,7 +30,7 @@ export default function Login() {
         setProcessing(true);
         setErrors({});
 
-        router.post('/login', form, {
+        router.post('/masuk', { ...form, next }, {
             onError: (validationErrors) => setErrors(normalizeInertiaErrors(validationErrors)),
             onFinish: () => setProcessing(false),
         });
@@ -84,7 +86,7 @@ export default function Login() {
                         Lupa <AuthLink href="/forgot-password">Kata Sandi?</AuthLink>
                     </p>
                     <p className="mt-1">
-                        Belum punya akun? <AuthLink href="/register">Daftar</AuthLink>
+                        Belum punya akun? <AuthLink href="/daftar">Daftar</AuthLink>
                     </p>
                 </AuthFooter>
             </AuthPageShell>

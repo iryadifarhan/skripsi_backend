@@ -21,7 +21,7 @@ class InertiaShellTest extends TestCase
 
     public function test_guest_register_page_renders_with_app_shared_props(): void
     {
-        $this->get('/register')
+        $this->get('/daftar')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('auth/register')
@@ -33,20 +33,21 @@ class InertiaShellTest extends TestCase
     public function test_web_login_and_register_use_session_redirects(): void
     {
         $user = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
             'email' => 'web-login@example.test',
             'password' => bcrypt('Password123!'),
         ]);
 
-        $this->post('/login', [
+        $this->post('/masuk', [
             'email' => $user->email,
             'password' => 'Password123!',
-        ])->assertRedirect('/dashboard');
+        ])->assertRedirect('/beranda');
 
         $this->assertAuthenticatedAs($user);
 
-        $this->post('/logout')->assertRedirect('/login');
+        $this->post('/logout')->assertRedirect('/masuk');
 
-        $this->post('/register', [
+        $this->post('/daftar', [
             'name' => 'Web Register Patient',
             'username' => 'web_register_patient',
             'email' => 'web-register@example.test',
@@ -55,9 +56,38 @@ class InertiaShellTest extends TestCase
             'gender' => User::GENDER_PEREMPUAN,
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
-        ])->assertRedirect('/dashboard');
+        ])->assertRedirect('/beranda');
 
         $this->assertAuthenticated();
+    }
+
+    public function test_patient_login_respects_next_redirect_and_beranda_is_patient_only(): void
+    {
+        $patient = User::factory()->create([
+            'role' => User::ROLE_PATIENT,
+            'email' => 'patient-next@example.test',
+            'password' => bcrypt('Password123!'),
+        ]);
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'email' => 'admin-next@example.test',
+            'password' => bcrypt('Password123!'),
+        ]);
+
+        $this->get('/beranda')->assertRedirect('/masuk?next=%2Fberanda');
+
+        $this->post('/masuk', [
+            'email' => $patient->email,
+            'password' => 'Password123!',
+            'next' => '/reservasi',
+        ])->assertRedirect('/reservasi');
+
+        $this->assertAuthenticatedAs($patient);
+        $this->post('/logout');
+
+        $this->actingAs($admin)
+            ->get('/beranda')
+            ->assertRedirect('/dashboard');
     }
 
     public function test_legacy_query_reset_password_url_redirects_to_inertia_route(): void
@@ -73,6 +103,16 @@ class InertiaShellTest extends TestCase
         $user = User::factory()->create([
             'role' => User::ROLE_PATIENT,
         ]);
+
+        $this->actingAs($user)
+            ->get('/beranda')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('patient/home')
+                ->where('userName', $user->name)
+                ->has('clinics')
+                ->has('doctors')
+            );
 
         $this->actingAs($user)
             ->get('/reservations')
@@ -605,7 +645,7 @@ class InertiaShellTest extends TestCase
             'password' => bcrypt('Password123!'),
         ]);
 
-        $this->postJson('/login', [
+        $this->postJson('/masuk', [
             'email' => $superadmin->email,
             'password' => 'Password123!',
         ])->assertOk();

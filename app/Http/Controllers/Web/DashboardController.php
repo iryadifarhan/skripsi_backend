@@ -30,6 +30,10 @@ class DashboardController extends Controller
 
     public function home(Request $request): RedirectResponse|Response
     {
+        if ($request->user()?->role === User::ROLE_PATIENT) {
+            return to_route('patient.home');
+        }
+
         if ($request->user()) {
             return to_route('dashboard');
         }

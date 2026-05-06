@@ -93,7 +93,7 @@ export default function ForgotPassword() {
                         {sent && countdown > 0 ? `Kirim lagi dalam (${countdown} detik)` : 'Kirim ulang'}
                     </button>
                     <p className="mt-2">
-                        Kembali ke <AuthLink href="/login">Masuk</AuthLink>
+                        Kembali ke <AuthLink href="/masuk">Masuk</AuthLink>
                     </p>
                 </AuthFooter>
             </AuthPageShell>

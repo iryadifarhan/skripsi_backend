@@ -17,7 +17,13 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
         $middleware->redirectGuestsTo(function (Request $request): ?string {
-            return '/login';
+            $next = $request->getRequestUri();
+
+            if ($next === '' || $next === '/masuk') {
+                return '/masuk';
+            }
+
+            return '/masuk?next='.rawurlencode($next);
         });
         $middleware->alias([
             'authorize' => \App\Http\Middleware\AuthorizeRole::class,

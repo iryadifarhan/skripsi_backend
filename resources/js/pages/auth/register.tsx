@@ -40,7 +40,7 @@ export default function Register() {
         setErrors({});
 
         router.post(
-            '/register',
+            '/daftar',
             {
                 ...form,
                 phone_number: form.phone_number || null,
@@ -167,7 +167,7 @@ export default function Register() {
                 </form>
 
                 <AuthFooter>
-                    Sudah punya akun? <AuthLink href="/login">Masuk</AuthLink>
+                    Sudah punya akun? <AuthLink href="/masuk">Masuk</AuthLink>
                 </AuthFooter>
             </AuthPageShell>
 

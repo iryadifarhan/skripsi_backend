@@ -34,11 +34,11 @@ export default function GuestLayout({ children, title, subtitle }: GuestLayoutPr
                         </Link>
 
                         <nav className="flex items-center gap-4 text-sm font-medium text-ink-700">
-                            <Link href="/login" className="transition hover:text-night-900">
+                            <Link href="/masuk" className="transition hover:text-night-900">
                                 Login
                             </Link>
                             <Link
-                                href="/register"
+                                href="/daftar"
                                 className="rounded-full border border-night-900/15 bg-white/80 px-4 py-2 text-night-900 shadow-sm backdrop-blur transition hover:-translate-y-0.5"
                             >
                                 Register
