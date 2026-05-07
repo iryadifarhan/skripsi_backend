@@ -67,7 +67,7 @@ const STYLES = `
   .hp-greeting-label { font-size: 1rem; font-weight: 600; opacity: .6; margin-bottom: .3rem; }
   .hp-clock { font-size: clamp(4.4rem, 8vw, 5.2rem); font-weight: 700; letter-spacing: -.05em; line-height: 1; }
   .hp-clock-tz { font-size: .78rem; font-weight: 500; opacity: .5; margin-left: .3rem; vertical-align: super; }
-  .hp-location { font-size: .78rem; opacity: .55; margin-top: .5rem; }
+  .hp-location { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; opacity: .55; margin-top: .5rem; }
   .hp-booking-col, .hp-booking-col-middle { padding-left: 2rem; border-left: 1px solid rgba(64,49,29,.12); min-width: 0; }
   .hp-booking-label { font-size: .75rem; font-weight: 700; opacity: .5; margin-bottom: .6rem; text-transform: uppercase; letter-spacing: .07em; }
   .hp-booking-clinic { font-size: clamp(1.25rem, 2.5vw, 1.92rem); font-weight: 700; color: var(--hp-dark); line-height: 1.1; margin-bottom: .4rem; }
@@ -147,6 +147,116 @@ function useLiveClock() {
     }, []);
 
     return `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+}
+
+type ReverseGeocodeResponse = {
+    locality?: string | null;
+    city?: string | null;
+    principalSubdivision?: string | null;
+    countryName?: string | null;
+    localityInfo?: {
+        administrative?: {
+            name?: string | null;
+            adminLevel?: number | null;
+        }[];
+    } | null;
+};
+
+const LOCATION_FALLBACK = 'Indonesia';
+const LOCATION_CACHE_KEY = 'cliniqueue.patient.location_label';
+
+function normalizeLocationPart(value?: string | null) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function pushUniqueLocationPart(parts: string[], value?: string | null) {
+    const normalized = normalizeLocationPart(value);
+
+    if (normalized === '') {
+        return;
+    }
+
+    const alreadyExists = parts.some((part) => part.toLowerCase() === normalized.toLowerCase());
+
+    if (!alreadyExists) {
+        parts.push(normalized);
+    }
+}
+
+function locationLabelFromReverseGeocode(payload: ReverseGeocodeResponse) {
+    const parts: string[] = [];
+    const cityLikeAdministrativeArea = payload.localityInfo?.administrative
+        ?.filter((area) => typeof area.adminLevel === 'number' && area.adminLevel >= 4 && area.adminLevel <= 8)
+        ?.map((area) => normalizeLocationPart(area.name))
+        ?.find((name) => name !== '' && name.toLowerCase() !== normalizeLocationPart(payload.locality).toLowerCase());
+
+    pushUniqueLocationPart(parts, payload.locality);
+    pushUniqueLocationPart(parts, payload.city ?? cityLikeAdministrativeArea ?? payload.principalSubdivision);
+    pushUniqueLocationPart(parts, payload.countryName ?? LOCATION_FALLBACK);
+
+    return parts.join(', ') || LOCATION_FALLBACK;
+}
+
+function useUserLocationLabel() {
+    const [locationLabel, setLocationLabel] = useState(LOCATION_FALLBACK);
+
+    useEffect(() => {
+        const cachedLocation = window.sessionStorage.getItem(LOCATION_CACHE_KEY);
+
+        if (cachedLocation) {
+            setLocationLabel(cachedLocation);
+            return;
+        }
+
+        if (!navigator.geolocation) {
+            return;
+        }
+
+        let cancelled = false;
+        const controller = new AbortController();
+
+        navigator.geolocation.getCurrentPosition(
+            async ({ coords }) => {
+                try {
+                    const query = new URLSearchParams({
+                        latitude: String(coords.latitude),
+                        longitude: String(coords.longitude),
+                        localityLanguage: 'id',
+                    });
+                    const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${query.toString()}`, {
+                        signal: controller.signal,
+                    });
+
+                    if (!response.ok) {
+                        return;
+                    }
+
+                    const payload = await response.json() as ReverseGeocodeResponse;
+                    const nextLocation = locationLabelFromReverseGeocode(payload);
+
+                    if (!cancelled) {
+                        setLocationLabel(nextLocation);
+                        window.sessionStorage.setItem(LOCATION_CACHE_KEY, nextLocation);
+                    }
+                } catch {
+                    // Keep Indonesia as a quiet fallback when permission/API/network fails.
+                }
+            },
+            () => undefined,
+            {
+                enableHighAccuracy: false,
+                maximumAge: 1000 * 60 * 30,
+                timeout: 8000,
+            },
+        );
+
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, []);
+
+    return locationLabel;
 }
 
 function getGreeting() {
@@ -355,6 +465,7 @@ function FlipCard({
 
 export default function PatientHome({ userName, currentReservation, lastReservation, clinics, doctors }: PatientHomeProps) {
     const clock = useLiveClock();
+    const locationLabel = useUserLocationLabel();
     const greeting = getGreeting();
     const [activeClinic, setActiveClinic] = useState<number | null>(null);
     const [activeDoctor, setActiveDoctor] = useState<number | null>(null);
@@ -379,7 +490,10 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                     {clock}
                                     <span className="hp-clock-tz">WIB</span>
                                 </div>
-                                <div className="hp-location">Indonesia</div>
+                                <div className="hp-location">
+                                    <i className="fa fa-map-marker-alt" aria-hidden="true" />
+                                    {locationLabel}
+                                </div>
                             </div>
 
                             <div className="hp-booking-col-middle">
@@ -506,4 +620,3 @@ export default function PatientHome({ userName, currentReservation, lastReservat
         </>
     );
 }
-
