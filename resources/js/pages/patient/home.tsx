@@ -1,8 +1,9 @@
 import { Head, Link } from '@inertiajs/react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faHospital, faMapMarkerAlt, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import reservasiImg from '@/assets/reservasi-mock.png';
 import { PublicFooter } from '@/components/landing/public-footer';
 import { PublicNavbar } from '@/components/landing/public-navbar';
 import type { ReservationEntry } from '@/types';
@@ -54,8 +55,8 @@ const STYLES = `
     --hp-deep: #2c2115;
     --hp-teal: #00917B;
     --hp-silver: #DFE0DF;
-    --hp-page-max: 1180px;
-    --hp-page-pad: 1.5rem;
+    --hp-page-max: 1400px;
+    --hp-page-pad: 2rem;
   }
 
   .hp-page { min-height: 100vh; background: var(--hp-cream); color: var(--hp-dark); font-family: 'Work Sans', sans-serif; }
@@ -94,6 +95,8 @@ const STYLES = `
   .hp-card-flipper.flipped { transform: rotateY(180deg); }
   .hp-card-front, .hp-card-back { position: absolute; inset: 0; border-radius: 10px; -webkit-backface-visibility: hidden; backface-visibility: hidden; overflow: hidden; }
   .hp-card-front { background: var(--hp-silver); background-size: cover; background-position: center; transition: box-shadow .2s; }
+  .hp-card-placeholder { background: linear-gradient(135deg, #f5f5f3 0%, var(--hp-silver) 100%); display: flex; align-items: center; justify-content: center; color: rgba(64,49,29,.32); }
+  .hp-card-placeholder svg { width: 3.4rem; height: 3.4rem; }
   .hp-card-front.ring { box-shadow: 0 0 0 3px var(--hp-teal); }
   .hp-flip-hint { position: absolute; right: 8px; bottom: 8px; border-radius: 8px; background: rgba(64,49,29,.78); color: var(--hp-cream); padding: 3px 7px; font-size: 10px; font-weight: 700; pointer-events: none; }
   .hp-card-back { background: var(--hp-cream); border: 1.5px solid rgba(64,49,29,.15); transform: rotateY(180deg); padding: .75rem; display: flex; flex-direction: column; gap: .2rem; font-size: .72rem; overflow-y: auto; }
@@ -122,16 +125,15 @@ const STYLES = `
   .hp-dokter-bg .hp-review-btn { border-color: var(--hp-cream); color: var(--hp-cream); }
   .hp-dokter-bg .hp-review-btn:hover { background: var(--hp-cream); color: var(--hp-dark); }
   .hp-scroll-btn { position: absolute; top: 36%; z-index: 10; width: 32px; height: 32px; border: none; border-radius: 999px; background: var(--hp-dark); color: var(--hp-cream); display: flex; align-items: center; justify-content: center; }
-  .hp-scroll-btn.left { left: -40px; }
-  .hp-scroll-btn.right { right: -40px; }
+  .hp-scroll-btn.left { left: -25px; }
+  .hp-scroll-btn.right { right: -25px; }
   .hp-dokter-bg .hp-scroll-btn { background: var(--hp-cream); color: var(--hp-dark); }
 
-  @media (max-width: 1024px) {
+  @media (max-width: 804px) {
     .hp-hero { grid-template-columns: 1fr; gap: 1.5rem; }
     .hp-booking-col, .hp-booking-col-middle { padding-left: 0; border-left: none; border-top: 1px solid rgba(64,49,29,.12); padding-top: 1rem; }
   }
   @media (max-width: 768px) {
-    :root { --hp-page-pad: 1rem; }
     .hp-card-grid { grid-template-columns: repeat(6, 190px); }
     .hp-scroll-btn { display: none; }
   }
@@ -164,6 +166,11 @@ type ReverseGeocodeResponse = {
 
 const LOCATION_FALLBACK = 'Indonesia';
 const LOCATION_CACHE_KEY = 'cliniqueue.patient.location_label';
+const LOCATION_ADMIN_LEVELS = {
+    village: [8, 9, 10],
+    district: [6, 7],
+    city: [4, 5],
+};
 
 function normalizeLocationPart(value?: string | null) {
     return typeof value === 'string' ? value.trim() : '';
@@ -185,13 +192,21 @@ function pushUniqueLocationPart(parts: string[], value?: string | null) {
 
 function locationLabelFromReverseGeocode(payload: ReverseGeocodeResponse) {
     const parts: string[] = [];
-    const cityLikeAdministrativeArea = payload.localityInfo?.administrative
-        ?.filter((area) => typeof area.adminLevel === 'number' && area.adminLevel >= 4 && area.adminLevel <= 8)
-        ?.map((area) => normalizeLocationPart(area.name))
-        ?.find((name) => name !== '' && name.toLowerCase() !== normalizeLocationPart(payload.locality).toLowerCase());
+    const administrativeAreas = payload.localityInfo?.administrative ?? [];
+    const areaByLevel = (levels: number[]) => administrativeAreas
+        .filter((area) => typeof area.adminLevel === 'number' && levels.includes(area.adminLevel))
+        .map((area) => normalizeLocationPart(area.name))
+        .find((name) => name !== '');
 
-    pushUniqueLocationPart(parts, payload.locality);
-    pushUniqueLocationPart(parts, payload.city ?? cityLikeAdministrativeArea ?? payload.principalSubdivision);
+    const village = normalizeLocationPart(payload.locality) || areaByLevel(LOCATION_ADMIN_LEVELS.village);
+    const district = areaByLevel(LOCATION_ADMIN_LEVELS.district);
+    const city = normalizeLocationPart(payload.city) || areaByLevel(LOCATION_ADMIN_LEVELS.city) || normalizeLocationPart(payload.principalSubdivision);
+
+    console.log(areaByLevel);
+    console.log('Reverse geocode parts:', { village, district, city });
+
+    pushUniqueLocationPart(parts, village);
+    pushUniqueLocationPart(parts, district ?? city);
     pushUniqueLocationPart(parts, payload.countryName ?? LOCATION_FALLBACK);
 
     return parts.join(', ') || LOCATION_FALLBACK;
@@ -346,7 +361,7 @@ function ScrollableCards({
         <div className="relative">
             {canScroll && !atStart ? (
                 <button type="button" onClick={() => scrollRef.current?.scrollBy({ left: -240, behavior: 'smooth' })} className="hp-scroll-btn left">
-                    &lt;
+                    <FontAwesomeIcon icon={faChevronLeft} aria-hidden="true" />
                 </button>
             ) : null}
             <div ref={scrollRef} className="hp-scroll-region">
@@ -354,7 +369,7 @@ function ScrollableCards({
             </div>
             {canScroll && !atEnd ? (
                 <button type="button" onClick={() => scrollRef.current?.scrollBy({ left: 240, behavior: 'smooth' })} className={`hp-scroll-btn right ${dark ? 'dark' : ''}`}>
-                    &gt;
+                    <FontAwesomeIcon icon={faChevronRight} aria-hidden="true" />
                 </button>
             ) : null}
         </div>
@@ -432,6 +447,7 @@ function FlipCard({
     onClick,
     back,
     isDark = false,
+    useClinicPlaceholder = false,
 }: {
     image?: string | null;
     label: string;
@@ -440,15 +456,19 @@ function FlipCard({
     onClick: () => void;
     back: ReactNode;
     isDark?: boolean;
+    useClinicPlaceholder?: boolean;
 }) {
+    const imageUrl = image || (useClinicPlaceholder ? null : reservasiImg);
+
     return (
         <div>
             <div className="hp-card-scene" onClick={onClick}>
                 <div className={`hp-card-flipper ${isActive ? 'flipped' : ''}`}>
                     <div
-                        className={`hp-card-front ${isActive ? 'ring' : ''}`}
-                        style={{ backgroundImage: `url(${image || reservasiImg})` }}
+                        className={`hp-card-front ${imageUrl ? '' : 'hp-card-placeholder'} ${isActive ? 'ring' : ''}`}
+                        style={imageUrl ? { backgroundImage: `url(${imageUrl})` } : undefined}
                     >
+                        {!imageUrl && useClinicPlaceholder ? <FontAwesomeIcon icon={faHospital} aria-hidden="true" /> : null}
                         {!isActive ? <div className="hp-flip-hint">lihat</div> : null}
                     </div>
                     {back}
@@ -491,7 +511,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                     <span className="hp-clock-tz">WIB</span>
                                 </div>
                                 <div className="hp-location">
-                                    <i className="fa fa-map-marker-alt" aria-hidden="true" />
+                                    <FontAwesomeIcon icon={faMapMarkerAlt} aria-hidden="true" />
                                     {locationLabel}
                                 </div>
                             </div>
@@ -570,6 +590,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                             label={clinic.name}
                                             subLabel={clinic.city_name}
                                             image={clinic.image_url}
+                                            useClinicPlaceholder
                                             isActive={activeClinic === clinic.id}
                                             onClick={() => setActiveClinic((current) => (current === clinic.id ? null : clinic.id))}
                                             back={<KlinikBack clinic={clinic} />}

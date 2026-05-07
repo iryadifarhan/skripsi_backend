@@ -5,6 +5,16 @@ import type { SharedData } from '@/types';
 
 const loginNext = (path: string) => `/masuk?next=${encodeURIComponent(path)}`;
 
+function pathFromHref(href: string) {
+    return href.split('?')[0].split('#')[0] || '/';
+}
+
+function isActivePath(currentPath: string, href: string) {
+    const linkPath = pathFromHref(href);
+
+    return currentPath === linkPath;
+}
+
 function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
     const initial = name.trim().charAt(0).toUpperCase() || 'P';
 
@@ -38,10 +48,12 @@ function LogoutIcon() {
 }
 
 export function PublicNavbar() {
-    const { auth } = usePage<SharedData>().props;
+    const page = usePage<SharedData>();
+    const { auth } = page.props;
     const user = auth?.user ?? null;
     const isPatient = user?.role === 'patient';
     const avatarUrl = user?.display_avatar_url ?? user?.image_url ?? user?.profile_picture_url ?? null;
+    const currentPath = pathFromHref(page.url);
     const [scrolled, setScrolled] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
@@ -110,13 +122,24 @@ export function PublicNavbar() {
                 </Link>
 
                 <ul className="hidden items-center gap-7 md:flex">
-                    {navLinks.map((link) => (
-                        <li key={`${link.href}-${link.label}`}>
-                            <Link href={link.href} className="text-sm font-medium text-[#40311D]/65 transition hover:text-[#40311D]">
-                                {link.label}
-                            </Link>
-                        </li>
-                    ))}
+                    {navLinks.map((link) => {
+                        const active = isActivePath(currentPath, link.href);
+
+                        return (
+                            <li key={`${link.href}-${link.label}`}>
+                                <Link
+                                    href={link.href}
+                                    className={`border-b-2 pb-px text-sm transition hover:text-[#40311D] ${
+                                        active
+                                            ? 'border-[#00917B] font-bold text-[#40311D] opacity-100'
+                                            : 'border-transparent font-medium text-[#40311D]/65'
+                                    }`}
+                                >
+                                    {link.label}
+                                </Link>
+                            </li>
+                        );
+                    })}
                 </ul>
 
                 {isPatient ? (
@@ -179,11 +202,24 @@ export function PublicNavbar() {
 
             {menuOpen ? (
                 <div className="mx-auto flex max-w-[1400px] flex-col gap-3 border-t border-[#40311D]/10 px-5 py-5 md:hidden">
-                    {navLinks.map((link) => (
-                        <Link key={`${link.href}-${link.label}-mobile`} href={link.href} onClick={() => setMenuOpen(false)} className="text-base font-medium text-[#40311D]">
-                            {link.label}
-                        </Link>
-                    ))}
+                    {navLinks.map((link) => {
+                        const active = isActivePath(currentPath, link.href);
+
+                        return (
+                            <Link
+                                key={`${link.href}-${link.label}-mobile`}
+                                href={link.href}
+                                onClick={() => setMenuOpen(false)}
+                                className={`w-fit border-b-2 pb-px text-base transition hover:text-[#40311D] ${
+                                    active
+                                        ? 'border-[#00917B] font-bold text-[#40311D] opacity-100'
+                                        : 'border-transparent font-medium text-[#40311D]/65'
+                                }`}
+                            >
+                                {link.label}
+                            </Link>
+                        );
+                    })}
                     {!isPatient ? (
                         <div className="mt-2 grid grid-cols-2 gap-2">
                             <Link href="/masuk" className="rounded-full border-[1.5px] border-[#40311D] px-4 py-2 text-center text-sm font-semibold text-[#40311D]">
