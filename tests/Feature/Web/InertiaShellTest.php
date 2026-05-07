@@ -115,6 +115,20 @@ class InertiaShellTest extends TestCase
             );
 
         $this->actingAs($user)
+            ->get('/profil')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('profile')
+                ->where('user.id', $user->id)
+                ->where('user.role', User::ROLE_PATIENT)
+                ->where('canManageAvatar', true)
+            );
+
+        $this->actingAs($user)
+            ->get('/profile')
+            ->assertRedirect('/profil');
+
+        $this->actingAs($user)
             ->get('/reservations')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page

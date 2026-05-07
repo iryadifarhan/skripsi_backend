@@ -155,6 +155,12 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware('authorize:patient')->group(function (): void {
+        Route::get('/profil', [ProfileController::class, 'show'])->name('patient.profile');
+        Route::patch('/profil', [ProfileController::class, 'update'])->name('patient.profile.update');
+        Route::patch('/profil/password', [ProfileController::class, 'updatePassword'])->name('patient.profile.password');
+        Route::patch('/profil/picture', [ProfileController::class, 'updateProfilePicture'])->name('patient.profile.picture');
+        Route::post('/profil/image', [ProfileController::class, 'uploadImage'])->name('patient.profile.image');
+        Route::delete('/profil/image', [ProfileController::class, 'deleteImage'])->name('patient.profile.image.destroy');
         Route::get('/queues/my', [QueueController::class, 'patientIndex']);
         Route::get('/medical-records/{medicalRecord}', [MedicalRecordController::class, 'patientShow']);
     });

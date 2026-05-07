@@ -17,11 +17,15 @@ use Inertia\Response;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request): JsonResponse|Response
+    public function show(Request $request): JsonResponse|RedirectResponse|Response
     {
         $user = $request->user()->loadMissing('clinics:id,name');
 
         if (!$request->expectsJson()) {
+            if ($user->role === User::ROLE_PATIENT && $request->path() === 'profile') {
+                return redirect('/profil');
+            }
+
             return Inertia::render('profile', [
                 'user' => $this->serializeProfileUser($user),
                 'profilePictureOptions' => User::profilePicturesForRole($user->role),

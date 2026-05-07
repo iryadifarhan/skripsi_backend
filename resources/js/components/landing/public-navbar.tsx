@@ -101,6 +101,9 @@ export function PublicNavbar() {
                 scrolled ? 'border-b border-[#40311D]/15 shadow-[0_2px_12px_rgba(64,49,29,0.08)]' : 'border-b border-transparent'
             }`}
         >
+            <style>
+                {`@keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }`}
+            </style>
             <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-5 py-3.5 md:px-8">
                 <Link href={logoHref} className="mr-auto shrink-0 text-xl font-black tracking-[-0.02em] text-[#40311D]">
                     CLINI<span className="text-[#00917B]">&gt;</span>QUEUE<span className="text-[#00917B]">&gt;</span>
@@ -129,10 +132,10 @@ export function PublicNavbar() {
                         </button>
 
                         {profileOpen ? (
-                            <div className="absolute right-0 top-[calc(100%+0.75rem)] md:w-56 w-40 overflow-hidden rounded-xl border border-[#40311D]/20 bg-[#DED0B6] text-[#40311D] shadow-[0_14px_34px_rgba(64,49,29,0.16)]">
+                            <div className="absolute right-0 top-[calc(100%+0.75rem)] md:w-56 w-40 overflow-hidden rounded-xl border border-[#40311D]/20 bg-[#DED0B6] text-[#40311D] shadow-[0_14px_34px_rgba(64,49,29,0.16)] shadow-[0_8px_24px_rgba(64,49,29,0.12)] animate-[dropIn_0.15s_ease]">
                                 <div className="border-b border-[#40311D]/10 px-4 py-3 text-xs font-semibold text-[#40311D]/45">{user.name}</div>
                                 <Link
-                                    href="/profile"
+                                    href="/profil"
                                     onClick={() => setProfileOpen(false)}
                                     className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-[#40311D] transition hover:bg-[#40311D]/5"
                                 >
