@@ -11,12 +11,17 @@ use App\Http\Controllers\Web\MedicalRecordController;
 use App\Http\Controllers\Web\PatientHomeController;
 use App\Http\Controllers\Web\PatientController;
 use App\Http\Controllers\Web\ProfileController;
+use App\Http\Controllers\Web\PublicDirectoryController;
 use App\Http\Controllers\Web\QueueController;
 use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\ReservationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [DashboardController::class, 'home'])->name('home');
+Route::get('/klinik', [PublicDirectoryController::class, 'clinics'])->name('public.clinics.index');
+Route::get('/klinik/{clinicSlug}', [PublicDirectoryController::class, 'clinic'])->name('public.clinics.show');
+Route::get('/dokter', [PublicDirectoryController::class, 'doctors'])->name('public.doctors.index');
+Route::get('/dokter/{doctorSlug}', [PublicDirectoryController::class, 'doctor'])->name('public.doctors.show');
 
 Route::redirect('/login', '/masuk');
 Route::redirect('/register', '/daftar');
@@ -38,8 +43,6 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
     Route::get('/beranda', [PatientHomeController::class, 'index'])->name('patient.home');
-    Route::get('/klinik', [PatientHomeController::class, 'clinicsRedirect'])->name('patient.clinics');
-    Route::get('/dokter', [PatientHomeController::class, 'doctorsRedirect'])->name('patient.doctors');
     Route::get('/reservasi', [ReservationController::class, 'index'])->name('patient.reservations');
     Route::get('/rekam-medis', [MedicalRecordController::class, 'page'])->name('patient.medical-records');
     Route::post('/logout', [DashboardController::class, 'logout'])->name('logout');

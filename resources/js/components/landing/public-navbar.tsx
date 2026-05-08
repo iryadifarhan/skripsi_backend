@@ -12,7 +12,11 @@ function pathFromHref(href: string) {
 function isActivePath(currentPath: string, href: string) {
     const linkPath = pathFromHref(href);
 
-    return currentPath === linkPath;
+    if (linkPath === '/') {
+        return currentPath === '/';
+    }
+
+    return currentPath === linkPath || currentPath.startsWith(`${linkPath}/`);
 }
 
 function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
@@ -96,8 +100,8 @@ export function PublicNavbar() {
     const logoHref = isPatient ? '/beranda' : '/';
     const navLinks = [
         { href: isPatient ? '/beranda' : '/', label: 'beranda' },
-        { href: patientHref('/klinik'), label: 'klinik' },
-        { href: patientHref('/dokter'), label: 'dokter' },
+        { href: '/klinik', label: 'klinik' },
+        { href: '/dokter', label: 'dokter' },
         { href: patientHref('/reservasi'), label: 'reservasi' },
         { href: patientHref('/rekam-medis'), label: 'rekam medis' },
     ];
@@ -141,6 +145,19 @@ export function PublicNavbar() {
                         );
                     })}
                 </ul>
+
+                <Link
+                    href="/klinik"
+                    className="hidden h-9 w-9 items-center justify-center rounded-full text-[#40311D] transition hover:bg-[#40311D]/8 md:flex"
+                    aria-label="Cari klinik atau dokter"
+                >
+                    <svg viewBox="0 0 20 20" aria-hidden="true" className="h-5 w-5">
+                        <path
+                            fill="currentColor"
+                            d="M8.5 3a5.5 5.5 0 0 1 4.38 8.83l3.15 3.15-1.06 1.06-3.15-3.15A5.5 5.5 0 1 1 8.5 3Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"
+                        />
+                    </svg>
+                </Link>
 
                 {isPatient ? (
                     <div ref={profileRef} className="relative">

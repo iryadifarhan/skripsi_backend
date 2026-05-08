@@ -41,10 +41,15 @@ class DashboardController extends Controller
         return Inertia::render('welcome');
     }
 
-    public function dashboard(Request $request): Response
+    public function dashboard(Request $request): RedirectResponse|Response
     {
         /** @var User $user */
         $user = $request->user();
+
+        if ($user?->role === User::ROLE_PATIENT) {
+            return to_route('patient.home');
+        }
+
         $context = $this->workspace->context($request);
         $selectedClinic = $this->workspace->selectedClinic($request, $context);
         $dashboardData = null;

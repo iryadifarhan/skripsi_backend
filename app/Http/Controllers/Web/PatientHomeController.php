@@ -44,16 +44,6 @@ class PatientHomeController extends Controller
         ]);
     }
 
-    public function clinicsRedirect(): RedirectResponse
-    {
-        return redirect('/beranda#klinik');
-    }
-
-    public function doctorsRedirect(): RedirectResponse
-    {
-        return redirect('/beranda#dokter');
-    }
-
     /**
      * @return array<string, mixed>|null
      */

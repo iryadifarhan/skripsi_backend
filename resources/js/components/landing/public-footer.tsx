@@ -16,15 +16,15 @@ export function PublicFooter() {
                     <div className="text-3xl font-black tracking-[-0.03em] text-[#40311D]">
                         CLINI<span className="text-[#00917B]">&gt;</span>QUEUE<span className="text-[#00917B]">&gt;</span>
                     </div>
-                    <div className="mt-1 text-xs text-[#40311D]/40">2026 @Cliniqueue all rights reserved</div>
+                    <div className="mt-1 text-xs text-[#40311D]/40">&copy; 2026 @Clinique all rights reserved</div>
                 </div>
 
                 <nav className="flex flex-col gap-1">
                     <div className="mb-1 text-xs font-bold uppercase tracking-widest text-[#40311D]/40">Navigasi</div>
                     {[
                         ['beranda', isPatient ? '/beranda' : '/'],
-                        ['klinik', patientHref('/klinik')],
-                        ['dokter', patientHref('/dokter')],
+                        ['klinik', '/klinik'],
+                        ['dokter', '/dokter'],
                         ['reservasi', patientHref('/reservasi')],
                         ['rekam medis', patientHref('/rekam-medis')],
                     ].map(([label, href]) => (
@@ -40,8 +40,6 @@ export function PublicFooter() {
                     <br />
                     Jl Clinic, Jakarta Barat
                 </div>
-
-                <div className="border-t border-[#40311D]/10 pt-4 text-xs text-[#40311D]/40">© 2026 @Clinique all rights reserved</div>
             </div>
         </footer>
     );
