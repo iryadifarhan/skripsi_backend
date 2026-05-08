@@ -2,6 +2,12 @@ import { Head, Link } from '@inertiajs/react';
 
 import rekamanMedisImg from '@/assets/rekaman-medis-mock.png';
 import reservasiImg from '@/assets/reservasi-mock.png';
+import berandaImg from '@/assets/beranda-mock.jpeg';
+
+import dashboardImg from '@/assets/dashboard-mock.jpeg'
+import dataDokterImg from '@/assets/data-dokter-mock.jpeg'
+import laporanImg from '@/assets/laporan-mock.jpeg'
+
 import ImageStack from '@/components/landing/image-stack';
 import { PublicFooter } from '@/components/landing/public-footer';
 import { PublicNavbar } from '@/components/landing/public-navbar';
@@ -124,9 +130,9 @@ function Features() {
 
 function MedicalRecords() {
     const cards = [
-        { id: 'A', src: reservasiImg, alt: 'Preview reservasi pasien', top: 0, left: 5, zIndex: 3 },
-        { id: 'B', src: rekamanMedisImg, alt: 'Preview rekam medis pasien', top: 12, left: 40, zIndex: 2 },
-        { id: 'C', src: rekamanMedisImg, alt: 'Preview detail rekam medis', top: 40, left: 20, zIndex: 1 },
+        { id: 'A', src: berandaImg, alt: 'Preview beranda', top: 0, left: 5, zIndex: 2 },
+        { id: 'B', src: reservasiImg, alt: 'Preview reservasi pasien',  top: 12, left: 40, zIndex: 3 },
+        { id: 'C', src: rekamanMedisImg, alt: 'Preview rekam medis pasien', top: 40, left: 20, zIndex: 1 },
     ];
 
     return (
@@ -152,9 +158,9 @@ function MedicalRecords() {
 
 function AdminDashboard() {
     const cards = [
-        { id: 'A', src: reservasiImg, alt: 'Preview dashboard administrasi', top: 0, left: 5, zIndex: 3 },
-        { id: 'B', src: reservasiImg, alt: 'Preview manajemen reservasi', top: 12, left: 40, zIndex: 2 },
-        { id: 'C', src: reservasiImg, alt: 'Preview manajemen antrean', top: 40, left: 20, zIndex: 1 },
+        { id: 'A', src: dashboardImg, alt: 'Preview dashboard administrasi', top: 0, left: 5, zIndex: 3 },
+        { id: 'B', src: dataDokterImg, alt: 'Preview data dokter', top: 12, left: 40, zIndex: 2 },
+        { id: 'C', src: laporanImg, alt: 'Preview laporan', top: 40, left: 20, zIndex: 1 },
     ];
 
     return (
