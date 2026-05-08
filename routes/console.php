@@ -12,8 +12,8 @@ Artisan::command('inspire', function () {
 Artisan::command('reservations:send-reminders', function (ReservationReminderService $reminderService): void {
     $sent = $reminderService->sendUpcomingApprovedReminders();
 
-    $this->info("Reservation reminders dispatched: {$sent}");
-})->purpose('Send reminders for approved reservations starting within the next 2 hours.');
+    $this->info("Pengingat reservasi dikirim: {$sent}");
+})->purpose('Mengirim pengingat untuk reservasi approved yang dimulai kurang dari 2 jam lagi.');
 
 Schedule::command('reservations:send-reminders')
     ->everyMinute()

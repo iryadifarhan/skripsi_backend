@@ -44,7 +44,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return response()->json([
-            'message' => 'Registration successful.',
+            'message' => 'Registrasi berhasil.',
             'user'    => $user,
         ], 201);
     }
@@ -64,14 +64,14 @@ class AuthController extends Controller
 
         if (! $authenticated) {
             throw ValidationException::withMessages([
-                'message' => ['The provided credentials are incorrect.'],
+                'message' => ['Email atau password yang diberikan salah.'],
             ]);
         }
 
         $request->session()->regenerate();
 
         return response()->json([
-            'message' => 'Login successful.',
+            'message' => 'Login berhasil.',
             'user' => $request->user(),
         ]);
     }
@@ -97,7 +97,7 @@ class AuthController extends Controller
         Auth::forgetGuards();
 
         return response()->json([
-            'message' => 'Logout successful.',
+            'message' => 'Logout berhasil.',
         ]);
     }
 
@@ -113,12 +113,12 @@ class AuthController extends Controller
 
         if ($status !== Password::RESET_LINK_SENT) {
             throw ValidationException::withMessages([
-                'email' => [__($status)],
+                'email' => [$this->passwordStatusMessage($status)],
             ]);
         }
 
         return response()->json([
-            'message' => __($status),
+            'message' => $this->passwordStatusMessage($status),
         ]);
     }
 
@@ -145,12 +145,12 @@ class AuthController extends Controller
 
         if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages([
-                'email' => [__($status)],
+                'email' => [$this->passwordStatusMessage($status)],
             ]);
         }
 
         return response()->json([
-            'message' => __($status),
+            'message' => $this->passwordStatusMessage($status),
         ]);
     }
 
@@ -174,6 +174,18 @@ class AuthController extends Controller
         })->values()->all();
 
         return $payload;
+    }
+
+    private function passwordStatusMessage(string $status): string
+    {
+        return match ($status) {
+            Password::RESET_LINK_SENT => 'Link reset password telah dikirim.',
+            Password::PASSWORD_RESET => 'Password berhasil direset.',
+            Password::INVALID_USER => 'Email tidak ditemukan.',
+            Password::INVALID_TOKEN => 'Token reset password tidak valid.',
+            Password::RESET_THROTTLED => 'Terlalu banyak permintaan reset password. Silakan coba lagi nanti.',
+            default => __($status),
+        };
     }
 
     /**

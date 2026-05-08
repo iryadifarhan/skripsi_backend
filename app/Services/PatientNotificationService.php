@@ -34,7 +34,7 @@ class PatientNotificationService
             try {
                 $patient->notify($notification);
             } catch (Throwable $exception) {
-                Log::warning('Patient email notification failed.', [
+                Log::warning('Pengiriman notifikasi email pasien gagal.', [
                     'reservation_id' => $reservation->id,
                     'event_type' => $eventType,
                     'message' => $exception->getMessage(),
@@ -63,7 +63,7 @@ class PatientNotificationService
             try {
                 $patient->notify($notification);
             } catch (Throwable $exception) {
-                Log::warning('Patient queue email notification failed.', [
+                Log::warning('Pengiriman notifikasi email antrean pasien gagal.', [
                     'reservation_id' => $reservation->id,
                     'queue_status' => $queueStatus,
                     'message' => $exception->getMessage(),
@@ -97,7 +97,7 @@ class PatientNotificationService
             try {
                 $patient->notify($notification);
             } catch (Throwable $exception) {
-                Log::warning('Patient medical record email notification failed.', [
+                Log::warning('Pengiriman notifikasi email rekam medis pasien gagal.', [
                     'reservation_id' => $reservation->id,
                     'medical_record_id' => $medicalRecord->id,
                     'message' => $exception->getMessage(),
@@ -128,7 +128,7 @@ class PatientNotificationService
                 $patient->notify($notification);
                 $notificationDispatched = true;
             } catch (Throwable $exception) {
-                Log::warning('Patient reservation reminder email notification failed.', [
+                Log::warning('Pengiriman notifikasi email pengingat reservasi pasien gagal.', [
                     'reservation_id' => $reservation->id,
                     'message' => $exception->getMessage(),
                 ]);
@@ -163,7 +163,7 @@ class PatientNotificationService
 
             return true;
         } catch (Throwable $exception) {
-            Log::warning('Patient WhatsApp notification dispatch failed.', [
+            Log::warning('Dispatch notifikasi WhatsApp pasien gagal.', [
                 'reservation_id' => $reservation->id,
                 'message' => $exception->getMessage(),
             ]);

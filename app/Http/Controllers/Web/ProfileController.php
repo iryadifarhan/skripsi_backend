@@ -34,7 +34,7 @@ class ProfileController extends Controller
         }
 
         return response()->json([
-            'message' => 'Profile retrieval successful.',
+            'message' => 'Pengambilan profil berhasil.',
             'user' => $this->serializeProfileUser($user),
         ]);
     }
@@ -54,7 +54,7 @@ class ProfileController extends Controller
 
         if ($payload === []) {
             return response()->json([
-                'message' => 'At least one profile field is required.',
+                'message' => 'Minimal satu field profil wajib diisi.',
             ], 422);
         }
 
@@ -65,7 +65,7 @@ class ProfileController extends Controller
         }
 
         return response()->json([
-            'message' => 'Profile update successful.',
+            'message' => 'Profil berhasil diperbarui.',
             'user' => $user->fresh(),
         ]);
     }
@@ -88,7 +88,7 @@ class ProfileController extends Controller
         }
 
         return response()->json([
-            'message' => 'Password update successful.',
+            'message' => 'Password berhasil diperbarui.',
         ]);
     }
 
@@ -107,7 +107,7 @@ class ProfileController extends Controller
         $clinic = $doctor->clinics()->whereKey($payload['clinic_id'])->first();
 
         if ($clinic === null) {
-            abort(403, 'Forbidden, you are not authorized to update speciality for this clinic.');
+            abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk memperbarui spesialisasi klinik ini.');
         }
 
         $specialities = collect($payload['specialities'])
@@ -128,7 +128,7 @@ class ProfileController extends Controller
         }
 
         return response()->json([
-            'message' => 'Clinic speciality update successful.',
+            'message' => 'Spesialisasi klinik berhasil diperbarui.',
             'clinic_id' => (int) $payload['clinic_id'],
             'specialities' => $specialities,
         ]);
@@ -176,7 +176,7 @@ class ProfileController extends Controller
         }
 
         return response()->json([
-            'message' => 'Profile picture update successful.',
+            'message' => 'Avatar profil berhasil diperbarui.',
             'user' => $user->fresh(),
         ]);
     }
@@ -208,7 +208,7 @@ class ProfileController extends Controller
         }
 
         return response()->json([
-            'message' => 'Profile image uploaded successfully.',
+            'message' => 'Foto profil berhasil diunggah.',
             'user' => $user->fresh(),
         ]);
     }
@@ -228,7 +228,7 @@ class ProfileController extends Controller
         }
 
         return response()->json([
-            'message' => 'Profile image deleted successfully.',
+            'message' => 'Foto profil berhasil dihapus.',
             'user' => $user->fresh(),
         ]);
     }

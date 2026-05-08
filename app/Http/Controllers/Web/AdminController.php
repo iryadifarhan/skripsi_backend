@@ -34,7 +34,7 @@ class AdminController extends Controller
             ->get(['id', 'name', 'username', 'email', 'phone_number', 'gender']);
 
         return response()->json([
-            'message' => 'Patient search successful.',
+            'message' => 'Pencarian pasien berhasil.',
             'patients' => $patients,
         ]);
     }
@@ -47,7 +47,7 @@ class AdminController extends Controller
 
         if (!$user) {
             return response()->json([
-                'message' => 'User not found.',
+                'message' => 'Pengguna tidak ditemukan.',
             ], 404);
         }
 
@@ -56,7 +56,7 @@ class AdminController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'User retrieval successful.',
+            'message' => 'Pengambilan data pengguna berhasil.',
             'user'   => $this->serializeUser($request, $user),
         ]);
     }
@@ -87,7 +87,7 @@ class AdminController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'User creation successful.',
+            'message' => 'Pengguna berhasil dibuat.',
             'user'    => $user,
         ], 201);
     }
@@ -100,7 +100,7 @@ class AdminController extends Controller
 
         if (!$user) {
             return response()->json([
-                'message' => 'User not found.',
+                'message' => 'Pengguna tidak ditemukan.',
             ], 404);
         }
 
@@ -121,7 +121,7 @@ class AdminController extends Controller
         $user->update($payload);
 
         return response()->json([
-            'message' => "User update successful.",
+            'message' => "Pengguna berhasil diperbarui.",
             'user'    => $user,
         ]);
     }
@@ -134,20 +134,20 @@ class AdminController extends Controller
 
         if (!$user) {
             return response()->json([
-                'message' => 'User not found.',
+                'message' => 'Pengguna tidak ditemukan.',
             ], 404);
         }
 
         if ($user->id === Auth::id()) {
             return response()->json([
-                'message' => 'You cannot delete your own account.',
+                'message' => 'Anda tidak dapat menghapus akun sendiri.',
             ], 400);
         }
 
         $user->delete();
 
         return response()->json([
-            'message' => 'User deletion successful.',
+            'message' => 'Pengguna berhasil dihapus.',
         ]);
     }
 

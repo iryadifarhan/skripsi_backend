@@ -98,7 +98,7 @@ class MedicalRecordWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '081234500006'
-            && str_contains($job->message, 'completed')
+            && str_contains($job->message, 'telah selesai')
             && str_contains($job->message, 'Patient should rest for three days.')
             && str_contains($job->message, '/rekam-medis')
         );
@@ -210,7 +210,7 @@ class MedicalRecordWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '081234500012'
-            && str_contains($job->message, 'completed')
+            && str_contains($job->message, 'telah selesai')
             && str_contains($job->message, 'Admin recorded the consultation result.')
             && str_contains($job->message, '/rekam-medis')
         );

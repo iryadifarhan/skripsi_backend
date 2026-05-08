@@ -39,7 +39,7 @@ class FonnteService
                 ]);
 
             if ($response->failed()) {
-                Log::warning('Fonnte request failed.', [
+                Log::warning('Permintaan ke Fonnte gagal.', [
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
@@ -50,7 +50,7 @@ class FonnteService
             $data = $response->json();
 
             if (is_array($data) && array_key_exists('status', $data) && $data['status'] === false) {
-                Log::warning('Fonnte reported an unsuccessful response.', [
+                Log::warning('Fonnte mengembalikan respons gagal.', [
                     'response' => $data,
                 ]);
 
@@ -59,7 +59,7 @@ class FonnteService
 
             return true;
         } catch (Throwable $exception) {
-            Log::warning('Fonnte message sending failed.', [
+            Log::warning('Pengiriman pesan Fonnte gagal.', [
                 'message' => $exception->getMessage(),
             ]);
 

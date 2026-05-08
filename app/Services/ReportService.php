@@ -221,7 +221,7 @@ class ReportService
     {
         if ($actor->role === User::ROLE_DOCTOR) {
             if ($doctorId !== null && (int) $doctorId !== (int) $actor->id) {
-                abort(403, 'Forbidden, you are not authorized to access another doctor report.');
+                abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses laporan dokter lain.');
             }
 
             return (int) $actor->id;
@@ -235,13 +235,13 @@ class ReportService
 
         if (!$doctor || $doctor->role !== User::ROLE_DOCTOR) {
             throw ValidationException::withMessages([
-                'doctor_id' => ['Selected doctor is invalid.'],
+                'doctor_id' => ['Dokter yang dipilih tidak valid.'],
             ]);
         }
 
         if (!$doctor->clinics()->whereKey($clinicId)->exists()) {
             throw ValidationException::withMessages([
-                'doctor_id' => ['Selected doctor is not assigned to the selected clinic.'],
+                'doctor_id' => ['Dokter yang dipilih tidak terdaftar pada klinik yang dipilih.'],
             ]);
         }
 

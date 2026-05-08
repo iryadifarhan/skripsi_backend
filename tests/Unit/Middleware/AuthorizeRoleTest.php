@@ -34,7 +34,7 @@ class AuthorizeRoleTest extends TestCase
 
         $this->assertSame(401, $response->getStatusCode());
         $this->assertSame(
-            ['message' => 'Unauthorized, you are not authenticated.'],
+            ['message' => 'Tidak terautentikasi. Silakan masuk terlebih dahulu.'],
             json_decode((string) $response->getContent(), true)
         );
     }
@@ -66,7 +66,7 @@ class AuthorizeRoleTest extends TestCase
 
         $this->assertSame(403, $response->getStatusCode());
         $this->assertSame(
-            ['message' => 'Forbidden, you are not authorized.'],
+            ['message' => 'Akses ditolak. Anda tidak memiliki izin.'],
             json_decode((string) $response->getContent(), true)
         );
     }
@@ -115,7 +115,7 @@ class AuthorizeRoleTest extends TestCase
                 'clinic-scoped'
             ),
             403,
-            'Forbidden, you are not authorized as an admin to this clinic.'
+            'Akses ditolak. Anda tidak memiliki izin sebagai admin untuk klinik ini.'
         );
     }
 
@@ -149,7 +149,7 @@ class AuthorizeRoleTest extends TestCase
                 'clinic-scoped'
             ),
             403,
-            'Forbidden, you are not authorized as a doctor to this clinic.'
+            'Akses ditolak. Anda tidak memiliki izin sebagai dokter untuk klinik ini.'
         );
     }
 
@@ -165,7 +165,7 @@ class AuthorizeRoleTest extends TestCase
                 'clinic-scoped'
             ),
             422,
-            'clinic_id is required for clinic-scoped access.'
+            'clinic_id wajib diisi untuk akses berbasis klinik.'
         );
     }
 
@@ -181,7 +181,7 @@ class AuthorizeRoleTest extends TestCase
                 'clinic-scoped'
             ),
             404,
-            'Clinic id provided is not found or deleted.'
+            'ID klinik yang diberikan tidak ditemukan atau sudah dihapus.'
         );
     }
 

@@ -198,7 +198,7 @@ class ClinicWebTest extends TestCase
             'password_confirmation' => 'Password123!',
         ], $this->spaHeaders())
             ->assertCreated()
-            ->assertJsonPath('message', 'Clinic admin created successfully.')
+            ->assertJsonPath('message', 'Admin klinik berhasil dibuat.')
             ->assertJsonPath('admin.email', 'clinic-admin-baru@example.test');
 
         $admin = User::where('email', 'clinic-admin-baru@example.test')->firstOrFail();
@@ -244,7 +244,7 @@ class ClinicWebTest extends TestCase
             'password_confirmation' => 'NewPassword123!',
         ], $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('message', 'Clinic admin updated successfully.')
+            ->assertJsonPath('message', 'Admin klinik berhasil diperbarui.')
             ->assertJsonPath('admin.email', 'clinic-admin-updated@example.test');
 
         $admin->refresh();
@@ -262,7 +262,7 @@ class ClinicWebTest extends TestCase
 
         $this->deleteJson("/clinic-settings/{$clinic->id}/admins/{$admin->id}", [], $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('message', 'Clinic admin deleted successfully.')
+            ->assertJsonPath('message', 'Admin klinik berhasil dihapus.')
             ->assertJsonPath('admin_id', $admin->id);
 
         $this->assertDatabaseMissing('users', [
@@ -383,7 +383,7 @@ class ClinicWebTest extends TestCase
             'clinic_id' => $clinic->id,
         ], $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('message', 'Doctor clinic schedule deleted successfully.');
+            ->assertJsonPath('message', 'Jadwal dokter klinik berhasil dihapus.');
 
         $this->assertDatabaseMissing('doctor_clinic_schedules', [
             'id' => $schedule->id,
@@ -404,7 +404,7 @@ class ClinicWebTest extends TestCase
             'image' => UploadedFile::fake()->image('clinic-logo.png', 400, 400),
         ], $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('message', 'Clinic image uploaded successfully.');
+            ->assertJsonPath('message', 'Foto klinik berhasil diunggah.');
 
         $clinic = $clinic->fresh();
 
@@ -439,7 +439,7 @@ class ClinicWebTest extends TestCase
             'image' => UploadedFile::fake()->image('doctor-photo.webp', 500, 500),
         ], $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('message', 'Doctor image uploaded successfully.')
+            ->assertJsonPath('message', 'Foto dokter berhasil diunggah.')
             ->assertJsonPath('doctor.id', $doctor->id)
             ->assertJsonPath('doctor.specialities.0', 'Cardiology');
 
@@ -508,7 +508,7 @@ class ClinicWebTest extends TestCase
             'max_patients_per_window' => 4,
         ], $this->spaHeaders())
             ->assertCreated()
-            ->assertJsonPath('message', 'Doctor clinic schedules created successfully.')
+            ->assertJsonPath('message', 'Jadwal dokter klinik berhasil dibuat.')
             ->assertJsonCount(2, 'schedules');
 
         $this->assertDatabaseHas('doctor_clinic_schedules', [

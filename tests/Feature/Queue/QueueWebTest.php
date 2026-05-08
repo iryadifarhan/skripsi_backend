@@ -377,7 +377,7 @@ class QueueWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '+628123450005'
-            && str_contains($job->message, 'being called')
+            && str_contains($job->message, 'sedang dipanggil')
         );
     }
 
@@ -488,7 +488,7 @@ class QueueWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '+628123450006'
-            && str_contains($job->message, 'cancelled')
+            && str_contains($job->message, 'telah dibatalkan')
         );
     }
 

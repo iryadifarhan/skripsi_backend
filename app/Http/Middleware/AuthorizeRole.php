@@ -16,7 +16,7 @@ class AuthorizeRole
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized as an admin to this clinic.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin sebagai admin untuk klinik ini.');
     }
 
     private function authorizeClinicDoctor(User $user, Clinic $clinic): void
@@ -25,7 +25,7 @@ class AuthorizeRole
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized as a doctor to this clinic.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin sebagai dokter untuk klinik ini.');
     }
 
     private function resolveClinicFromRequest(Request $request): Clinic
@@ -33,13 +33,13 @@ class AuthorizeRole
         $clinicId = $request->input('clinic_id');
 
         if ($clinicId === null || $clinicId === '') {
-            abort(422, 'clinic_id is required for clinic-scoped access.');
+            abort(422, 'clinic_id wajib diisi untuk akses berbasis klinik.');
         }
 
         $clinic = Clinic::where('id', $clinicId)->first();
 
         if (!$clinic) {
-            abort(404, 'Clinic id provided is not found or deleted.');
+            abort(404, 'ID klinik yang diberikan tidak ditemukan atau sudah dihapus.');
         }
 
         return $clinic;
@@ -54,7 +54,7 @@ class AuthorizeRole
         $user = $request->user();
 
         if (!$user) {
-            return response()->json(['message' => 'Unauthorized, you are not authenticated.'], 401);
+            return response()->json(['message' => 'Tidak terautentikasi. Silakan masuk terlebih dahulu.'], 401);
         }
 
         // Superadmin get bypass for all access
@@ -66,7 +66,7 @@ class AuthorizeRole
         $allowedRoles = array_values(array_filter($roles, fn (string $role): bool => $role !== 'clinic-scoped'));
 
         if (!in_array($user->role, $allowedRoles, true)) {
-            return response()->json(['message' => 'Forbidden, you are not authorized.'], 403);
+            return response()->json(['message' => 'Akses ditolak. Anda tidak memiliki izin.'], 403);
         }
 
         // Decide if clinic scope check is needed based on presence of 'clinic-scoped' flag
@@ -88,6 +88,6 @@ class AuthorizeRole
             return $next($request);
         }
 
-        return response()->json(['message' => 'Forbidden, you are not authorized.'], 403);
+        return response()->json(['message' => 'Akses ditolak. Anda tidak memiliki izin.'], 403);
     }
 }

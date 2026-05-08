@@ -88,7 +88,7 @@ class ReportController extends Controller
             'format' => ['required', 'string', 'in:xlsx,pdf'],
         ]));
         $selectedClinic = $this->selectedReportClinic($request, $context, $payload);
-        abort_if($selectedClinic === null, 422, 'Clinic is required for report export.');
+        abort_if($selectedClinic === null, 422, 'Klinik wajib dipilih untuk export laporan.');
 
         $filters = $this->normalizedPageFilters($payload, $selectedClinic->id);
         $reservationReport = $this->reportService->reservations($user, $filters);
@@ -138,7 +138,7 @@ class ReportController extends Controller
         $report = $this->reportService->reservations($request->user(), $filters);
 
         return response()->json([
-            'message' => 'Reservation report retrieval successful.',
+            'message' => 'Pengambilan laporan reservasi berhasil.',
             'filters' => $report['filters'],
             'summary' => $report['summary'],
             'reservations' => $this->queueService->serializeReservations($report['records']),
@@ -177,7 +177,7 @@ class ReportController extends Controller
         $report = $this->reportService->medicalRecords($request->user(), $filters);
 
         return response()->json([
-            'message' => 'Medical record report retrieval successful.',
+            'message' => 'Pengambilan laporan rekam medis berhasil.',
             'filters' => $report['filters'],
             'summary' => $report['summary'],
             'medical_records' => $this->serializeMedicalRecords($report['records']),
@@ -283,7 +283,7 @@ class ReportController extends Controller
                 : (int) $clinicIds->first();
 
             if (!$clinicIds->contains($clinicId)) {
-                abort(403, 'Forbidden, you are not authorized to access this clinic report.');
+                abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses laporan klinik ini.');
             }
 
             return Clinic::find($clinicId);
@@ -445,7 +445,7 @@ class ReportController extends Controller
 
     private function denySuperadminMedicalRecordAccess(Request $request): void
     {
-        abort_if($request->user()->role === User::ROLE_SUPERADMIN, 403, 'Superadmin cannot access medical record data.');
+        abort_if($request->user()->role === User::ROLE_SUPERADMIN, 403, 'Superadmin tidak dapat mengakses data rekam medis.');
     }
 
     /**

@@ -56,7 +56,7 @@ class AdminReservationController extends Controller
         }
 
         return response()->json([
-            'message' => 'Reservation retrieval successful.',
+            'message' => 'Pengambilan data reservasi berhasil.',
             'reservations' => $this->queueService->serializeReservations($query->get()),
         ]);
     }
@@ -66,7 +66,7 @@ class AdminReservationController extends Controller
         $this->assertReservationBelongsToRequestedClinic($request, $reservation);
 
         return response()->json([
-            'message' => 'Reservation retrieval successful.',
+            'message' => 'Pengambilan data reservasi berhasil.',
             'reservation' => $this->queueService->serializeReservation(
                 $reservation->load($this->reservationRelations())
             ),
@@ -92,7 +92,7 @@ class AdminReservationController extends Controller
 
         if (count(array_diff(array_keys($payload), ['clinic_id'])) === 0) {
             throw ValidationException::withMessages([
-                'message' => ['At least one field is required to update reservation details.'],
+                'message' => ['Minimal satu field wajib diisi untuk memperbarui detail reservasi.'],
             ]);
         }
 
@@ -128,7 +128,7 @@ class AdminReservationController extends Controller
                 && !$scheduleRequested
             ) {
                 throw ValidationException::withMessages([
-                    'doctor_clinic_schedule_id' => ['doctor_clinic_schedule_id is required when changing doctors.'],
+                    'doctor_clinic_schedule_id' => ['doctor_clinic_schedule_id wajib diisi ketika mengganti dokter.'],
                 ]);
             }
 
@@ -144,7 +144,7 @@ class AdminReservationController extends Controller
 
                 if ((int) $targetSchedule->clinic_id !== $clinicId) {
                     throw ValidationException::withMessages([
-                        'doctor_clinic_schedule_id' => ['Selected practice schedule does not belong to the selected clinic.'],
+                        'doctor_clinic_schedule_id' => ['Jadwal praktik yang dipilih tidak terdaftar pada klinik yang dipilih.'],
                     ]);
                 }
 
@@ -153,7 +153,7 @@ class AdminReservationController extends Controller
 
                     if ((int) $targetSchedule->doctor_id !== (int) $payload['doctor_id']) {
                         throw ValidationException::withMessages([
-                            'doctor_clinic_schedule_id' => ['Selected practice schedule does not match the selected doctor.'],
+                            'doctor_clinic_schedule_id' => ['Jadwal praktik yang dipilih tidak sesuai dengan dokter yang dipilih.'],
                         ]);
                     }
                 }
@@ -165,7 +165,7 @@ class AdminReservationController extends Controller
 
                 if ($selectedWindow === null) {
                     throw ValidationException::withMessages([
-                        'window_start_time' => ['Selected window is not available in this practice schedule.'],
+                        'window_start_time' => ['Window yang dipilih tidak tersedia pada jadwal praktik ini.'],
                     ]);
                 }
             }
@@ -180,7 +180,7 @@ class AdminReservationController extends Controller
 
             if ($targetPatient === null && empty($targetGuestName)) {
                 throw ValidationException::withMessages([
-                    'guest_name' => ['guest_name is required when reservation has no linked patient account.'],
+                    'guest_name' => ['guest_name wajib diisi jika reservasi tidak terhubung dengan akun pasien.'],
                 ]);
             }
 
@@ -212,7 +212,7 @@ class AdminReservationController extends Controller
 
                 if ($isScheduleChanged && !in_array($lockedReservation->status, Reservation::ACTIVE_STATUSES, true)) {
                     throw ValidationException::withMessages([
-                        'reservation_date' => ['Only active reservations can have their schedule changed.'],
+                        'reservation_date' => ['Hanya reservasi aktif yang dapat diubah jadwalnya.'],
                     ]);
                 }
 
@@ -301,7 +301,7 @@ class AdminReservationController extends Controller
         }
 
         return response()->json([
-            'message' => 'Reservation detail update successful.',
+            'message' => 'Detail reservasi berhasil diperbarui.',
             'reservation' => $this->queueService->serializeReservation(
                 $reservation->fresh()->load($this->reservationRelations())
             ),
@@ -321,7 +321,7 @@ class AdminReservationController extends Controller
 
         if (count(array_diff(array_keys($payload), ['clinic_id'])) === 0) {
             throw ValidationException::withMessages([
-                'message' => ['At least one field is required to process reservation.'],
+                'message' => ['Minimal satu field wajib diisi untuk memproses reservasi.'],
             ]);
         }
 
@@ -340,7 +340,7 @@ class AdminReservationController extends Controller
                     && $payload['status'] !== $lockedReservation->status
                 ) {
                     throw ValidationException::withMessages([
-                        'status' => ['Terminal reservation status cannot be changed.'],
+                        'status' => ['Status reservasi final tidak dapat diubah.'],
                     ]);
                 }
 
@@ -349,7 +349,7 @@ class AdminReservationController extends Controller
                     && empty($payload['cancellation_reason'])
                 ) {
                     throw ValidationException::withMessages([
-                        'cancellation_reason' => ['Cancellation or rejection reason is required when status is cancelled or rejected.'],
+                        'cancellation_reason' => ['Alasan pembatalan atau penolakan wajib diisi jika status dibatalkan atau ditolak.'],
                     ]);
                 }
 
@@ -408,7 +408,7 @@ class AdminReservationController extends Controller
         }
 
         return response()->json([
-            'message' => 'Reservation processing successful.',
+            'message' => 'Proses reservasi berhasil.',
             'reservation' => $this->queueService->serializeReservation(
                 $reservation->fresh()->load($this->reservationRelations())
             ),
@@ -434,13 +434,13 @@ class AdminReservationController extends Controller
 
         if (!$doctor || $doctor->role !== User::ROLE_DOCTOR) {
             throw ValidationException::withMessages([
-                'doctor_id' => ['Selected doctor is invalid.'],
+                'doctor_id' => ['Dokter yang dipilih tidak valid.'],
             ]);
         }
 
         if (!$doctor->clinics()->whereKey($clinicId)->exists()) {
             throw ValidationException::withMessages([
-                'doctor_id' => ['Selected doctor is not assigned to the selected clinic.'],
+                'doctor_id' => ['Dokter yang dipilih tidak terdaftar pada klinik yang dipilih.'],
             ]);
         }
     }
@@ -451,7 +451,7 @@ class AdminReservationController extends Controller
 
         if (!$schedule || !$schedule->is_active) {
             throw ValidationException::withMessages([
-                'doctor_clinic_schedule_id' => ['Selected practice schedule is invalid or inactive.'],
+                'doctor_clinic_schedule_id' => ['Jadwal praktik yang dipilih tidak valid atau tidak aktif.'],
             ]);
         }
 
@@ -459,7 +459,7 @@ class AdminReservationController extends Controller
 
         if ((int) $schedule->day_of_week !== (int) $dayOfWeek) {
             throw ValidationException::withMessages([
-                'reservation_date' => ['Selected date does not match the doctor practice schedule day.'],
+                'reservation_date' => ['Tanggal yang dipilih tidak sesuai dengan hari jadwal praktik dokter.'],
             ]);
         }
 
@@ -482,7 +482,7 @@ class AdminReservationController extends Controller
 
         if (!$patient || $patient->role !== User::ROLE_PATIENT) {
             throw ValidationException::withMessages([
-                'patient_id' => ['Selected patient is invalid.'],
+                'patient_id' => ['Pasien yang dipilih tidak valid.'],
             ]);
         }
 
@@ -505,7 +505,7 @@ class AdminReservationController extends Controller
 
         if ($query->exists()) {
             throw ValidationException::withMessages([
-                'reservation_date' => ['You already have an active reservation at this clinic on the selected date.'],
+                'reservation_date' => ['Anda sudah memiliki reservasi aktif di klinik ini pada tanggal yang dipilih.'],
             ]);
         }
     }
@@ -546,7 +546,7 @@ class AdminReservationController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'window_start_time' => ['Selected window is full. Please choose another window.'],
+            'window_start_time' => ['Window yang dipilih sudah penuh. Silakan pilih window lain.'],
         ]);
     }
 
@@ -556,7 +556,7 @@ class AdminReservationController extends Controller
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses reservasi klinik ini.');
     }
 
     private function normalizeTimeString(string $value): string

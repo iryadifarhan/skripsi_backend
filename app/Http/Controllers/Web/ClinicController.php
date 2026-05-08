@@ -119,7 +119,7 @@ class ClinicController extends Controller
         }
 
         return response()->json([
-            'message' => 'Clinic retrieval successful.',
+            'message' => 'Pengambilan data klinik berhasil.',
             'clinics' => $clinics->map(fn (Clinic $clinic): array => $this->serializeClinicSummary($clinic))->all(),
         ]);
     }
@@ -128,7 +128,7 @@ class ClinicController extends Controller
     {
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -172,7 +172,7 @@ class ClinicController extends Controller
         ]);
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Clinic city created successfully.',
+            'message' => 'Kota klinik berhasil dibuat.',
             'city' => $this->serializeClinicCity($city),
         ], 201, 'Kota klinik berhasil ditambahkan.');
     }
@@ -186,7 +186,7 @@ class ClinicController extends Controller
 
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -203,7 +203,7 @@ class ClinicController extends Controller
         $this->deleteStoredImage($previousImagePath, $newImagePath);
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Clinic image uploaded successfully.',
+            'message' => 'Foto klinik berhasil diunggah.',
             'clinic' => $this->serializeClinicDetail($clinic->fresh()->load([
                 'city:id,name',
                 'doctors:id,name,username,email,phone_number,profile_picture,image_path,role',
@@ -222,7 +222,7 @@ class ClinicController extends Controller
 
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -233,13 +233,13 @@ class ClinicController extends Controller
 
         if ($doctor === null || $doctor->role !== User::ROLE_DOCTOR) {
             return response()->json([
-                'message' => 'The selected user is not a doctor.',
+                'message' => 'Pengguna yang dipilih bukan dokter.',
             ], 400);
         }
 
         if (!$doctor->clinics()->whereKey($clinic->id)->exists()) {
             return response()->json([
-                'message' => 'The doctor is not assigned to the specified clinic.',
+                'message' => 'Dokter belum terdaftar pada klinik yang ditentukan.',
             ], 400);
         }
 
@@ -258,7 +258,7 @@ class ClinicController extends Controller
             ->first(['users.id', 'users.name', 'users.username', 'users.email', 'users.phone_number', 'users.profile_picture', 'users.image_path', 'users.role']);
 
         return response()->json([
-            'message' => 'Doctor image uploaded successfully.',
+            'message' => 'Foto dokter berhasil diunggah.',
             'doctor' => [
                 'id' => $doctor->id,
                 'name' => $doctor->name,
@@ -300,7 +300,7 @@ class ClinicController extends Controller
         $this->syncOperatingHours($clinic, $payload['operating_hours'] ?? null);
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Clinic created successfully.',
+            'message' => 'Klinik berhasil dibuat.',
             'clinic' => $this->serializeClinicDetail($clinic->fresh()->load([
                 'city:id,name',
                 'doctors:id,name,username,email,phone_number,profile_picture,image_path,role',
@@ -312,7 +312,7 @@ class ClinicController extends Controller
     public function update(Request $request, $clinicId) {
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -335,7 +335,7 @@ class ClinicController extends Controller
         $this->syncOperatingHours($clinic, $request->input('operating_hours'));
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Clinic updated successfully.',
+            'message' => 'Klinik berhasil diperbarui.',
         ], flashMessage: 'Data klinik berhasil diperbarui.');
     }
 
@@ -345,7 +345,7 @@ class ClinicController extends Controller
 
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -377,7 +377,7 @@ class ClinicController extends Controller
         ])->save();
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Clinic admin created successfully.',
+            'message' => 'Admin klinik berhasil dibuat.',
             'admin' => $this->serializeClinicAdmin($admin),
         ], 201, 'Admin klinik berhasil dibuat.');
     }
@@ -388,7 +388,7 @@ class ClinicController extends Controller
 
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -396,7 +396,7 @@ class ClinicController extends Controller
 
         if ($admin === null) {
             return response()->json([
-                'message' => 'Clinic admin not found.',
+                'message' => 'Admin klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -434,7 +434,7 @@ class ClinicController extends Controller
         $admin->save();
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Clinic admin updated successfully.',
+            'message' => 'Admin klinik berhasil diperbarui.',
             'admin' => $this->serializeClinicAdmin($admin),
         ], flashMessage: 'Admin klinik berhasil diperbarui.');
     }
@@ -445,7 +445,7 @@ class ClinicController extends Controller
 
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -453,7 +453,7 @@ class ClinicController extends Controller
 
         if ($admin === null) {
             return response()->json([
-                'message' => 'Clinic admin not found.',
+                'message' => 'Admin klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -467,7 +467,7 @@ class ClinicController extends Controller
         $admin->delete();
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Clinic admin deleted successfully.',
+            'message' => 'Admin klinik berhasil dihapus.',
             'admin_id' => $deletedAdminId,
         ], flashMessage: 'Admin klinik berhasil dihapus.');
     }
@@ -475,7 +475,7 @@ class ClinicController extends Controller
     public function delete(Request $request, $clinicId): JsonResponse|RedirectResponse {
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -487,14 +487,14 @@ class ClinicController extends Controller
         $clinic->delete();
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Clinic deleted successfully.',
+            'message' => 'Klinik berhasil dihapus.',
         ], flashMessage: 'Data klinik berhasil dihapus.');
     }
 
     public function assignDoctor(Request $request, $clinicId) {
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -522,7 +522,7 @@ class ClinicController extends Controller
 
         if (User::where('id', $request->doctor_id)->where('role', User::ROLE_DOCTOR)->doesntExist()) {
             return response()->json([
-                'message' => 'The selected user is not a doctor.',
+                'message' => 'Pengguna yang dipilih bukan dokter.',
             ], 400);
         }
 
@@ -545,14 +545,14 @@ class ClinicController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Doctor assigned to clinic successfully.',
+            'message' => 'Dokter berhasil ditambahkan ke klinik.',
         ]);
     }
 
     public function removeDoctor(Request $request, $clinicId) {
         if (!$clinic = Clinic::find($clinicId)) {
             return response()->json([
-                'message' => 'Clinic not found.',
+                'message' => 'Klinik tidak ditemukan.',
             ], 404);
         }
 
@@ -564,14 +564,14 @@ class ClinicController extends Controller
 
         if (User::where('id', $request->doctor_id)->where('role', User::ROLE_DOCTOR)->doesntExist()) {
             return response()->json([
-                'message' => 'The selected user is not a doctor.',
+                'message' => 'Pengguna yang dipilih bukan dokter.',
             ], 400);
         }
 
         $clinic->doctors()->detach($request->doctor_id);
 
         return response()->json([
-            'message' => 'Doctor removed from clinic successfully.',
+            'message' => 'Dokter berhasil dihapus dari klinik.',
         ]);
     }
 
@@ -609,13 +609,13 @@ class ClinicController extends Controller
 
         if ($user->role !== User::ROLE_DOCTOR) {
             return response()->json([
-                'message' => 'The selected user is not a doctor.',
+                'message' => 'Pengguna yang dipilih bukan dokter.',
             ], 400);
         }
 
         if ($user->clinics()->where('clinic_id', $request->clinic_id)->doesntExist()) {
             return response()->json([
-                'message' => 'The doctor is not assigned to the specified clinic.',
+                'message' => 'Dokter belum terdaftar pada klinik yang ditentukan.',
             ], 400);
         }
 
@@ -630,7 +630,7 @@ class ClinicController extends Controller
         if ($existingScheduleDays !== []) {
             throw ValidationException::withMessages([
                 'day_of_week' => [
-                    'A schedule for this doctor, clinic, and day of week already exists for: '.implode(', ', $existingScheduleDays).'.',
+                    'Jadwal untuk dokter, klinik, dan hari tersebut sudah tersedia untuk: '.implode(', ', $existingScheduleDays).'.',
                 ],
             ]);
         }
@@ -646,7 +646,7 @@ class ClinicController extends Controller
             if ($clinicSchedule === null || (bool) $clinicSchedule->is_closed) {
                 throw ValidationException::withMessages([
                     'day_of_week' => [
-                        "The clinic does not have an available operating hour on day_of_week {$dayOfWeek}.",
+                        "Klinik tidak memiliki jam operasional tersedia pada day_of_week {$dayOfWeek}.",
                     ],
                 ]);
             }
@@ -654,7 +654,7 @@ class ClinicController extends Controller
             if ($request->start_time < $clinicSchedule->open_time || $request->end_time > $clinicSchedule->close_time) {
                 throw ValidationException::withMessages([
                     'day_of_week' => [
-                        "The schedule is outside the clinic's operating hours for day_of_week {$dayOfWeek}.",
+                        "Jadwal berada di luar jam operasional klinik pada day_of_week {$dayOfWeek}.",
                     ],
                 ]);
             }
@@ -677,8 +677,8 @@ class ClinicController extends Controller
 
         return $this->jsonOrRedirect($request, [
             'message' => $createdSchedules->count() === 1
-                ? 'Doctor clinic schedule created successfully.'
-                : 'Doctor clinic schedules created successfully.',
+                ? 'Jadwal dokter klinik berhasil dibuat.'
+                : 'Jadwal dokter klinik berhasil dibuat.',
             'schedules' => $createdSchedules->values(),
         ], 201, 'Jadwal dokter berhasil dibuat.');
     }
@@ -709,13 +709,13 @@ class ClinicController extends Controller
         if ($clinicSchedule === null || (bool) $clinicSchedule->is_closed || $startTime < $clinicSchedule->open_time || $endTime > $clinicSchedule->close_time) {
             if ($request->expectsJson()) {
                 return response()->json([
-                    'message' => 'The schedule is outside the clinic\'s operating hours.',
+                    'message' => 'Jadwal berada di luar jam operasional klinik.',
                 ], 400);
             }
 
             throw ValidationException::withMessages([
                 'start_time' => [
-                    'The schedule is outside the clinic\'s operating hours.',
+                    'Jadwal berada di luar jam operasional klinik.',
                 ],
             ]);
         }
@@ -729,7 +729,7 @@ class ClinicController extends Controller
         ]));
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Doctor clinic schedule updated successfully.',
+            'message' => 'Jadwal dokter klinik berhasil diperbarui.',
         ], flashMessage: 'Jadwal dokter berhasil diperbarui.');
     }
 
@@ -753,7 +753,7 @@ class ClinicController extends Controller
         $schedule->delete();
 
         return $this->jsonOrRedirect($request, [
-            'message' => 'Doctor clinic schedule deleted successfully.',
+            'message' => 'Jadwal dokter klinik berhasil dihapus.',
         ], flashMessage: 'Jadwal dokter berhasil dihapus.');
     }
 
@@ -832,18 +832,18 @@ class ClinicController extends Controller
             $closeTime = $hour['close_time'] ?? null;
 
             if (!$openTime || !$closeTime) {
-                $errors["operating_hours.$index.open_time"][] = 'Open time is required when clinic is not closed.';
-                $errors["operating_hours.$index.close_time"][] = 'Close time is required when clinic is not closed.';
+                $errors["operating_hours.$index.open_time"][] = 'Jam buka wajib diisi jika klinik tidak tutup.';
+                $errors["operating_hours.$index.close_time"][] = 'Jam tutup wajib diisi jika klinik tidak tutup.';
                 continue;
             }
 
             if (strtotime($openTime) >= strtotime($closeTime)) {
-                $errors["operating_hours.$index.close_time"][] = 'Close time must be after open time.';
+                $errors["operating_hours.$index.close_time"][] = 'Jam tutup harus setelah jam buka.';
             }
         }
 
         if (count($days) !== count(array_unique($days))) {
-            $errors['operating_hours'][] = 'Each day_of_week must be unique.';
+            $errors['operating_hours'][] = 'Setiap day_of_week harus unik.';
         }
 
         if ($errors !== []) {
@@ -1053,7 +1053,7 @@ class ClinicController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'clinic_id' => ['The provided clinic_id does not match the route clinic id.'],
+            'clinic_id' => ['clinic_id yang diberikan tidak sesuai dengan ID klinik pada route.'],
         ]);
     }
 
@@ -1118,7 +1118,7 @@ class ClinicController extends Controller
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized to manage this clinic.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengelola klinik ini.');
     }
 
     private function assertClinicCanBeDeleted(Clinic $clinic): void
@@ -1173,7 +1173,7 @@ class ClinicController extends Controller
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized to manage this schedule.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengelola jadwal ini.');
     }
 
     private function assertCanManageSchedule(Request $request, DoctorClinicSchedule $schedule): void
@@ -1193,7 +1193,7 @@ class ClinicController extends Controller
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized to manage this schedule.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengelola jadwal ini.');
     }
 
     /**
@@ -1229,7 +1229,7 @@ class ClinicController extends Controller
             return response()->json($payload, $status);
         }
 
-        return back()->with('status', $flashMessage ?? ($payload['message'] ?? 'Operation completed successfully.'));
+        return back()->with('status', $flashMessage ?? ($payload['message'] ?? 'Operasi berhasil diselesaikan.'));
     }
 
     private function storeImage(UploadedFile $image, string $directory): string

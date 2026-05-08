@@ -31,23 +31,23 @@ class ReservationReminderNotification extends Notification implements ShouldQueu
     {
         $this->loadContext();
 
-        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
-        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $clinicName = $this->reservation->clinic?->name ?? 'klinik Anda';
+        $doctorName = $this->reservation->doctor?->name ?? 'dokter yang ditugaskan';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
         $windowEnd = (string) $this->reservation->window_end_time;
         $reservationUrl = $this->reservationPageUrl();
 
         return (new MailMessage())
-            ->subject('Reservation reminder: your schedule is approaching')
-            ->greeting('Hello '.$notifiable->name.',')
-            ->line("This is a reminder that your reservation at {$clinicName} will start in less than 2 hours.")
-            ->line("Doctor: {$doctorName}")
-            ->line("Reservation date: {$reservationDate}")
-            ->line("Reservation window: {$windowStart} - {$windowEnd}")
-            ->line('Please click the button below to check your reservation details.')
-            ->action('Check Reservation', $reservationUrl)
-            ->line('If the button does not work, copy and open this link:')
+            ->subject('Pengingat reservasi: jadwal Anda segera dimulai')
+            ->greeting('Halo '.$notifiable->name.',')
+            ->line("Ini adalah pengingat bahwa reservasi Anda di {$clinicName} akan dimulai kurang dari 2 jam lagi.")
+            ->line("Dokter: {$doctorName}")
+            ->line("Tanggal reservasi: {$reservationDate}")
+            ->line("Waktu reservasi: {$windowStart} - {$windowEnd}")
+            ->line('Silakan klik tombol di bawah untuk melihat detail reservasi Anda.')
+            ->action('Cek Reservasi', $reservationUrl)
+            ->line('Jika tombol tidak berfungsi, salin dan buka tautan ini:')
             ->line($reservationUrl);
     }
 
@@ -55,21 +55,21 @@ class ReservationReminderNotification extends Notification implements ShouldQueu
     {
         $this->loadContext();
 
-        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
-        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $clinicName = $this->reservation->clinic?->name ?? 'klinik Anda';
+        $doctorName = $this->reservation->doctor?->name ?? 'dokter yang ditugaskan';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
         $windowEnd = (string) $this->reservation->window_end_time;
 
         return implode("\n", [
-            trim('Hello '.($recipientName ?? 'Patient').','),
-            "This is a reminder that your reservation at {$clinicName} will start in less than 2 hours.",
+            trim('Halo '.($recipientName ?? 'Pasien').','),
+            "Ini adalah pengingat bahwa reservasi Anda di {$clinicName} akan dimulai kurang dari 2 jam lagi.",
             '',
-            "*Doctor*: {$doctorName}",
-            "*Reservation date*: {$reservationDate}",
-            "*Reservation window*: {$windowStart} - {$windowEnd}",
+            "*Dokter*: {$doctorName}",
+            "*Tanggal reservasi*: {$reservationDate}",
+            "*Waktu reservasi*: {$windowStart} - {$windowEnd}",
             '',
-            'Please click the link below to check your reservation details:',
+            'Silakan klik tautan di bawah untuk melihat detail reservasi Anda:',
             $this->reservationPageUrl(),
         ]);
     }

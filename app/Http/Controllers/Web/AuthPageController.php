@@ -41,7 +41,7 @@ class AuthPageController extends Controller
             $errorKey = $request->expectsJson() ? 'message' : 'email';
 
             throw ValidationException::withMessages([
-                $errorKey => ['The provided credentials are incorrect.'],
+                $errorKey => ['Email atau password yang diberikan salah.'],
             ]);
         }
 
@@ -49,7 +49,7 @@ class AuthPageController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => 'Login successful.',
+                'message' => 'Login berhasil.',
                 'user' => $request->user(),
                 'redirect' => $this->redirectTargetAfterLogin($request),
             ]);
@@ -92,7 +92,7 @@ class AuthPageController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => 'Registration successful.',
+                'message' => 'Registrasi berhasil.',
                 'user' => $user,
                 'redirect' => '/beranda',
             ], 201);
@@ -118,17 +118,17 @@ class AuthPageController extends Controller
 
         if ($status !== Password::RESET_LINK_SENT) {
             throw ValidationException::withMessages([
-                'email' => [__($status)],
+                'email' => [$this->passwordStatusMessage($status)],
             ]);
         }
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => __($status),
+                'message' => $this->passwordStatusMessage($status),
             ]);
         }
 
-        return back()->with('status', __($status));
+        return back()->with('status', $this->passwordStatusMessage($status));
     }
 
     public function redirectResetPassword(Request $request): RedirectResponse
@@ -174,17 +174,17 @@ class AuthPageController extends Controller
 
         if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages([
-                'email' => [__($status)],
+                'email' => [$this->passwordStatusMessage($status)],
             ]);
         }
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => __($status),
+                'message' => $this->passwordStatusMessage($status),
             ]);
         }
 
-        return to_route('login')->with('status', __($status));
+        return to_route('login')->with('status', $this->passwordStatusMessage($status));
     }
 
     private function redirectTargetAfterLogin(Request $request): string
@@ -215,6 +215,18 @@ class AuthPageController extends Controller
         }
 
         return $next;
+    }
+
+    private function passwordStatusMessage(string $status): string
+    {
+        return match ($status) {
+            Password::RESET_LINK_SENT => 'Link reset password telah dikirim.',
+            Password::PASSWORD_RESET => 'Password berhasil direset.',
+            Password::INVALID_USER => 'Email tidak ditemukan.',
+            Password::INVALID_TOKEN => 'Token reset password tidak valid.',
+            Password::RESET_THROTTLED => 'Terlalu banyak permintaan reset password. Silakan coba lagi nanti.',
+            default => __($status),
+        };
     }
 }
 

@@ -97,7 +97,7 @@ class AdminManagementWebTest extends TestCase
             'clinic_id' => $clinic->id,
         ], $this->spaHeaders())
             ->assertStatus(400)
-            ->assertJsonPath('message', 'You cannot delete your own account.');
+            ->assertJsonPath('message', 'Anda tidak dapat menghapus akun sendiri.');
     }
 
     public function test_admin_can_get_doctor_user_with_scoped_speciality(): void

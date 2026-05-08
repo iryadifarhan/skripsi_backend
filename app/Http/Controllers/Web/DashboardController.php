@@ -143,7 +143,7 @@ class DashboardController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => 'Logout successful.',
+                'message' => 'Logout berhasil.',
             ]);
         }
 
@@ -157,22 +157,22 @@ class DashboardController extends Controller
     {
         return match ($role) {
             User::ROLE_SUPERADMIN => [
-                ['title' => 'Clinic Management', 'description' => 'Create clinics, update clinic data, and manage doctor assignments.'],
-                ['title' => 'System Oversight', 'description' => 'Monitor multi-clinic growth while preserving clinic-scoped access control.'],
+                ['title' => 'Manajemen Klinik', 'description' => 'Buat klinik, perbarui data klinik, dan kelola penugasan dokter.'],
+                ['title' => 'Pemantauan Sistem', 'description' => 'Pantau perkembangan multi-klinik dengan tetap menjaga akses berbasis klinik.'],
             ],
             User::ROLE_ADMIN => [
-                ['title' => 'Reservations', 'description' => 'Approve, reject, reschedule, and handle walk-in bookings.'],
-                ['title' => 'Queue Management', 'description' => 'Call, reorder, skip, and monitor active clinic queues.'],
-                ['title' => 'Reports', 'description' => 'Export reservation and medical-record recaps in PDF or Excel format.'],
+                ['title' => 'Reservasi', 'description' => 'Setujui, tolak, jadwalkan ulang, dan tangani booking walk-in.'],
+                ['title' => 'Manajemen Antrean', 'description' => 'Panggil, ubah urutan, skip, dan pantau antrean klinik aktif.'],
+                ['title' => 'Laporan', 'description' => 'Export rekap reservasi dan rekam medis dalam format PDF atau Excel.'],
             ],
             User::ROLE_DOCTOR => [
-                ['title' => 'Doctor Queue', 'description' => 'Follow the current queue line and monitor pending patients.'],
-                ['title' => 'Medical Records', 'description' => 'Complete consultations by issuing a medical record.'],
+                ['title' => 'Antrean Dokter', 'description' => 'Ikuti antrean saat ini dan pantau pasien yang menunggu.'],
+                ['title' => 'Rekam Medis', 'description' => 'Selesaikan konsultasi dengan membuat rekam medis.'],
             ],
             default => [
-                ['title' => 'My Reservations', 'description' => 'Review reservation history, statuses, and reschedule outcomes.'],
-                ['title' => 'My Queue', 'description' => 'Track queue position and current clinic progress in real time.'],
-                ['title' => 'Medical Records', 'description' => 'Access completed consultation results securely by clinic scope.'],
+                ['title' => 'Reservasi Saya', 'description' => 'Lihat riwayat reservasi, status, dan hasil penjadwalan ulang.'],
+                ['title' => 'Antrean Saya', 'description' => 'Pantau posisi antrean dan progres klinik secara real time.'],
+                ['title' => 'Rekam Medis', 'description' => 'Akses hasil konsultasi yang selesai secara aman sesuai cakupan klinik.'],
             ],
         };
     }

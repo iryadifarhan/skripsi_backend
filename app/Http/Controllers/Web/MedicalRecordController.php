@@ -49,7 +49,7 @@ class MedicalRecordController extends Controller
 
         if ($user->role === User::ROLE_SUPERADMIN) {
             if ($request->expectsJson()) {
-                abort(403, 'Superadmin cannot access medical record data.');
+                abort(403, 'Superadmin tidak dapat mengakses data rekam medis.');
             }
 
             return Inertia::render('medical-records/index', [
@@ -92,7 +92,7 @@ class MedicalRecordController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => 'Medical record retrieval successful.',
+                'message' => 'Pengambilan data rekam medis berhasil.',
                 'medical_records' => $medicalRecords,
             ]);
         }
@@ -153,7 +153,7 @@ class MedicalRecordController extends Controller
 
     private function denySuperadminMedicalRecordAccess(Request $request): void
     {
-        abort_if($request->user()->role === User::ROLE_SUPERADMIN, 403, 'Superadmin cannot access medical record data.');
+        abort_if($request->user()->role === User::ROLE_SUPERADMIN, 403, 'Superadmin tidak dapat mengakses data rekam medis.');
     }
 
     public function patientIndex(Request $request): JsonResponse
@@ -178,7 +178,7 @@ class MedicalRecordController extends Controller
         }
 
         return response()->json([
-            'message' => 'Medical record retrieval successful.',
+            'message' => 'Pengambilan data rekam medis berhasil.',
             'medical_records' => $this->serializeMedicalRecords($query->get()),
         ]);
     }
@@ -188,7 +188,7 @@ class MedicalRecordController extends Controller
         $this->assertPatientOwnsMedicalRecord($request->user(), $medicalRecord);
 
         return response()->json([
-            'message' => 'Medical record retrieval successful.',
+            'message' => 'Pengambilan data rekam medis berhasil.',
             'medical_record' => $this->serializeMedicalRecord($medicalRecord->load($this->medicalRecordRelations())),
         ]);
     }
@@ -218,7 +218,7 @@ class MedicalRecordController extends Controller
         }
 
         return response()->json([
-            'message' => 'Medical record retrieval successful.',
+            'message' => 'Pengambilan data rekam medis berhasil.',
             'medical_records' => $this->serializeMedicalRecords($query->get()),
         ]);
     }
@@ -234,7 +234,7 @@ class MedicalRecordController extends Controller
         $this->assertMedicalRecordBelongsToClinic((int) $payload['clinic_id'], $medicalRecord);
 
         return response()->json([
-            'message' => 'Medical record retrieval successful.',
+            'message' => 'Pengambilan data rekam medis berhasil.',
             'medical_record' => $this->serializeMedicalRecord($medicalRecord->load($this->medicalRecordRelations())),
         ]);
     }
@@ -263,7 +263,7 @@ class MedicalRecordController extends Controller
         }
 
         return response()->json([
-            'message' => 'Medical record retrieval successful.',
+            'message' => 'Pengambilan data rekam medis berhasil.',
             'medical_records' => $this->serializeMedicalRecords($query->get()),
         ]);
     }
@@ -277,7 +277,7 @@ class MedicalRecordController extends Controller
         $this->assertMedicalRecordBelongsToDoctor($request->user(), (int) $payload['clinic_id'], $medicalRecord);
 
         return response()->json([
-            'message' => 'Medical record retrieval successful.',
+            'message' => 'Pengambilan data rekam medis berhasil.',
             'medical_record' => $this->serializeMedicalRecord($medicalRecord->load($this->medicalRecordRelations())),
         ]);
     }
@@ -305,16 +305,16 @@ class MedicalRecordController extends Controller
             $responsibleDoctorId = $this->responsibleDoctorIdForMedicalRecord($actor, $lockedReservation, (int) $payload['clinic_id']);
 
             if ($lockedReservation->medicalRecord !== null) {
-                abort(422, 'A medical record already exists for this reservation.');
+                abort(422, 'Rekam medis untuk reservasi ini sudah ada.');
             }
 
             if (!in_array($lockedReservation->status, Reservation::ACTIVE_STATUSES, true)) {
-                abort(422, 'Only active reservations can be completed with a medical record.');
+                abort(422, 'Hanya reservasi aktif yang dapat diselesaikan dengan rekam medis.');
             }
 
             if ((string) $lockedReservation->queue_status !== Reservation::QUEUE_STATUS_IN_PROGRESS) {
                 throw ValidationException::withMessages([
-                    'queue_status' => ['Only in-progress queue entries can be completed with a medical record.'],
+                    'queue_status' => ['Hanya antrean yang sedang berjalan yang dapat diselesaikan dengan rekam medis.'],
                 ]);
             }
 
@@ -346,7 +346,7 @@ class MedicalRecordController extends Controller
         $this->patientNotificationService->sendMedicalRecordReadyNotification($reservation->loadMissing('patient'), $medicalRecord);
 
         return response()->json([
-            'message' => 'Medical record creation successful.',
+            'message' => 'Rekam medis berhasil dibuat.',
             'medical_record' => $this->serializeMedicalRecord($medicalRecord),
             'reservation' => $this->queueService->serializeReservation($reservation),
         ], 201);
@@ -466,7 +466,7 @@ class MedicalRecordController extends Controller
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin.');
     }
 
     private function assertMedicalRecordBelongsToClinic(int $clinicId, MedicalRecord $medicalRecord): void
@@ -475,7 +475,7 @@ class MedicalRecordController extends Controller
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized to access this clinic medical record.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses rekam medis klinik ini.');
     }
 
     private function normalizeDateValue(mixed $value): string
@@ -490,20 +490,20 @@ class MedicalRecordController extends Controller
     private function assertMedicalRecordBelongsToDoctor(User $doctor, int $clinicId, MedicalRecord $medicalRecord): void
     {
         if ((int) $medicalRecord->clinic_id !== $clinicId) {
-            abort(403, 'Forbidden, you are not authorized to access this clinic medical record.');
+            abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses rekam medis klinik ini.');
         }
 
         if ((int) $medicalRecord->doctor_id === (int) $doctor->id) {
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin.');
     }
 
     private function responsibleDoctorIdForMedicalRecord(User $actor, Reservation $reservation, int $clinicId): int
     {
         if ((int) $reservation->clinic_id !== $clinicId) {
-            abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
+            abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses reservasi klinik ini.');
         }
 
         if ($actor->role === User::ROLE_DOCTOR) {
@@ -511,17 +511,17 @@ class MedicalRecordController extends Controller
                 return $actor->id;
             }
 
-            abort(403, 'Forbidden, you are not authorized.');
+            abort(403, 'Akses ditolak. Anda tidak memiliki izin.');
         }
 
         if ($actor->role === User::ROLE_ADMIN) {
             if ((int) $actor->clinic_id !== $clinicId) {
-                abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
+                abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses reservasi klinik ini.');
             }
 
             if ($reservation->doctor_id === null) {
                 throw ValidationException::withMessages([
-                    'doctor_id' => ['Selected reservation does not have an assigned doctor.'],
+                    'doctor_id' => ['Reservasi yang dipilih belum memiliki dokter yang ditugaskan.'],
                 ]);
             }
 
@@ -532,14 +532,14 @@ class MedicalRecordController extends Controller
 
             if (!$doctorExists) {
                 throw ValidationException::withMessages([
-                    'doctor_id' => ['Selected reservation doctor is invalid.'],
+                    'doctor_id' => ['Dokter pada reservasi yang dipilih tidak valid.'],
                 ]);
             }
 
             return (int) $reservation->doctor_id;
         }
 
-        abort(403, 'Forbidden, you are not authorized.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin.');
     }
 }
 

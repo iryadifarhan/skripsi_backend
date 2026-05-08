@@ -65,20 +65,20 @@ class ReservationReminderCommandTest extends TestCase
         );
 
         $this->artisan('reservations:send-reminders')
-            ->expectsOutput('Reservation reminders dispatched: 1')
+            ->expectsOutput('Pengingat reservasi dikirim: 1')
             ->assertExitCode(0);
 
         Notification::assertSentToTimes($patient, ReservationReminderNotification::class, 1);
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->reservationId === $reservation->id
             && $job->phoneNumber === '+628123450110'
-            && str_contains($job->message, 'less than 2 hours')
+            && str_contains($job->message, 'kurang dari 2 jam lagi')
         );
 
         $this->assertNotNull($reservation->fresh()->reminder_sent_at);
 
         $this->artisan('reservations:send-reminders')
-            ->expectsOutput('Reservation reminders dispatched: 0')
+            ->expectsOutput('Pengingat reservasi dikirim: 0')
             ->assertExitCode(0);
 
         Notification::assertSentToTimes($patient, ReservationReminderNotification::class, 1);
@@ -112,7 +112,7 @@ class ReservationReminderCommandTest extends TestCase
         );
 
         $this->artisan('reservations:send-reminders')
-            ->expectsOutput('Reservation reminders dispatched: 1')
+            ->expectsOutput('Pengingat reservasi dikirim: 1')
             ->assertExitCode(0);
 
         Notification::assertNothingSent();
@@ -152,7 +152,7 @@ class ReservationReminderCommandTest extends TestCase
         );
 
         $this->artisan('reservations:send-reminders')
-            ->expectsOutput('Reservation reminders dispatched: 1')
+            ->expectsOutput('Pengingat reservasi dikirim: 1')
             ->assertExitCode(0);
 
         Notification::assertSentToTimes($patient, ReservationReminderNotification::class, 1);
@@ -221,7 +221,7 @@ class ReservationReminderCommandTest extends TestCase
         ]);
 
         $this->artisan('reservations:send-reminders')
-            ->expectsOutput('Reservation reminders dispatched: 0')
+            ->expectsOutput('Pengingat reservasi dikirim: 0')
             ->assertExitCode(0);
 
         Notification::assertNothingSent();

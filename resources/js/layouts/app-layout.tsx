@@ -86,7 +86,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
                             onClick={() => router.post('/logout')}
                             className="w-full rounded-lg bg-[#2c2115] px-4 py-2.5 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-[#1a140d] hover:text-white"
                         >
-                            Logout
+                            Keluar
                         </button>
                     </div>
                 </aside>
@@ -102,7 +102,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
                                     onClick={() => router.post('/logout')}
                                     className="rounded-md bg-[#40311D] px-4 py-2 text-sm font-bold text-white"
                                 >
-                                    Logout
+                                    Keluar
                                 </button>
                             </div>
                         </div>
@@ -182,7 +182,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
                             onClick={() => router.post('/logout')}
                             className="w-full rounded-lg bg-[#2c2115] px-4 py-2.5 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-[#1a140d] hover:text-white"
                         >
-                            Logout
+                            Keluar
                         </button>
                     </div>
                 </aside>
@@ -198,7 +198,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
                                     onClick={() => router.post('/logout')}
                                     className="rounded-md bg-[#40311D] px-4 py-2 text-sm font-bold text-white"
                                 >
-                                    Logout
+                                    Keluar
                                 </button>
                             </div>
                         </div>
@@ -278,7 +278,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
                                 onClick={() => router.post('/logout')}
                                 className="rounded-full bg-clinic-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinic-700"
                             >
-                                Logout
+                                Keluar
                             </button>
                         </div>
                     </div>

@@ -151,7 +151,7 @@ class QueueController extends Controller
         }
 
         return response()->json([
-            'message' => 'Queue retrieval successful.',
+            'message' => 'Pengambilan data antrean berhasil.',
             'queues' => $this->queueService->serializeQueueEntries($reservations),
         ]);
     }
@@ -172,7 +172,7 @@ class QueueController extends Controller
 
             if (!$schedule || (int) $schedule->clinic_id !== (int) $payload['clinic_id']) {
                 throw ValidationException::withMessages([
-                    'doctor_clinic_schedule_id' => ['Selected practice schedule does not belong to the selected clinic.'],
+                    'doctor_clinic_schedule_id' => ['Jadwal praktik yang dipilih tidak terdaftar pada klinik yang dipilih.'],
                 ]);
             }
         }
@@ -205,7 +205,7 @@ class QueueController extends Controller
         }
 
         return response()->json([
-            'message' => 'Queue retrieval successful.',
+            'message' => 'Pengambilan data antrean berhasil.',
             'queues' => $this->queueService->serializeQueueEntries($reservations, true),
         ]);
     }
@@ -231,7 +231,7 @@ class QueueController extends Controller
                 || (int) $schedule->clinic_id !== (int) $payload['clinic_id']
             ) {
                 throw ValidationException::withMessages([
-                    'doctor_clinic_schedule_id' => ['Selected practice schedule is not accessible by this doctor.'],
+                    'doctor_clinic_schedule_id' => ['Jadwal praktik yang dipilih tidak dapat diakses oleh dokter ini.'],
                 ]);
             }
         }
@@ -261,7 +261,7 @@ class QueueController extends Controller
         }
 
         return response()->json([
-            'message' => 'Queue retrieval successful.',
+            'message' => 'Pengambilan data antrean berhasil.',
             'queues' => $this->queueService->serializeQueueEntries($reservations, true),
         ]);
     }
@@ -275,18 +275,18 @@ class QueueController extends Controller
             'queue_number' => ['sometimes', 'integer', 'min:1'],
             'queue_status' => ['sometimes', 'string', Rule::in(Reservation::QUEUE_STATUSES), Rule::notIn([Reservation::QUEUE_STATUS_COMPLETED])],
         ], [
-            'queue_status.not_in' => 'Queue entries must be completed by creating a medical record.',
+            'queue_status.not_in' => 'Antrean harus diselesaikan dengan membuat rekam medis.',
         ]);
 
         if (!isset($payload['queue_number']) && !isset($payload['queue_status'])) {
             throw ValidationException::withMessages([
-                'message' => ['At least one queue field is required to update the queue.'],
+                'message' => ['Minimal satu field antrean wajib diisi untuk memperbarui antrean.'],
             ]);
         }
 
         if ($reservation->doctor_clinic_schedule_id === null || $reservation->queue_number === null) {
             throw ValidationException::withMessages([
-                'reservation' => ['Selected reservation does not have queue information yet.'],
+                'reservation' => ['Reservasi yang dipilih belum memiliki informasi antrean.'],
             ]);
         }
 
@@ -309,7 +309,7 @@ class QueueController extends Controller
             if (isset($payload['queue_number'])) {
                 if (!in_array((string) $reservation->queue_status, Reservation::ACTIVE_QUEUE_STATUSES, true)) {
                     throw ValidationException::withMessages([
-                        'queue_number' => ['Only active queue entries can be reordered.'],
+                        'queue_number' => ['Hanya antrean aktif yang dapat diubah urutannya.'],
                     ]);
                 }
 
@@ -353,7 +353,7 @@ class QueueController extends Controller
         }
 
         return response()->json([
-            'message' => 'Queue update successful.',
+            'message' => 'Antrean berhasil diperbarui.',
             'queue' => $this->queueService->serializeQueueEntry($reservation, true),
         ]);
     }
@@ -365,25 +365,25 @@ class QueueController extends Controller
     {
         if (isset($payload['queue_number'])) {
             throw ValidationException::withMessages([
-                'queue_number' => ['Doctors cannot reorder queue entries.'],
+                'queue_number' => ['Dokter tidak dapat mengubah urutan antrean.'],
             ]);
         }
 
         if (($payload['queue_status'] ?? null) !== Reservation::QUEUE_STATUS_IN_PROGRESS) {
             throw ValidationException::withMessages([
-                'queue_status' => ['Doctors can only start called queue entries.'],
+                'queue_status' => ['Dokter hanya dapat memulai antrean yang sudah dipanggil.'],
             ]);
         }
 
         if ((string) $reservation->status !== Reservation::STATUS_APPROVED) {
             throw ValidationException::withMessages([
-                'queue_status' => ['Only approved reservations can be started by the doctor.'],
+                'queue_status' => ['Hanya reservasi yang disetujui yang dapat dimulai oleh dokter.'],
             ]);
         }
 
         if ((string) $reservation->queue_status !== Reservation::QUEUE_STATUS_CALLED) {
             throw ValidationException::withMessages([
-                'queue_status' => ['Only called queue entries can be started by the doctor.'],
+                'queue_status' => ['Hanya antrean yang sudah dipanggil yang dapat dimulai oleh dokter.'],
             ]);
         }
     }
@@ -395,7 +395,7 @@ class QueueController extends Controller
             && in_array($queueStatus, [Reservation::QUEUE_STATUS_WAITING, Reservation::QUEUE_STATUS_SKIPPED], true)
         ) {
             throw ValidationException::withMessages([
-                'queue_status' => ['In-progress queue entries can only be completed or cancelled.'],
+                'queue_status' => ['Antrean yang sedang berjalan hanya dapat diselesaikan atau dibatalkan.'],
             ]);
         }
 
@@ -404,7 +404,7 @@ class QueueController extends Controller
             && !in_array($queueStatus, [Reservation::QUEUE_STATUS_CANCELLED, Reservation::QUEUE_STATUS_COMPLETED], true)
         ) {
             throw ValidationException::withMessages([
-                'queue_status' => ['Terminal reservations cannot be moved back into the active queue.'],
+                'queue_status' => ['Reservasi final tidak dapat dikembalikan ke antrean aktif.'],
             ]);
         }
 
@@ -444,7 +444,7 @@ class QueueController extends Controller
         $clinicId = (int) $request->input('clinic_id');
 
         if ((int) $reservation->clinic_id !== $clinicId) {
-            abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
+            abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses reservasi klinik ini.');
         }
 
         if ($user->role === User::ROLE_SUPERADMIN) {
@@ -459,7 +459,7 @@ class QueueController extends Controller
             return;
         }
 
-        abort(403, 'Forbidden, you are not authorized to access this clinic reservation.');
+        abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengakses reservasi klinik ini.');
     }
 }
 

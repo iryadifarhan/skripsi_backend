@@ -29,7 +29,7 @@ class SendWhatsAppNotificationJob implements ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        Log::warning('Queued WhatsApp notification failed.', [
+        Log::warning('Pengiriman notifikasi WhatsApp dari antrean gagal.', [
             'reservation_id' => $this->reservationId,
             'phone_number' => $this->phoneNumber,
             'message' => $exception->getMessage(),

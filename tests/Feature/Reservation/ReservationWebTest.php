@@ -358,7 +358,7 @@ class ReservationWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '+628123450001'
-            && str_contains($job->message, 'rescheduled')
+            && str_contains($job->message, 'telah dijadwalkan ulang')
             && str_contains($job->message, 'Ada keperluan mendadak di jadwal sebelumnya.')
         );
     }
@@ -625,7 +625,7 @@ class ReservationWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '081234500002'
-            && str_contains($job->message, 'approved')
+            && str_contains($job->message, 'telah disetujui')
         );
     }
 
@@ -724,7 +724,7 @@ class ReservationWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '081234500007'
-            && str_contains($job->message, 'rescheduled')
+            && str_contains($job->message, 'telah dijadwalkan ulang')
         );
     }
 
@@ -788,7 +788,7 @@ class ReservationWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '081234500006'
-            && str_contains($job->message, 'cancelled')
+            && str_contains($job->message, 'telah dibatalkan')
             && str_contains($job->message, 'Doctor unavailable.')
         );
     }
@@ -847,7 +847,7 @@ class ReservationWebTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppNotificationJob::class, fn (SendWhatsAppNotificationJob $job): bool =>
             $job->phoneNumber === '+628123450003'
-            && str_contains($job->message, 'rejected')
+            && str_contains($job->message, 'telah ditolak')
             && str_contains($job->message, 'Patient data did not pass clinic validation.')
         );
     }

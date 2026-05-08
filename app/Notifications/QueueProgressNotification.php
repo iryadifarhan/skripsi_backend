@@ -32,23 +32,23 @@ class QueueProgressNotification extends Notification implements ShouldQueue
     {
         $this->loadContext();
 
-        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
-        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $clinicName = $this->reservation->clinic?->name ?? 'klinik Anda';
+        $doctorName = $this->reservation->doctor?->name ?? 'dokter yang ditugaskan';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
         $queueUrl = $this->queuePageUrl();
 
         return (new MailMessage())
             ->subject($this->subject())
-            ->greeting('Hello '.$notifiable->name.',')
+            ->greeting('Halo '.$notifiable->name.',')
             ->line($this->introLine($clinicName))
-            ->line("Doctor: {$doctorName}")
-            ->line("Reservation date: {$reservationDate}")
-            ->line("Reservation window: {$windowStart}")
-            ->line('Queue number: '.($this->reservation->queue_number ?? '-'))
-            ->line('Please click the button below to check your queue status.')
-            ->action('Check Queue', $queueUrl)
-            ->line('If the button does not work, copy and open this link:')
+            ->line("Dokter: {$doctorName}")
+            ->line("Tanggal reservasi: {$reservationDate}")
+            ->line("Waktu reservasi: {$windowStart}")
+            ->line('Nomor antrean: '.($this->reservation->queue_number ?? '-'))
+            ->line('Silakan klik tombol di bawah untuk melihat status antrean Anda.')
+            ->action('Cek Antrean', $queueUrl)
+            ->line('Jika tombol tidak berfungsi, salin dan buka tautan ini:')
             ->line($queueUrl);
     }
 
@@ -56,21 +56,21 @@ class QueueProgressNotification extends Notification implements ShouldQueue
     {
         $this->loadContext();
 
-        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
-        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $clinicName = $this->reservation->clinic?->name ?? 'klinik Anda';
+        $doctorName = $this->reservation->doctor?->name ?? 'dokter yang ditugaskan';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
 
         return implode("\n", [
-            trim('Hello '.($recipientName ?? 'Patient').','),
+            trim('Halo '.($recipientName ?? 'Pasien').','),
             $this->introLine($clinicName),
             "",
-            "*Doctor*: {$doctorName}",
-            "*Reservation date*: {$reservationDate}",
-            "*Reservation window*: {$windowStart}",
-            '*Queue number*: '.($this->reservation->queue_number ?? '-'),
+            "*Dokter*: {$doctorName}",
+            "*Tanggal reservasi*: {$reservationDate}",
+            "*Waktu reservasi*: {$windowStart}",
+            '*Nomor antrean*: '.($this->reservation->queue_number ?? '-'),
             "",
-            'Please click the link below to check your queue status:',
+            'Silakan klik tautan di bawah untuk melihat status antrean Anda:',
             $this->queuePageUrl(),
         ]);
     }
@@ -91,18 +91,18 @@ class QueueProgressNotification extends Notification implements ShouldQueue
     private function subject(): string
     {
         return match ($this->queueStatus) {
-            Reservation::QUEUE_STATUS_CALLED => 'Your queue is being called',
-            Reservation::QUEUE_STATUS_COMPLETED => 'Your queue has been completed',
-            default => 'Queue update',
+            Reservation::QUEUE_STATUS_CALLED => 'Antrean Anda sedang dipanggil',
+            Reservation::QUEUE_STATUS_COMPLETED => 'Antrean Anda telah selesai',
+            default => 'Pembaruan antrean',
         };
     }
 
     private function introLine(string $clinicName): string
     {
         return match ($this->queueStatus) {
-            Reservation::QUEUE_STATUS_CALLED => "Your queue at {$clinicName} is now being called.",
-            Reservation::QUEUE_STATUS_COMPLETED => "Your reservation at {$clinicName} has been completed.",
-            default => "There is an update for your queue at {$clinicName}.",
+            Reservation::QUEUE_STATUS_CALLED => "Antrean Anda di {$clinicName} sedang dipanggil.",
+            Reservation::QUEUE_STATUS_COMPLETED => "Reservasi Anda di {$clinicName} telah selesai.",
+            default => "Terdapat pembaruan pada antrean Anda di {$clinicName}.",
         };
     }
 }

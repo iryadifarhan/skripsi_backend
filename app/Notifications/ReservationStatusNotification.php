@@ -32,8 +32,8 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
     {
         $this->loadContext();
 
-        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
-        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $clinicName = $this->reservation->clinic?->name ?? 'klinik Anda';
+        $doctorName = $this->reservation->doctor?->name ?? 'dokter yang ditugaskan';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
         $windowEnd = (string) $this->reservation->window_end_time;
@@ -41,14 +41,14 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
 
         $mail = (new MailMessage())
             ->subject($this->subject())
-            ->greeting('Hello '.$notifiable->name.',')
+            ->greeting('Halo '.$notifiable->name.',')
             ->line($this->introLine($clinicName))
-            ->line("Doctor: {$doctorName}")
-            ->line("Reservation date: {$reservationDate}")
-            ->line("Reservation window: {$windowStart} - {$windowEnd}");
+            ->line("Dokter: {$doctorName}")
+            ->line("Tanggal reservasi: {$reservationDate}")
+            ->line("Waktu reservasi: {$windowStart} - {$windowEnd}");
 
         if (!empty($this->reservation->admin_notes)) {
-            $mail->line('Admin note: '.$this->reservation->admin_notes);
+            $mail->line('Catatan admin: '.$this->reservation->admin_notes);
         }
 
         if (in_array($this->eventType, ['cancelled', 'rejected'], true) && !empty($this->reservation->cancellation_reason)) {
@@ -56,13 +56,13 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
         }
 
         if ($this->eventType === 'rescheduled' && !empty($this->reservation->reschedule_reason)) {
-            $mail->line('Reschedule reason: '.$this->reservation->reschedule_reason);
+            $mail->line('Alasan penjadwalan ulang: '.$this->reservation->reschedule_reason);
         }
 
         return $mail
-            ->line('Please click the button below to check your reservation details.')
-            ->action('Check Reservation', $reservationUrl)
-            ->line('If the button does not work, copy and open this link:')
+            ->line('Silakan klik tombol di bawah untuk melihat detail reservasi Anda.')
+            ->action('Cek Reservasi', $reservationUrl)
+            ->line('Jika tombol tidak berfungsi, salin dan buka tautan ini:')
             ->line($reservationUrl);
     }
 
@@ -70,23 +70,23 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
     {
         $this->loadContext();
 
-        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
-        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $clinicName = $this->reservation->clinic?->name ?? 'klinik Anda';
+        $doctorName = $this->reservation->doctor?->name ?? 'dokter yang ditugaskan';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
         $windowEnd = (string) $this->reservation->window_end_time;
         $lines = [
-            trim('Hello '.($recipientName ?? 'Patient').','),
+            trim('Halo '.($recipientName ?? 'Pasien').','),
             $this->introLine($clinicName),
             "",
-            "*Doctor*: {$doctorName}",
-            "*Reservation date*: {$reservationDate}",
-            "*Reservation window*: {$windowStart} - {$windowEnd}",
+            "*Dokter*: {$doctorName}",
+            "*Tanggal reservasi*: {$reservationDate}",
+            "*Waktu reservasi*: {$windowStart} - {$windowEnd}",
             "",
         ];
 
         if (!empty($this->reservation->admin_notes)) {
-           $lines[] = '*Admin note*: '.$this->reservation->admin_notes;
+           $lines[] = '*Catatan admin*: '.$this->reservation->admin_notes;
         }
 
         if (in_array($this->eventType, ['cancelled', 'rejected'], true) && !empty($this->reservation->cancellation_reason)) {
@@ -94,10 +94,10 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
         }
 
         if ($this->eventType === 'rescheduled' && !empty($this->reservation->reschedule_reason)) {
-            $lines[] = '*Reschedule reason*: '.$this->reservation->reschedule_reason;
+            $lines[] = '*Alasan penjadwalan ulang*: '.$this->reservation->reschedule_reason;
         }
 
-        $lines[] = "\n".'Please click the link below to check your reservation details:';
+        $lines[] = "\n".'Silakan klik tautan di bawah untuk melihat detail reservasi Anda:';
         $lines[] = $this->reservationPageUrl();
 
         return implode("\n", $lines);
@@ -119,29 +119,29 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
     private function subject(): string
     {
         return match ($this->eventType) {
-            'approved' => 'Your reservation has been approved',
-            'cancelled' => 'Your reservation has been cancelled',
-            'rejected' => 'Your reservation has been rejected',
-            'rescheduled' => 'Your reservation has been rescheduled',
-            default => 'Reservation update',
+            'approved' => 'Reservasi Anda telah disetujui',
+            'cancelled' => 'Reservasi Anda telah dibatalkan',
+            'rejected' => 'Reservasi Anda ditolak',
+            'rescheduled' => 'Reservasi Anda telah dijadwalkan ulang',
+            default => 'Pembaruan reservasi',
         };
     }
 
     private function introLine(string $clinicName): string
     {
         return match ($this->eventType) {
-            'approved' => "Your reservation at {$clinicName} has been approved.",
-            'cancelled' => "Your reservation at {$clinicName} has been cancelled.",
-            'rejected' => "Your reservation at {$clinicName} has been rejected.",
-            'rescheduled' => "Your reservation at {$clinicName} has been rescheduled.",
-            default => "There is an update for your reservation at {$clinicName}.",
+            'approved' => "Reservasi Anda di {$clinicName} telah disetujui.",
+            'cancelled' => "Reservasi Anda di {$clinicName} telah dibatalkan.",
+            'rejected' => "Reservasi Anda di {$clinicName} telah ditolak.",
+            'rescheduled' => "Reservasi Anda di {$clinicName} telah dijadwalkan ulang.",
+            default => "Terdapat pembaruan pada reservasi Anda di {$clinicName}.",
         };
     }
 
     private function cancellationReasonLabel(): string
     {
         return $this->eventType === 'rejected'
-            ? 'Rejection reason'
-            : 'Cancellation reason';
+            ? 'Alasan penolakan'
+            : 'Alasan pembatalan';
     }
 }

@@ -33,26 +33,26 @@ class MedicalRecordReadyNotification extends Notification implements ShouldQueue
     {
         $this->loadContext();
 
-        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
-        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $clinicName = $this->reservation->clinic?->name ?? 'klinik Anda';
+        $doctorName = $this->reservation->doctor?->name ?? 'dokter yang ditugaskan';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
         $medicalRecordUrl = $this->medicalRecordPageUrl();
 
         $mail = (new MailMessage())
-            ->subject('Your medical record is ready')
-            ->greeting('Hello '.$notifiable->name.',')
-            ->line("Your reservation at {$clinicName} has been completed.")
-            ->line("Doctor: {$doctorName}")
-            ->line("Reservation date: {$reservationDate}")
-            ->line("Reservation window: {$windowStart}");
+            ->subject('Rekam medis Anda sudah tersedia')
+            ->greeting('Halo '.$notifiable->name.',')
+            ->line("Reservasi Anda di {$clinicName} telah selesai.")
+            ->line("Dokter: {$doctorName}")
+            ->line("Tanggal reservasi: {$reservationDate}")
+            ->line("Waktu reservasi: {$windowStart}");
 
         $this->appendMedicalRecordLines($mail);
 
         return $mail
-            ->line('Please click the button below to check your medical record.')
-            ->action('Check Medical Record', $medicalRecordUrl)
-            ->line('If the button does not work, copy and open this link:')
+            ->line('Silakan klik tombol di bawah untuk melihat rekam medis Anda.')
+            ->action('Cek Rekam Medis', $medicalRecordUrl)
+            ->line('Jika tombol tidak berfungsi, salin dan buka tautan ini:')
             ->line($medicalRecordUrl);
     }
 
@@ -60,20 +60,20 @@ class MedicalRecordReadyNotification extends Notification implements ShouldQueue
     {
         $this->loadContext();
 
-        $clinicName = $this->reservation->clinic?->name ?? 'your clinic';
-        $doctorName = $this->reservation->doctor?->name ?? 'the assigned doctor';
+        $clinicName = $this->reservation->clinic?->name ?? 'klinik Anda';
+        $doctorName = $this->reservation->doctor?->name ?? 'dokter yang ditugaskan';
         $reservationDate = $this->reservation->reservation_date?->format('Y-m-d') ?? '-';
         $windowStart = (string) $this->reservation->window_start_time;
 
         $lines = [
-            trim('Hello '.($recipientName ?? 'Patient').','),
-            "Your reservation at {$clinicName} has been completed.",
+            trim('Halo '.($recipientName ?? 'Pasien').','),
+            "Reservasi Anda di {$clinicName} telah selesai.",
             '',
-            "*Doctor*: {$doctorName}",
-            "*Reservation date*: {$reservationDate}",
-            "*Reservation window*: {$windowStart}",
+            "*Dokter*: {$doctorName}",
+            "*Tanggal reservasi*: {$reservationDate}",
+            "*Waktu reservasi*: {$windowStart}",
             '',
-            '*Doctor note*: '.$this->medicalRecord->doctor_notes,
+            '*Catatan dokter*: '.$this->medicalRecord->doctor_notes,
         ];
 
         if (!empty($this->medicalRecord->diagnosis)) {
@@ -81,15 +81,15 @@ class MedicalRecordReadyNotification extends Notification implements ShouldQueue
         }
 
         if (!empty($this->medicalRecord->treatment)) {
-            $lines[] = '*Treatment*: '.$this->medicalRecord->treatment;
+            $lines[] = '*Tindakan*: '.$this->medicalRecord->treatment;
         }
 
         if (!empty($this->medicalRecord->prescription_notes)) {
-            $lines[] = '*Prescription note*: '.$this->medicalRecord->prescription_notes;
+            $lines[] = '*Catatan resep*: '.$this->medicalRecord->prescription_notes;
         }
 
         $lines[] = '';
-        $lines[] = 'Please click the link below to check your medical record:';
+        $lines[] = 'Silakan klik tautan di bawah untuk melihat rekam medis Anda:';
         $lines[] = $this->medicalRecordPageUrl();
 
         return implode("\n", $lines);
@@ -97,18 +97,18 @@ class MedicalRecordReadyNotification extends Notification implements ShouldQueue
 
     private function appendMedicalRecordLines(MailMessage $mail): void
     {
-        $mail->line('Doctor note: '.$this->medicalRecord->doctor_notes);
+        $mail->line('Catatan dokter: '.$this->medicalRecord->doctor_notes);
 
         if (!empty($this->medicalRecord->diagnosis)) {
             $mail->line('Diagnosis: '.$this->medicalRecord->diagnosis);
         }
 
         if (!empty($this->medicalRecord->treatment)) {
-            $mail->line('Treatment: '.$this->medicalRecord->treatment);
+            $mail->line('Tindakan: '.$this->medicalRecord->treatment);
         }
 
         if (!empty($this->medicalRecord->prescription_notes)) {
-            $mail->line('Prescription note: '.$this->medicalRecord->prescription_notes);
+            $mail->line('Catatan resep: '.$this->medicalRecord->prescription_notes);
         }
     }
 

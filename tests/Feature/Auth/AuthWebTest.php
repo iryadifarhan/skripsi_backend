@@ -481,7 +481,7 @@ class AuthWebTest extends TestCase
             'image' => UploadedFile::fake()->image('patient-avatar.png', 400, 400),
         ], $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('message', 'Profile image uploaded successfully.');
+            ->assertJsonPath('message', 'Foto profil berhasil diunggah.');
 
         $uploadedPath = $user->fresh()->image_path;
 
@@ -491,7 +491,7 @@ class AuthWebTest extends TestCase
 
         $this->deleteJson('/profile/image', [], $this->spaHeaders())
             ->assertOk()
-            ->assertJsonPath('message', 'Profile image deleted successfully.');
+            ->assertJsonPath('message', 'Foto profil berhasil dihapus.');
 
         $this->assertNull($user->fresh()->image_path);
         $this->assertNull($user->fresh()->profile_picture);
