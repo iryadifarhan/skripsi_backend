@@ -8,7 +8,7 @@ export default defineConfig({
     plugins: [
         react(),
         laravel({
-            input: ['resources/js/app.tsx'],
+            input: ['resources/js/app.tsx', 'resources/js/assets/cliniquelogo.png'],
             refresh: true,
         }),
         tailwindcss(),
