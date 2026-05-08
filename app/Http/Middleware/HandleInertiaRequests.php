@@ -35,6 +35,7 @@ class HandleInertiaRequests extends Middleware
         ]);
 
         if ($user !== null) {
+            $authUser['date_of_birth'] = $user->date_of_birth?->toDateString();
             $authUser['clinic'] = $user->clinic?->only(['id', 'name']);
         }
 

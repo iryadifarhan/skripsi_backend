@@ -11,6 +11,7 @@ import type { ReservationEntry } from '@/types';
 type HomeClinic = {
     id: number;
     name: string;
+    slug: string;
     address?: string | null;
     city_name?: string | null;
     image_url?: string | null;
@@ -30,6 +31,7 @@ type HomeClinic = {
 type HomeDoctor = {
     id: number;
     name: string;
+    slug: string;
     image_url?: string | null;
     specialities?: string[];
     clinics: {
@@ -409,8 +411,8 @@ function KlinikBack({ clinic }: { clinic: HomeClinic }) {
             ) : (
                 <div className="hp-back-copy">Belum ada jadwal aktif.</div>
             )}
-            <Link href="/reservasi" className="hp-back-link">
-                Buat reservasi -&gt;
+            <Link href={`/klinik/${clinic.slug}`} className="hp-back-link">
+                Lihat lebih →
             </Link>
         </div>
     );
@@ -432,8 +434,8 @@ function DokterBack({ doctor }: { doctor: HomeDoctor }) {
             ) : (
                 <div className="hp-back-copy">Belum terhubung ke klinik.</div>
             )}
-            <Link href="/reservasi" className="hp-back-link">
-                Reservasi dokter -&gt;
+            <Link href={`/dokter/${doctor.slug}`} className="hp-back-link">
+                Lihat lebih →
             </Link>
         </div>
     );

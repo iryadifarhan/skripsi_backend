@@ -1,9 +1,10 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { csrfHeaders } from '@/lib/csrf';
 import { PublicFooter } from '@/components/landing/public-footer';
 import { PublicNavbar } from '@/components/landing/public-navbar';
 import {
@@ -32,11 +33,19 @@ type ClinicDoctor = PublicClinic['doctors'][number] & {
 
 type WindowSlot = {
     id: string;
+    scheduleId: number;
     label: string;
     start: string;
     end: string;
     filled: number;
     total: number;
+};
+
+type PatientFormState = {
+    name: string;
+    phone_number: string;
+    date_of_birth: string;
+    gender: string;
 };
 
 const MONTH_NAMES = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -56,13 +65,18 @@ export default function ClinicDetail({ clinic }: ClinicDetailProps) {
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<WindowSlot | null>(null);
     const [complaint, setComplaint] = useState('');
+    const [patientForm, setPatientForm] = useState<PatientFormState>(() => ({
+        name: user?.name ?? '',
+        phone_number: user?.phone_number ?? '',
+        date_of_birth: formatDateForDateInput(user?.date_of_birth ?? null),
+        gender: user?.gender ?? '',
+    }));
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+    const [submitting, setSubmitting] = useState(false);
+    const [reviewOpen, setReviewOpen] = useState(false);
+    const [successOpen, setSuccessOpen] = useState(false);
 
     const patientHref = (path: string) => (isPatient ? path : `/masuk?next=${encodeURIComponent(path)}`);
-    const reservationTarget = selectedDoctor
-        ? patientHref(`/reservasi?booking_clinic_id=${clinic.id}&booking_doctor_id=${selectedDoctor.id}`)
-        : patientHref(`/reservasi?booking_clinic_id=${clinic.id}`);
-
-    const activeStep = selectedDoctor ? (selectedDay ? (selectedSlot ? (complaint.trim() ? 4 : 3) : 2) : 1) : 0;
     const selectedDate = selectedDay ? new Date(calYear, calMonth, selectedDay) : null;
 
     const windowSlots = useMemo(() => {
@@ -81,7 +95,14 @@ export default function ClinicDetail({ clinic }: ClinicDetailProps) {
     }, [clinic.schedules, clinic.window_usage, selectedDate, selectedDoctor]);
 
     const slotGroups = useMemo(() => groupSlots(windowSlots), [windowSlots]);
-    const canBook = Boolean(selectedDoctor && selectedDay && selectedSlot && complaint.trim());
+    const hasPatientData = Boolean(
+        patientForm.name.trim()
+        && patientForm.phone_number.trim()
+        && isValidDateInput(patientForm.date_of_birth)
+        && patientForm.gender,
+    );
+    const activeStep = selectedDoctor ? (selectedDay ? (selectedSlot ? (hasPatientData && complaint.trim() ? 4 : 3) : 2) : 1) : 0;
+    const canBook = Boolean(selectedDoctor && selectedDay && selectedDate && selectedSlot && complaint.trim() && hasPatientData && !submitting);
 
     function selectDoctor(doctor: ClinicDoctor) {
         setSelectedDoctor((current) => (current?.id === doctor.id ? null : doctor));
@@ -91,6 +112,105 @@ export default function ClinicDetail({ clinic }: ClinicDetailProps) {
     function selectDay(day: number) {
         setSelectedDay(day);
         setSelectedSlot(null);
+    }
+
+    function updatePatientForm(field: keyof typeof patientForm, value: string) {
+        setPatientForm((current) => ({ ...current, [field]: value }));
+        setFormErrors((current) => ({ ...current, [field]: '' }));
+    }
+
+    function validateReservationForm() {
+        const normalizedBirthDate = isValidDateInput(patientForm.date_of_birth) ? patientForm.date_of_birth : null;
+        const nextErrors: Record<string, string> = {};
+
+        if (!patientForm.name.trim()) {
+            nextErrors.name = 'Nama pasien wajib diisi.';
+        }
+
+        if (!patientForm.phone_number.trim()) {
+            nextErrors.phone_number = 'Nomor telepon pasien wajib diisi.';
+        }
+
+        if (!normalizedBirthDate) {
+            nextErrors.date_of_birth = 'Tanggal lahir wajib dipilih.';
+        }
+
+        if (!patientForm.gender) {
+            nextErrors.gender = 'Jenis kelamin wajib dipilih.';
+        }
+
+        if (!complaint.trim()) {
+            nextErrors.complaint = 'Keluhan pasien wajib diisi.';
+        }
+
+        setFormErrors(nextErrors);
+
+        return Object.keys(nextErrors).length === 0;
+    }
+
+    function openReservationReview() {
+        if (!isPatient) {
+            const nextUrl = `${window.location.pathname}${window.location.search}`;
+            router.visit(`/masuk?next=${encodeURIComponent(nextUrl)}`);
+            return;
+        }
+
+        if (!selectedDoctor || !selectedDate || !selectedSlot) {
+            return;
+        }
+
+        if (!validateReservationForm()) {
+            return;
+        }
+
+        setReviewOpen(true);
+    }
+
+    async function submitReservation() {
+        if (!isPatient) {
+            const nextUrl = `${window.location.pathname}${window.location.search}`;
+            router.visit(`/masuk?next=${encodeURIComponent(nextUrl)}`);
+            return;
+        }
+
+        if (!selectedDate || !selectedSlot || !validateReservationForm()) {
+            return;
+        }
+
+        const normalizedBirthDate = patientForm.date_of_birth;
+
+        setSubmitting(true);
+        setFormErrors({});
+
+        const profileResult = await requestJson('/profil', 'PATCH', {
+            name: patientForm.name.trim(),
+            phone_number: patientForm.phone_number.trim(),
+            date_of_birth: normalizedBirthDate,
+            gender: patientForm.gender,
+        });
+
+        if (!profileResult.ok) {
+            setSubmitting(false);
+            setFormErrors(profileResult.errors);
+            return;
+        }
+
+        const reservationResult = await requestJson('/reservations', 'POST', {
+            doctor_clinic_schedule_id: selectedSlot.scheduleId,
+            reservation_date: dateKey(selectedDate),
+            window_start_time: selectedSlot.start,
+            complaint: complaint.trim(),
+        });
+
+        setSubmitting(false);
+
+        if (!reservationResult.ok) {
+            setFormErrors(reservationResult.errors);
+            return;
+        }
+
+        setReviewOpen(false);
+        setSuccessOpen(true);
     }
 
     return (
@@ -243,49 +363,99 @@ export default function ClinicDetail({ clinic }: ClinicDetailProps) {
                                     )}
                                 </div>
 
-                                <div className={selectedDoctor ? '' : 'pointer-events-none opacity-40'}>
+                                <div className={selectedDoctor && selectedDay && selectedSlot ? '' : 'pointer-events-none opacity-40'}>
                                     <SectionLabel>Isi data pasien</SectionLabel>
                                     <div className="grid gap-3 sm:grid-cols-2">
-                                        <PatientField label="Nama pasien" value={user?.name ?? 'Masuk untuk memakai data akun'} />
-                                        <PatientField label="Nomor telepon pasien" value={user?.phone_number ?? '-'} />
-                                        <PatientField label="Tanggal lahir" value={user?.date_of_birth ?? '-'} />
-                                        <PatientField label="Jenis kelamin" value={user?.gender ?? '-'} />
+                                        <PatientField
+                                            label="Nama pasien"
+                                            value={patientForm.name}
+                                            placeholder="Nama lengkap pasien"
+                                            error={formErrors.name}
+                                            onChange={(value) => updatePatientForm('name', value)}
+                                        />
+                                        <PatientField
+                                            label="Nomor telepon pasien"
+                                            value={patientForm.phone_number}
+                                            placeholder="Contoh: +628123456789"
+                                            error={formErrors.phone_number}
+                                            onChange={(value) => updatePatientForm('phone_number', value)}
+                                        />
+                                        <PatientField
+                                            label="Tanggal lahir"
+                                            value={patientForm.date_of_birth}
+                                            error={formErrors.date_of_birth}
+                                            type='date'
+                                            max={todayDateInput()}
+                                            onChange={(value) => updatePatientForm('date_of_birth', value)}
+                                        />
+                                        <PatientGenderField
+                                            value={patientForm.gender}
+                                            error={formErrors.gender}
+                                            onChange={(value) => updatePatientForm('gender', value)}
+                                        />
                                     </div>
 
                                     <div className="mt-4">
                                         <SectionLabel>Keluhan pasien</SectionLabel>
                                         <textarea
                                             value={complaint}
-                                            onChange={(event) => setComplaint(event.target.value)}
+                                            onChange={(event) => {
+                                                setComplaint(event.target.value);
+                                                setFormErrors((current) => ({ ...current, complaint: '' }));
+                                            }}
                                             placeholder="Tulis kepada kami alasan di balik penggunaan kunjungan"
                                             rows={4}
                                             className="w-full resize-y rounded-xl border border-[#40311D]/15 bg-[#40311D]/5 px-4 py-3 text-sm text-[#40311D] outline-none transition placeholder:text-[#40311D]/25 focus:border-[#00917B]"
                                         />
+                                        {formErrors.complaint ? <p className="mt-1 text-xs font-medium text-red-600">{formErrors.complaint}</p> : null}
                                     </div>
                                 </div>
                             </div>
 
-                            {canBook ? (
-                                <Link
-                                    href={reservationTarget}
+                            {selectedDoctor && selectedDay && selectedSlot ? (
+                                <button
+                                    type="button"
+                                    onClick={openReservationReview}
                                     className="mt-5 flex w-full items-center justify-center rounded-xl bg-[#40311D] px-4 py-3 text-sm font-bold text-[#DED0B6] transition hover:bg-[#2c2115]"
                                 >
-                                    Pesan
-                                </Link>
+                                    {submitting ? 'Memproses...' : 'Pesan'}
+                                </button>
                             ) : (
                                 <button
                                     type="button"
-                                    disabled
-                                    className="mt-5 w-full cursor-not-allowed rounded-xl bg-[#40311D]/20 px-4 py-3 text-sm font-bold text-[#40311D]/35"
+                                    onClick={openReservationReview}
+                                    disabled={submitting}
+                                    className="mt-5 w-full rounded-xl bg-[#40311D]/20 px-4 py-3 text-sm font-bold text-[#40311D]/35 transition disabled:cursor-not-allowed"
                                 >
-                                    Pesan
+                                    {submitting ? 'Memproses...' : 'Pesan'}
                                 </button>
                             )}
+                            {formErrors.general ? <p className="mt-2 text-center text-xs font-medium text-red-600">{formErrors.general}</p> : null}
                         </div>
                     </section>
                 </main>
 
                 <PublicFooter />
+
+                {reviewOpen && selectedDoctor && selectedDate && selectedSlot ? (
+                    <ReservationReviewModal
+                        clinic={clinic}
+                        doctor={selectedDoctor}
+                        patientForm={patientForm}
+                        complaint={complaint}
+                        selectedDate={selectedDate}
+                        selectedSlot={selectedSlot}
+                        submitting={submitting}
+                        onClose={() => {
+                            if (!submitting) {
+                                setReviewOpen(false);
+                            }
+                        }}
+                        onConfirm={submitReservation}
+                    />
+                ) : null}
+
+                {successOpen ? <ReservationSuccessModal onClose={() => setSuccessOpen(false)} /> : null}
             </div>
         </>
     );
@@ -569,15 +739,191 @@ function TimeSlotGroup({
     );
 }
 
-function PatientField({ label, value }: { label: string; value: string }) {
+function PatientField({
+    label,
+    value,
+    placeholder,
+    error,
+    onChange,
+    type,
+    max,
+}: {
+    label: string;
+    value: string;
+    placeholder?: string;
+    error?: string;
+    onChange: (value: string) => void;
+    type?: string;
+    max?: string;
+}) {
     return (
         <div>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#40311D]/35">{label} /</p>
             <input
                 value={value}
-                readOnly
-                className="w-full border-0 border-b border-[#40311D]/15 bg-transparent px-0 py-1 text-sm text-[#40311D]/65 outline-none"
+                type={type || 'text'}
+                max={max}
+                onChange={(event) => onChange(event.target.value)}
+                placeholder={placeholder}
+                className={[
+                    'w-full border-0 border-b bg-transparent px-0 py-1 text-sm text-[#40311D]/75 outline-none transition placeholder:text-[#40311D]/25 focus:border-[#00917B]',
+                    error ? 'border-red-500' : 'border-[#40311D]/15',
+                ].join(' ')}
             />
+            {error ? <p className="mt-1 text-xs font-medium text-red-600">{error}</p> : null}
+        </div>
+    );
+}
+
+function PatientGenderField({
+    value,
+    error,
+    onChange,
+}: {
+    value: string;
+    error?: string;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#40311D]/35">Jenis kelamin /</p>
+            <select
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className={[
+                    'w-full border-0 border-b bg-transparent px-0 py-1 text-sm text-[#40311D]/75 outline-none transition focus:border-[#00917B]',
+                    error ? 'border-red-500' : 'border-[#40311D]/15',
+                ].join(' ')}
+            >
+                <option value="">Pilih jenis kelamin</option>
+                <option value="Laki">Laki</option>
+                <option value="Perempuan">Perempuan</option>
+            </select>
+            {error ? <p className="mt-1 text-xs font-medium text-red-600">{error}</p> : null}
+        </div>
+    );
+}
+
+function ReservationReviewModal({
+    clinic,
+    doctor,
+    patientForm,
+    complaint,
+    selectedDate,
+    selectedSlot,
+    submitting,
+    onClose,
+    onConfirm,
+}: {
+    clinic: PublicClinic;
+    doctor: ClinicDoctor;
+    patientForm: PatientFormState;
+    complaint: string;
+    selectedDate: Date;
+    selectedSlot: WindowSlot;
+    submitting: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+}) {
+    const address = clinic.location || [clinic.address, clinic.city_name].filter(Boolean).join(', ') || '-';
+    const slotNumber = Math.min(Math.max(selectedSlot.filled + 1, 1), selectedSlot.total || 1);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-0 md:items-center md:px-4">
+            <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-[28px] bg-[#1b1b1b] text-white shadow-2xl md:max-w-[560px] md:rounded-[28px]">
+                <div className="p-6 md:p-7">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={submitting}
+                        className="mb-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-white/55 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Tutup rincian reservasi"
+                    >
+                        <ChevronIcon className="rotate-180" />
+                    </button>
+
+                    <h2 className="text-2xl font-bold tracking-[-0.03em]">Rincian Reservasi Mu</h2>
+
+                    <div className="mt-6 border-t border-dashed border-white/15 pt-5">
+                        <h3 className="text-sm font-bold">Data Pasien</h3>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <ReviewItem label="Nama Pasien" value={patientForm.name} />
+                            <ReviewItem label="Nomor Telepon" value={patientForm.phone_number} />
+                            <ReviewItem label="Tanggal Lahir" value={formatDateInputLabel(patientForm.date_of_birth)} />
+                            <ReviewItem label="Jenis Kelamin" value={patientForm.gender} />
+                            <ReviewItem label="Keluhan Pasien" value={complaint} className="sm:col-span-2" />
+                        </div>
+                    </div>
+
+                    <div className="mt-6 border-t border-dashed border-white/15 pt-5">
+                        <h3 className="text-sm font-bold">Data Reservasi</h3>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                            <ReviewItem label="Klinik" value={clinic.name} />
+                            <ReviewItem label="Alamat Klinik" value={address} />
+                            <ReviewItem label="Dokter" value={doctor.name} />
+                            <ReviewItem label="Waktu Reservasi" value={`${selectedSlot.start} - ${selectedSlot.end}`} />
+                            <ReviewItem label="Slot Ke" value={String(slotNumber)} />
+                            <ReviewItem label="Tanggal Reservasi" value={formatDateLabel(selectedDate)} />
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex items-start gap-3 border-t border-dashed border-white/15 pt-4 text-xs leading-relaxed text-white/55">
+                        <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-white/35 text-[10px]">i</span>
+                        <span>Pastikan data yang anda masukkan sesuai sebelum melanjutkan pemesanan.</span>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={submitting}
+                        className="mt-5 flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#1b1b1b] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {submitting ? 'Memproses...' : 'Konfirmasi Reservasi'}
+                    </button>
+                </div>
+            </section>
+        </div>
+    );
+}
+
+function ReservationSuccessModal({ onClose }: { onClose: () => void }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <section className="w-full max-w-[430px] rounded-[28px] bg-[#1b1b1b] p-8 text-center text-white shadow-2xl">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-8 w-8 text-white">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                </div>
+                <h2 className="mt-6 text-xl font-bold leading-snug tracking-[-0.03em]">Data Reservasi mu berhasil disimpan</h2>
+                <p className="mt-4 text-sm leading-relaxed text-white/65">
+                    Harap tunggu konfirmasi dari klinik dan juga mengecek status reservasi berkala di halaman reservasi.
+                </p>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-xl border border-white/15 px-4 py-3 text-sm font-bold text-white/80 transition hover:bg-white/10"
+                    >
+                        Tutup
+                    </button>
+                    <Link
+                        href="/reservasi"
+                        className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#1b1b1b] transition hover:bg-white/90"
+                    >
+                        Lihat Reservasi
+                    </Link>
+                </div>
+            </section>
+        </div>
+    );
+}
+
+function ReviewItem({ label, value, className = '' }: { label: string; value: string; className?: string }) {
+    return (
+        <div className={className}>
+            <p className="text-[11px] font-semibold text-white/35">{label}</p>
+            <p className="mt-1 whitespace-pre-line text-sm font-bold leading-relaxed text-white">{value || '-'}</p>
         </div>
     );
 }
@@ -635,6 +981,7 @@ function generateWindows(schedule: PublicSchedule, selectedDate: Date, windowUsa
 
         windows.push({
             id: `${schedule.id}-${index}`,
+            scheduleId: schedule.id,
             label: `${slotStart} - ${slotEnd}`,
             start: slotStart,
             end: slotEnd,
@@ -681,6 +1028,95 @@ function minutesToTime(totalMinutes: number) {
 
 function shortTime(time?: string | null) {
     return time ? time.slice(0, 5) : '-';
+}
+
+function formatDateLabel(date: Date) {
+    return `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function formatDateInputLabel(value: string) {
+    if (!isValidDateInput(value)) {
+        return '-';
+    }
+
+    const [year, month, day] = value.split('-');
+
+    return `${day}/${month}/${year}`;
+}
+
+function formatDateForDateInput(value?: string | null) {
+    if (!value) {
+        return '';
+    }
+
+    const [datePart] = value.split('T');
+    const [year, month, day] = datePart.split('-');
+
+    if (!year || !month || !day) {
+        return '';
+    }
+
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+function isValidDateInput(value: string) {
+    const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (!match) {
+        return false;
+    }
+
+    const [, year, month, day] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    const isValid = date.getFullYear() === Number(year)
+        && date.getMonth() === Number(month) - 1
+        && date.getDate() === Number(day);
+
+    if (!isValid) {
+        return false;
+    }
+
+    return value <= todayDateInput();
+}
+
+function todayDateInput() {
+    const today = new Date();
+
+    return dateKey(today);
+}
+
+function flattenInertiaErrors(errors: Record<string, string | string[]>) {
+    return Object.fromEntries(
+        Object.entries(errors).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]),
+    );
+}
+
+async function requestJson(url: string, method: 'POST' | 'PATCH', payload: Record<string, unknown>) {
+    const response = await fetch(url, {
+        method,
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            ...csrfHeaders(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const body = await response.json().catch(() => ({})) as { message?: string; errors?: Record<string, string | string[]> };
+
+    if (response.ok) {
+        return { ok: true, errors: {} };
+    }
+
+    const errors = flattenInertiaErrors(body.errors ?? {});
+    const message = body.message ?? Object.values(errors)[0] ?? 'Permintaan gagal diproses.';
+
+    return {
+        ok: false,
+        errors: Object.keys(errors).length > 0 ? errors : { general: message },
+    };
 }
 
 function ChevronIcon({ className = '' }: { className?: string }) {

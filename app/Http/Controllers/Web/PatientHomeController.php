@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -111,6 +112,7 @@ class PatientHomeController extends Controller
                 return [
                     'id' => $clinic->id,
                     'name' => $clinic->name,
+                    'slug' => Str::slug($clinic->name),
                     'address' => $clinic->address,
                     'city_name' => $clinic->city?->name,
                     'image_url' => $clinic->image_url,
@@ -156,6 +158,7 @@ class PatientHomeController extends Controller
             ->map(fn (User $doctor): array => [
                 'id' => $doctor->id,
                 'name' => $doctor->name,
+                'slug' => Str::slug($doctor->name),
                 'image_url' => $doctor->display_avatar_url,
                 'clinics' => $doctor->clinics
                     ->take(4)
