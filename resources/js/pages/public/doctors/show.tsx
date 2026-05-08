@@ -218,7 +218,7 @@ export default function DoctorDetail({ doctor }: DoctorDetailProps) {
                             <h1 className="text-3xl font-bold leading-tight tracking-[-0.03em] md:text-[2rem]">{doctor.name}</h1>
                             <p className="mt-2 text-lg text-[#40311D]/70">{doctor.primary_speciality || 'Dokter Klinik'}</p>
 
-                            <div className="mt-6 grid max-w-[520px] gap-5 sm:grid-cols-2">
+                            <div className="mt-6 flex flex-wrap max-w-[520px] gap-5">
                                 <ContactBlock label="Nomor telepon" value={doctor.phone_number || '-'} icon={<PhoneIcon />} />
                                 <ContactBlock label="Alamat email" value={doctor.email || '-'} icon={<MailIcon />} />
                             </div>

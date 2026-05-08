@@ -53,7 +53,7 @@ export default function ImageStack({ cards = [] }: { cards: ImageCard[] }) {
                     onClick={() => setSelectedCard(null)}
                     className="fixed inset-0 z-[999] flex items-center justify-center bg-black/85 p-4"
                 >
-                    <div role="presentation" onClick={(event) => event.stopPropagation()} className="relative w-full max-w-[60vw]">
+                    <div role="presentation" onClick={(event) => event.stopPropagation()} className="relative w-full max-w-[90vw] md:max-w-[80vw] lg:max-w-[60vw]">
                         <button
                             type="button"
                             onClick={() => setSelectedCard(null)}

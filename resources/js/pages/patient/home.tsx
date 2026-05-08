@@ -74,7 +74,7 @@ const STYLES = `
   .hp-booking-col, .hp-booking-col-middle { padding-left: 2rem; border-left: 1px solid rgba(64,49,29,.12); min-width: 0; }
   .hp-booking-label { font-size: .75rem; font-weight: 700; opacity: .5; margin-bottom: .6rem; text-transform: uppercase; letter-spacing: .07em; }
   .hp-booking-clinic { font-size: clamp(1.25rem, 2.5vw, 1.92rem); font-weight: 700; color: var(--hp-dark); line-height: 1.1; margin-bottom: .4rem; }
-  .hp-booking-chips { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; margin: .35rem 0 .6rem; }
+  .hp-booking-chips { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; margin: .35rem 0 .6rem; justify-content: center; }
   .hp-chip { font-size: .78rem; font-weight: 700; padding: .18rem .55rem; border-radius: 999px; background: var(--hp-dark); color: var(--hp-cream); white-space: nowrap; }
   .hp-chip-teal { background: var(--hp-teal); color: white; }
   .hp-booking-meta { font-size: .875rem; opacity: .62; line-height: 1.75; }
@@ -524,7 +524,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                     <>
                                         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
                                             <div className="hp-booking-clinic">{currentReservation.clinic?.name ?? 'Klinik'}</div>
-                                            <div className="hp-booking-chips sm:ml-auto">
+                                            <div className="hp-booking-chips">
                                                 <span className="hp-chip">Queue: {currentReservation.queue_summary?.number ?? '-'}</span>
                                                 <span className="hp-chip hp-chip-teal">Estimasi: {estimatedWait}</span>
                                             </div>

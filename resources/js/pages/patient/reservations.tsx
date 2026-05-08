@@ -232,7 +232,7 @@ function DetailItem({ label, value }: { label: string; value: ReactNode }) {
     return (
         <div>
             <p className="mb-0.5 whitespace-nowrap text-[10px] text-[#40311D]/40">{label}</p>
-            <p className="whitespace-nowrap text-xs font-medium text-[#40311D]">{value || '-'}</p>
+            <p className="text-xs font-medium text-[#40311D]">{value || '-'}</p>
         </div>
     );
 }

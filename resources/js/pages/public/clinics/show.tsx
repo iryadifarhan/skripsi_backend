@@ -240,7 +240,7 @@ export default function ClinicDetail({ clinic }: ClinicDetailProps) {
                                 ))}
                             </div>
 
-                            <div className="mt-6 grid max-w-[520px] gap-5 sm:grid-cols-2">
+                            <div className="mt-6 flex flex-wrap max-w-[520px] gap-5">
                                 <ContactBlock label="Nomor telepon" value={clinic.phone_number || '-'} icon={<PhoneIcon />} />
                                 <ContactBlock label="Alamat email" value={clinic.email || '-'} icon={<MailIcon />} />
                             </div>
