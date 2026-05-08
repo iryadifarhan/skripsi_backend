@@ -117,6 +117,79 @@ class PublicDirectoryController extends Controller
         ]);
     }
 
+    public function search(Request $request): Response
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $clinics = Clinic::query()
+            ->with([
+                'city:id,name',
+                'operatingHours:id,clinic_id,day_of_week,open_time,close_time,is_closed',
+                'doctors' => fn ($query) => $query
+                    ->select(['users.id', 'users.name', 'users.username', 'users.email', 'users.phone_number', 'users.profile_picture', 'users.image_path', 'users.role'])
+                    ->orderBy('users.name'),
+                'doctorClinicSchedules' => fn ($query) => $query
+                    ->with('doctor:id,name,username,email,phone_number,profile_picture,image_path,role')
+                    ->where('is_active', true)
+                    ->orderBy('day_of_week')
+                    ->orderBy('start_time'),
+            ])
+            ->select(['id', 'name', 'address', 'city_id', 'phone_number', 'email', 'image_path'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Clinic $clinic): array => $this->serializeClinic($clinic))
+            ->filter(fn (array $clinic): bool => $this->matchesDirectorySearch($query, [
+                $clinic['name'] ?? null,
+                $clinic['address'] ?? null,
+                $clinic['city_name'] ?? null,
+                $clinic['location'] ?? null,
+                $clinic['phone_number'] ?? null,
+                $clinic['email'] ?? null,
+                $clinic['specialities'] ?? [],
+                collect($clinic['doctors'] ?? [])->pluck('name')->all(),
+            ]))
+            ->take(12)
+            ->values();
+
+        $doctors = User::query()
+            ->where('role', User::ROLE_DOCTOR)
+            ->whereHas('clinics')
+            ->with([
+                'clinics' => fn ($query) => $query
+                    ->select(['clinics.id', 'clinics.name', 'clinics.address', 'clinics.city_id', 'clinics.phone_number', 'clinics.email', 'clinics.image_path'])
+                    ->with('city:id,name')
+                    ->orderBy('clinics.name'),
+                'doctorClinicSchedules' => fn ($query) => $query
+                    ->with('clinic:id,name,address,city_id,phone_number,email,image_path')
+                    ->where('is_active', true)
+                    ->orderBy('day_of_week')
+                    ->orderBy('start_time'),
+            ])
+            ->select(['id', 'name', 'username', 'email', 'phone_number', 'profile_picture', 'image_path', 'role'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (User $doctor): array => $this->serializeDoctor($doctor))
+            ->filter(fn (array $doctor): bool => $this->matchesDirectorySearch($query, [
+                $doctor['name'] ?? null,
+                $doctor['username'] ?? null,
+                $doctor['email'] ?? null,
+                $doctor['phone_number'] ?? null,
+                $doctor['specialities'] ?? [],
+                collect($doctor['clinics'] ?? [])->pluck('name')->all(),
+                collect($doctor['clinics'] ?? [])->pluck('city_name')->all(),
+                collect($doctor['clinics'] ?? [])->pluck('location')->all(),
+            ]))
+            ->take(12)
+            ->values();
+
+        return Inertia::render('public/search', [
+            'query' => $query,
+            'clinics' => $clinics,
+            'doctors' => $doctors,
+            'total' => $clinics->count() + $doctors->count(),
+        ]);
+    }
+
     public function doctor(string $doctorSlug): Response
     {
         $doctor = $this->findDoctorBySlug($doctorSlug);
@@ -839,5 +912,22 @@ class PublicDirectoryController extends Controller
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * @param array<int, mixed> $values
+     */
+    private function matchesDirectorySearch(string $query, array $values): bool
+    {
+        $normalizedQuery = Str::of($query)->lower()->squish()->toString();
+
+        if ($normalizedQuery === '') {
+            return true;
+        }
+
+        return collect($values)
+            ->flatten()
+            ->filter(fn ($value): bool => $value !== null && $value !== '')
+            ->contains(fn ($value): bool => Str::contains(Str::of((string) $value)->lower()->toString(), $normalizedQuery));
     }
 }

@@ -62,7 +62,7 @@ const STYLES = `
   .hp-page { min-height: 100vh; background: var(--hp-cream); color: var(--hp-dark); font-family: 'Work Sans', sans-serif; }
   .hp-container { width: 100%; max-width: var(--hp-page-max); margin: 0 auto; padding: 0 var(--hp-page-pad); }
   .hp-body { padding: 2rem 0 4rem; overflow: visible; }
-  .hp-hero { display: grid; grid-template-columns: 250px minmax(0,1fr) minmax(0,1fr); justify-items: stretch; gap: 2.5rem; align-items: start; padding: 2rem 0; margin-bottom: 2.5rem; border-bottom: 1px dashed rgba(64,49,29,.2); animation: hpFadeUp .5s ease both; }
+  .hp-hero { display: grid; grid-template-columns: 250px minmax(0,1fr) minmax(0,0.65fr); justify-items: stretch; gap: 2.5rem; align-items: start; padding: 2rem 0; margin-bottom: 2.5rem; border-bottom: 1px dashed rgba(64,49,29,.2); animation: hpFadeUp .5s ease both; }
   @keyframes hpFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
   .hp-greeting-label { font-size: 1rem; font-weight: 600; opacity: .6; margin-bottom: .3rem; }

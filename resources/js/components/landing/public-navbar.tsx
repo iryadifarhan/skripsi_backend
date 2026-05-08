@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import type { SharedData } from '@/types';
 
@@ -17,6 +17,29 @@ function isActivePath(currentPath: string, href: string) {
     }
 
     return currentPath === linkPath || currentPath.startsWith(`${linkPath}/`);
+}
+
+function searchQueryFromUrl(url: string) {
+    return new URLSearchParams(url.split('?')[1]?.split('#')[0] ?? '').get('q') ?? '';
+}
+
+function SearchIcon({ className = '' }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className={className}>
+            <path
+                fill="currentColor"
+                d="M8.5 3a5.5 5.5 0 0 1 4.38 8.83l3.15 3.15-1.06 1.06-3.15-3.15A5.5 5.5 0 1 1 8.5 3Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"
+            />
+        </svg>
+    );
+}
+
+function CloseIcon({ className = '' }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 20 20" aria-hidden="true" className={className}>
+            <path fill="currentColor" d="m5.28 4.22 4.72 4.72 4.72-4.72 1.06 1.06L11.06 10l4.72 4.72-1.06 1.06L10 11.06l-4.72 4.72-1.06-1.06L8.94 10 4.22 5.28l1.06-1.06Z" />
+        </svg>
+    );
 }
 
 function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
@@ -59,8 +82,12 @@ export function PublicNavbar() {
     const avatarUrl = user?.display_avatar_url ?? user?.image_url ?? user?.profile_picture_url ?? null;
     const currentPath = pathFromHref(page.url);
     const [scrolled, setScrolled] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState(() => searchQueryFromUrl(page.url));
     const [menuOpen, setMenuOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
+    const desktopSearchRef = useRef<HTMLInputElement | null>(null);
+    const mobileSearchRef = useRef<HTMLInputElement | null>(null);
     const profileRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
@@ -71,6 +98,32 @@ export function PublicNavbar() {
 
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    useEffect(() => {
+        setSearchQuery(searchQueryFromUrl(page.url));
+    }, [page.url]);
+
+    useEffect(() => {
+        if (searchOpen) {
+            const input = window.matchMedia('(min-width: 768px)').matches ? desktopSearchRef.current : mobileSearchRef.current;
+
+            input?.focus();
+        }
+    }, [searchOpen]);
+
+    useEffect(() => {
+        if (!searchOpen) return;
+
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setSearchOpen(false);
+            }
+        };
+
+        window.addEventListener('keydown', closeOnEscape);
+
+        return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [searchOpen]);
 
     useEffect(() => {
         if (!profileOpen) return;
@@ -105,6 +158,18 @@ export function PublicNavbar() {
         { href: patientHref('/reservasi'), label: 'reservasi' },
         { href: patientHref('/rekam-medis'), label: 'rekam medis' },
     ];
+    const submitSearch = (event?: FormEvent) => {
+        event?.preventDefault();
+
+        const q = searchQuery.trim();
+
+        setSearchOpen(false);
+        setMenuOpen(false);
+        router.get('/cari', q === '' ? {} : { q }, {
+            preserveScroll: false,
+            preserveState: false,
+        });
+    };
     const logout = () => {
         setProfileOpen(false);
         setMenuOpen(false);
@@ -120,12 +185,16 @@ export function PublicNavbar() {
             <style>
                 {`@keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }`}
             </style>
-            <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-5 py-3.5 md:px-8">
+            <div className="mx-auto flex max-w-[1400px] min-h-[76px] items-center gap-4 px-5 py-3.5 md:px-8">
                 <Link href={logoHref} className="mr-auto shrink-0 text-xl font-black tracking-[-0.02em] text-[#40311D]">
                     CLINI<span className="text-[#00917B]">&gt;</span>QUEUE<span className="text-[#00917B]">&gt;</span>
                 </Link>
 
-                <ul className="hidden items-center gap-7 md:flex">
+                <ul
+                    className={`hidden items-center transition-all duration-300 md:flex ${
+                        searchOpen ? 'max-w-0 gap-0 overflow-hidden opacity-0 pointer-events-none' : 'max-w-[640px] gap-7 opacity-100'
+                    }`}
+                >
                     {navLinks.map((link) => {
                         const active = isActivePath(currentPath, link.href);
 
@@ -146,18 +215,51 @@ export function PublicNavbar() {
                     })}
                 </ul>
 
-                <Link
-                    href="/klinik"
-                    className="hidden h-9 w-9 items-center justify-center rounded-full text-[#40311D] transition hover:bg-[#40311D]/8 md:flex"
-                    aria-label="Cari klinik atau dokter"
+                <form
+                    onSubmit={submitSearch}
+                    className={`hidden items-center overflow-hidden transition-all duration-300 ease-out md:flex ${
+                        searchOpen ? 'max-w-[400px] opacity-100' : 'max-w-0 opacity-0'
+                    }`}
                 >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" className="h-5 w-5">
-                        <path
-                            fill="currentColor"
-                            d="M8.5 3a5.5 5.5 0 0 1 4.38 8.83l3.15 3.15-1.06 1.06-3.15-3.15A5.5 5.5 0 1 1 8.5 3Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"
+                    <div className="flex min-w-[260px] items-center gap-2 rounded-full bg-[#DFE0DF] px-4 py-2">
+                        <SearchIcon className="h-5 w-5 text-[#40311D]/45" />
+                        <input
+                            ref={desktopSearchRef}
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder="Nama klinik, dokter..."
+                            className="w-full bg-transparent text-sm font-medium text-[#40311D] outline-none placeholder:text-[#40311D]/45 placeholder:italic"
+                            type="text"
                         />
-                    </svg>
-                </Link>
+                        {searchQuery !== '' ? (
+                            <button type="button" onClick={() => setSearchQuery('')} className="text-xs font-bold text-[#40311D]/45 hover:text-[#40311D] scale-125" aria-label="Kosongkan pencarian">
+                                x
+                            </button>
+                        ) : null}
+                    </div>
+                </form>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (!searchOpen) {
+                            setSearchOpen(true);
+                            return;
+                        }
+
+                        if (searchQuery.trim() !== '') {
+                            submitSearch();
+                            return;
+                        }
+
+                        setSearchOpen(false);
+                    }}
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-[#40311D] transition hover:bg-[#40311D]/8"
+                    aria-label={searchOpen ? 'Tutup pencarian' : 'Cari klinik atau dokter'}
+                    aria-expanded={searchOpen}
+                >
+                    {searchOpen ? <CloseIcon className="h-5 w-5" /> : <SearchIcon className="h-7 w-7" />}
+                </button>
 
                 {isPatient ? (
                     <div ref={profileRef} className="relative">
@@ -216,6 +318,27 @@ export function PublicNavbar() {
                     <span className="block h-0.5 w-6 bg-[#40311D]" />
                 </button>
             </div>
+
+            {searchOpen ? (
+                <form onSubmit={submitSearch} className="mx-auto flex max-w-[1400px] border-t border-[#40311D]/10 px-5 py-3 md:hidden">
+                    <div className="flex w-full items-center gap-2 rounded-full bg-[#DFE0DF] px-4 py-2.5">
+                        <SearchIcon className="h-5 w-5 text-[#40311D]/45" />
+                        <input
+                            ref={mobileSearchRef}
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder="Nama klinik, dokter..."
+                            className="w-full bg-transparent text-sm font-medium text-[#40311D] outline-none placeholder:text-[#40311D]/45 placeholder:italic"
+                            type="text"
+                        />
+                        {searchQuery !== '' ? (
+                            <button type="button" onClick={() => setSearchQuery('')} className="text-xs font-bold text-[#40311D]/45 hover:text-[#40311D] scale-125" aria-label="Kosongkan pencarian">
+                                x
+                            </button>
+                        ) : null}
+                    </div>
+                </form>
+            ) : null}
 
             {menuOpen ? (
                 <div className="mx-auto flex max-w-[1400px] flex-col gap-3 border-t border-[#40311D]/10 px-5 py-5 md:hidden">

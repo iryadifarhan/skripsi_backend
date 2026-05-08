@@ -18,6 +18,7 @@ use App\Http\Controllers\Web\ReservationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [DashboardController::class, 'home'])->name('home');
+Route::get('/cari', [PublicDirectoryController::class, 'search'])->name('public.search');
 Route::get('/klinik', [PublicDirectoryController::class, 'clinics'])->name('public.clinics.index');
 Route::get('/klinik/{clinicSlug}', [PublicDirectoryController::class, 'clinic'])->name('public.clinics.show');
 Route::get('/dokter', [PublicDirectoryController::class, 'doctors'])->name('public.doctors.index');
