@@ -45,7 +45,7 @@ class InertiaShellTest extends TestCase
 
         $this->assertAuthenticatedAs($user);
 
-        $this->post('/logout')->assertRedirect('/masuk');
+        $this->post('/logout')->assertRedirect('/');
 
         $this->post('/daftar', [
             'name' => 'Web Register Patient',
