@@ -114,7 +114,7 @@ class MedicalRecordReadyNotification extends Notification implements ShouldQueue
 
     private function medicalRecordPageUrl(): string
     {
-        return route('medical-records.page');
+        return route('patient.medical-records');
     }
 
     private function loadContext(): void

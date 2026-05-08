@@ -150,10 +150,14 @@ class InertiaShellTest extends TestCase
 
         $this->actingAs($user)
             ->get('/medical-records')
+            ->assertRedirect('/rekam-medis');
+
+        $this->actingAs($user)
+            ->get('/rekam-medis')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('medical-records/index')
-                ->where('context.role', User::ROLE_PATIENT)
+                ->component('patient/medical-records')
+                ->has('medicalRecords')
             );
     }
 
@@ -1401,7 +1405,7 @@ class InertiaShellTest extends TestCase
 
         $this->actingAs($user)
             ->get('/medical_record')
-            ->assertRedirect('/medical-records');
+            ->assertRedirect('/rekam-medis');
     }
 
     public function test_patient_dashboard_redirects_to_patient_home(): void

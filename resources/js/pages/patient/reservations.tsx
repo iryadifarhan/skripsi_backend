@@ -42,6 +42,8 @@ type RequestResult = {
 
 const ACTIVE_STATUSES = new Set(['pending', 'approved']);
 const CARDS_PER_PAGE = 4;
+const MONTH_NAMES = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const DAY_LABELS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
     pending: { label: 'Pending', color: '#b38600' },
@@ -135,6 +137,20 @@ function todayKey(): string {
         String(today.getMonth() + 1).padStart(2, '0'),
         String(today.getDate()).padStart(2, '0'),
     ].join('-');
+}
+
+function dateKeyFromParts(year: number, month: number, day: number): string {
+    return [year, String(month + 1).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
+}
+
+function daysInMonth(year: number, month: number): number {
+    return new Date(year, month + 1, 0).getDate();
+}
+
+function mondayFirstOffset(year: number, month: number): number {
+    const day = new Date(year, month, 1).getDay() - 1;
+
+    return day < 0 ? 6 : day;
 }
 
 function currentReservationFrom(reservations: ReservationEntry[]): ReservationEntry | null {
@@ -283,12 +299,12 @@ function ActionButton({ children, onClick, href, disabled = false }: { children:
     );
 }
 
-function ModalShell({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+function ModalShell({ children, onClose }: { children: ReactNode; onClose?: () => void }) {
     return (
         <div
             className="fixed inset-0 z-[90] flex items-center justify-center bg-black/65 p-4"
             onMouseDown={(event) => {
-                if (event.target === event.currentTarget) {
+                if (onClose && event.target === event.currentTarget) {
                     onClose();
                 }
             }}
@@ -300,25 +316,143 @@ function ModalShell({ children, onClose }: { children: ReactNode; onClose: () =>
 
 function ModalCard({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
     return (
-        <div className={`max-h-[90vh] w-full overflow-y-auto rounded-[18px] bg-[#1c1c1c] p-7 text-white shadow-2xl ${wide ? 'max-w-2xl' : 'max-w-sm'}`}>
+        <div className={`max-h-[90vh] w-full overflow-y-auto rounded-[18px] bg-[#1c1c1c] p-7 text-white shadow-2xl ${wide ? 'max-w-[420px]' : 'max-w-[340px]'}`}>
             {children}
         </div>
     );
 }
 
+function ModalActionButton({
+    children,
+    disabled = false,
+    outline = false,
+    onClick,
+}: {
+    children: ReactNode;
+    disabled?: boolean;
+    outline?: boolean;
+    onClick?: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                outline
+                    ? 'border border-white/25 bg-transparent text-white/70 hover:bg-white/10'
+                    : 'bg-white text-[#1c1c1c] hover:bg-[#DED0B6]'
+            } disabled:cursor-not-allowed disabled:opacity-40`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function RescheduleCalendar({
+    year,
+    month,
+    selectedDate,
+    onSelect,
+    onPrev,
+    onNext,
+}: {
+    year: number;
+    month: number;
+    selectedDate: string;
+    onSelect: (date: string) => void;
+    onPrev: () => void;
+    onNext: () => void;
+}) {
+    const today = todayKey();
+    const days = daysInMonth(year, month);
+    const offset = mondayFirstOffset(year, month);
+    const cells: Array<number | null> = [];
+
+    for (let index = 0; index < offset; index += 1) {
+        cells.push(null);
+    }
+
+    for (let day = 1; day <= days; day += 1) {
+        cells.push(day);
+    }
+
+    return (
+        <div className="select-none rounded-[10px] bg-white/[0.06] p-3">
+            <div className="mb-3 flex items-center justify-between">
+                <button type="button" onClick={onPrev} className="rounded-full p-1 text-white/80 transition hover:bg-white/10" aria-label="Bulan sebelumnya">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
+                        <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                </button>
+                <span className="text-xs font-semibold text-white">{MONTH_NAMES[month]} {year}</span>
+                <button type="button" onClick={onNext} className="rounded-full p-1 text-white/80 transition hover:bg-white/10" aria-label="Bulan berikutnya">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                </button>
+            </div>
+
+            <div className="mb-1 grid grid-cols-7">
+                {DAY_LABELS.map((day) => (
+                    <div key={day} className="py-1 text-center text-[9px] font-bold uppercase tracking-wide text-white/35">
+                        {day}
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+                {cells.map((day, index) => {
+                    if (day === null) {
+                        return <div key={`blank-${index}`} />;
+                    }
+
+                    const key = dateKeyFromParts(year, month, day);
+                    const selected = selectedDate === key;
+                    const isToday = today === key;
+                    const disabled = key < today;
+
+                    return (
+                        <button
+                            key={key}
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => onSelect(key)}
+                            className={`aspect-square rounded-md text-[11px] font-medium transition ${
+                                selected
+                                    ? 'bg-[#40311D] text-[#DED0B6] ring-1 ring-white/20'
+                                    : isToday
+                                      ? 'border border-[#00917B] text-[#00917B] hover:bg-white/10'
+                                      : disabled ? 'cursor-not-allowed border-0 text-gray-700'
+                                                 : 'text-white/85 hover:bg-white/10' 
+                            }`}
+                        >
+                            {day}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function CancelModal({ reservation, onClose }: { reservation: ReservationEntry; onClose: () => void }) {
+    const [step, setStep] = useState<'confirm' | 'reason' | 'success'>('confirm');
     const [reason, setReason] = useState('');
     const [agreed, setAgreed] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState(false);
 
     const submit = async () => {
+        if (!reason.trim() || !agreed) {
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         const result = await patchJson(`/reservations/${reservation.id}/cancel`, {
-            cancellation_reason: reason.trim() === '' ? null : reason.trim(),
+            cancellation_reason: reason.trim(),
         });
 
         setLoading(false);
@@ -328,62 +462,77 @@ function CancelModal({ reservation, onClose }: { reservation: ReservationEntry; 
             return;
         }
 
-        setSuccess(true);
+        setStep('success');
         setTimeout(() => {
             onClose();
             router.reload({ only: ['reservations'], preserveScroll: true });
-        }, 800);
+        }, 2500);
     };
 
     return (
-        <ModalShell onClose={onClose}>
+        <ModalShell onClose={step !== 'success' && !loading ? onClose : undefined}>
             <ModalCard>
-                {success ? (
+                {step === 'confirm' ? (
+                    <>
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/20 text-white">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                        </div>
+                        <h3 className="text-center text-base font-medium">Apakah anda ingin melakukan pembatalan reservasi?</h3>
+                        <div className="mt-6 flex gap-2">
+                            <ModalActionButton outline onClick={onClose}>
+                                Kembali
+                            </ModalActionButton>
+                            <ModalActionButton onClick={() => setStep('reason')}>
+                                Ya
+                            </ModalActionButton>
+                        </div>
+                    </>
+                ) : null}
+
+                {step === 'reason' ? (
+                    <>
+                        <h3 className="mb-3 text-[15px] font-medium">Apa alasan anda mengajukan pembatalan reservasi?</h3>
+                        <textarea
+                            value={reason}
+                            onChange={(event) => setReason(event.target.value.slice(0, 90))}
+                            rows={4}
+                            className="w-full resize-none rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2 text-xs text-white outline-none focus:border-[#00917B]"
+                            placeholder="Ketik alasan anda disini"
+                        />
+                        <p className="mt-1 text-right text-[10px] text-white/35">{reason.length}/90</p>
+                        <label className="mt-3 flex cursor-pointer items-start gap-2 text-[11px] leading-5 text-white/60">
+                            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-1 accent-[#00917B]" />
+                            Dengan ini saya setuju untuk membatalkan reservasi
+                        </label>
+
+                        {error ? <p className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-100">{error}</p> : null}
+
+                        <div className="mt-5 flex gap-2">
+                            <ModalActionButton outline disabled={loading} onClick={() => setStep('confirm')}>
+                                Kembali
+                            </ModalActionButton>
+                            <ModalActionButton disabled={!reason.trim() || !agreed || loading} onClick={submit}>
+                                {loading ? 'Mengajukan...' : 'Lanjut'}
+                            </ModalActionButton>
+                        </div>
+                    </>
+                ) : null}
+
+                {step === 'success' ? (
                     <div className="text-center">
                         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#00917B]/20 text-[#00917B]">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6">
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
                         </div>
-                        <h3 className="text-base font-semibold">Pembatalan reservasi berhasil diajukan.</h3>
-                        <p className="mt-2 text-xs text-white/50">Data reservasi akan diperbarui sebentar lagi.</p>
+                        <h3 className="text-base font-medium">Pembatalan reservasi anda berhasil diajukan.</h3>
+                        <p className="mt-2 text-xs text-white/50">Status pada website akan segera mengikuti pembatalan yang diajukan.</p>
                     </div>
-                ) : (
-                    <>
-                        <h3 className="text-base font-semibold">Batalkan reservasi?</h3>
-                        <p className="mt-2 text-xs leading-6 text-white/55">Reservasi akan berubah menjadi cancelled dan antrean akan disesuaikan ulang oleh sistem.</p>
-
-                        <label className="mt-5 block text-xs font-semibold text-white/70">Alasan pembatalan</label>
-                        <textarea
-                            value={reason}
-                            onChange={(event) => setReason(event.target.value.slice(0, 1000))}
-                            rows={4}
-                            className="mt-2 w-full resize-none rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[#00917B]"
-                            placeholder="Ketik alasan pembatalan"
-                        />
-
-                        <label className="mt-4 flex cursor-pointer gap-2 text-xs leading-5 text-white/60">
-                            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 accent-[#00917B]" />
-                            Saya setuju untuk membatalkan reservasi ini.
-                        </label>
-
-                        {error ? <p className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-100">{error}</p> : null}
-
-                        <div className="mt-6 flex gap-2">
-                            <button type="button" onClick={onClose} disabled={loading} className="flex-1 rounded-lg border border-white/20 px-3 py-2 text-sm text-white/75 transition hover:bg-white/10 disabled:opacity-50">
-                                Kembali
-                            </button>
-                            <button
-                                type="button"
-                                onClick={submit}
-                                disabled={!agreed || loading}
-                                className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-[#1c1c1c] transition hover:bg-[#DED0B6] disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                {loading ? 'Memproses...' : 'Batalkan'}
-                            </button>
-                        </div>
-                    </>
-                )}
+                ) : null}
             </ModalCard>
         </ModalShell>
     );
@@ -391,7 +540,11 @@ function CancelModal({ reservation, onClose }: { reservation: ReservationEntry; 
 
 function RescheduleModal({ reservation, onClose }: { reservation: ReservationEntry; onClose: () => void }) {
     const initialDate = dateKey(reservation.reservation_date) >= todayKey() ? dateKey(reservation.reservation_date) : todayKey();
-    const [reservationDate, setReservationDate] = useState(initialDate);
+    const initialCalendarDate = localDate(initialDate) ?? new Date();
+    const [step, setStep] = useState<'confirm' | 'form' | 'success'>('confirm');
+    const [calYear, setCalYear] = useState(initialCalendarDate.getFullYear());
+    const [calMonth, setCalMonth] = useState(initialCalendarDate.getMonth());
+    const [reservationDate, setReservationDate] = useState();
     const [scheduleId, setScheduleId] = useState(reservation.doctor_clinic_schedule_id ? String(reservation.doctor_clinic_schedule_id) : '');
     const [windowStart, setWindowStart] = useState(shortTime(reservation.window_start_time));
     const [reason, setReason] = useState('');
@@ -402,19 +555,30 @@ function RescheduleModal({ reservation, onClose }: { reservation: ReservationEnt
     const [loadingWindows, setLoadingWindows] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState(false);
 
     useEffect(() => {
+        if (step !== 'form') {
+            return;
+        }
+
         const clinicId = reservation.clinic_id ?? reservation.clinic?.id;
         const doctorId = reservation.doctor_id ?? reservation.doctor?.id;
 
         if (!clinicId || !doctorId || !reservationDate) {
             setSchedules([]);
             setScheduleId('');
+            setWindows([]);
+            setWindowStart('');
             return;
         }
 
         const controller = new AbortController();
+        let active = true;
+
+        setSchedules([]);
+        setScheduleId('');
+        setWindows([]);
+        setWindowStart('');
         setLoadingSchedules(true);
         setError(null);
 
@@ -427,31 +591,47 @@ function RescheduleModal({ reservation, onClose }: { reservation: ReservationEnt
             controller.signal,
         )
             .then((data) => {
+                if (!active) {
+                    return;
+                }
+
                 const options = data.schedules ?? [];
-                const currentExists = options.some((schedule) => String(schedule.id) === scheduleId);
                 setSchedules(options);
-                setScheduleId(currentExists ? scheduleId : (options[0]?.id ? String(options[0].id) : ''));
+                setScheduleId(options[0]?.id ? String(options[0].id) : '');
             })
             .catch((fetchError: Error) => {
-                if (fetchError.name !== 'AbortError') {
+                if (active && fetchError.name !== 'AbortError') {
                     setSchedules([]);
                     setScheduleId('');
+                    setWindows([]);
+                    setWindowStart('');
                     setError(fetchError.message);
                 }
             })
-            .finally(() => setLoadingSchedules(false));
+            .finally(() => {
+                if (active) {
+                    setLoadingSchedules(false);
+                }
+            });
 
-        return () => controller.abort();
-    }, [reservation, reservationDate, scheduleId]);
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [reservation, reservationDate, step]);
 
     useEffect(() => {
-        if (!scheduleId || !reservationDate) {
+        const scheduleMatchesSelectedDate = schedules.some((schedule) => String(schedule.id) === scheduleId);
+
+        if (step !== 'form' || loadingSchedules || !scheduleId || !scheduleMatchesSelectedDate || !reservationDate) {
             setWindows([]);
             setWindowStart('');
             return;
         }
 
         const controller = new AbortController();
+        let active = true;
+
         setLoadingWindows(true);
         setError(null);
 
@@ -464,24 +644,37 @@ function RescheduleModal({ reservation, onClose }: { reservation: ReservationEnt
             controller.signal,
         )
             .then((data) => {
-                const options = data.windows ?? [];
-                const currentAvailable = options.some((window) => window.is_available && shortTime(window.window_start_time) === windowStart);
-                const fallback = options.find((window) => window.is_available);
+                if (!active) {
+                    return;
+                }
 
+                const options = data.windows ?? [];
                 setWindows(options);
-                setWindowStart(currentAvailable ? windowStart : (fallback ? shortTime(fallback.window_start_time) : ''));
+                setWindowStart((current) => {
+                    const currentAvailable = options.some((slot) => slot.is_available && shortTime(slot.window_start_time) === current);
+                    const fallback = options.find((slot) => slot.is_available);
+
+                    return currentAvailable ? current : (fallback ? shortTime(fallback.window_start_time) : '');
+                });
             })
             .catch((fetchError: Error) => {
-                if (fetchError.name !== 'AbortError') {
+                if (active && fetchError.name !== 'AbortError') {
                     setWindows([]);
                     setWindowStart('');
                     setError(fetchError.message);
                 }
             })
-            .finally(() => setLoadingWindows(false));
+            .finally(() => {
+                if (active) {
+                    setLoadingWindows(false);
+                }
+            });
 
-        return () => controller.abort();
-    }, [reservation.id, reservationDate, scheduleId, windowStart]);
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [loadingSchedules, reservation.id, reservationDate, scheduleId, schedules, step]);
 
     const submit = async () => {
         if (!reservationDate || !scheduleId || !windowStart) {
@@ -511,130 +704,143 @@ function RescheduleModal({ reservation, onClose }: { reservation: ReservationEnt
             return;
         }
 
-        setSuccess(true);
+        setStep('success');
         setTimeout(() => {
             onClose();
             router.reload({ only: ['reservations'], preserveScroll: true });
-        }, 800);
+        }, 2500);
     };
 
     return (
-        <ModalShell onClose={onClose}>
+        <ModalShell onClose={step !== 'success' && !submitting ? onClose : undefined}>
             <ModalCard wide>
-                {success ? (
-                    <div className="py-3 text-center">
+                {step === 'confirm' ? (
+                    <>
+                        <h3 className="text-center text-base font-medium">Apakah anda ingin melakukan reschedule reservasi?</h3>
+                        <div className="mt-6 flex gap-2">
+                            <ModalActionButton outline onClick={onClose}>
+                                Kembali
+                            </ModalActionButton>
+                            <ModalActionButton onClick={() => setStep('form')}>
+                                Ya
+                            </ModalActionButton>
+                        </div>
+                    </>
+                ) : null}
+
+                {step === 'form' ? (
+                    <>
+                        <p className="mb-1 text-sm font-semibold">Detail reservasi mu</p>
+                        <p className="text-xs text-white/60">
+                            {reservation.clinic?.name ?? '-'}, {reservation.doctor?.name ?? '-'}, Slot {slotLabel(reservation.window_slot_number)}
+                        </p>
+                        <p className="mb-4 text-xs text-white/60">
+                            {dateLabel(reservation.reservation_date)}, {timeRange(reservation)}
+                        </p>
+
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">Slot waktu tersedia</p>
+                        <RescheduleCalendar
+                            year={calYear}
+                            month={calMonth}
+                            selectedDate={reservationDate}
+                            onSelect={(date) => {
+                                setReservationDate(date);
+                                setSchedules([]);
+                                setScheduleId('');
+                                setWindows([]);
+                                setWindowStart('');
+                                setError(null);
+                            }}
+                            onPrev={() => {
+                                if (calMonth === 0) {
+                                    setCalMonth(11);
+                                    setCalYear((yearValue) => yearValue - 1);
+                                } else {
+                                    setCalMonth((monthValue) => monthValue - 1);
+                                }
+                            }}
+                            onNext={() => {
+                                if (calMonth === 11) {
+                                    setCalMonth(0);
+                                    setCalYear((yearValue) => yearValue + 1);
+                                } else {
+                                    setCalMonth((monthValue) => monthValue + 1);
+                                }
+                            }}
+                        />
+
+                        <div className="mt-3 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                            {loadingSchedules || loadingWindows ? (
+                                <p className="w-full rounded-lg bg-white/[0.06] px-3 py-2 text-xs text-white/50">Memuat slot waktu...</p>
+                            ) : schedules.length === 0 ? (
+                                <p className="w-full rounded-lg bg-white/[0.06] px-3 py-2 text-xs text-white/50">Dokter tidak memiliki jadwal praktik pada tanggal ini.</p>
+                            ) : windows.length === 0 ? (
+                                <p className="w-full rounded-lg bg-white/[0.06] px-3 py-2 text-xs text-white/50">Tidak ada slot untuk tanggal ini.</p>
+                            ) : (
+                                windows.map((slot) => {
+                                    const selected = shortTime(slot.window_start_time) === windowStart;
+                                    const disabled = !slot.is_available;
+                                    const filled = Math.max(0, slot.max_slots - slot.available_slots);
+
+                                    return (
+                                        <button
+                                            key={`${slot.window_start_time}-${slot.window_end_time}`}
+                                            type="button"
+                                            onClick={() => setWindowStart(shortTime(slot.window_start_time))}
+                                            disabled={disabled}
+                                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                                                selected
+                                                    ? 'border-[#00917B] bg-[#00917B]/20 text-[#00917B]'
+                                                    : 'border-white/20 bg-transparent text-white hover:border-white/35'
+                                            } ${disabled ? 'cursor-not-allowed text-white/25 hover:border-white/20' : ''}`}
+                                        >
+                                            {shortTime(slot.window_start_time)} - {shortTime(slot.window_end_time)}
+                                            <span className="text-[10px] opacity-60">{filled}/{slot.max_slots}</span>
+                                        </button>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <p className="mt-4 mb-2 text-[13px] font-medium">Apa alasan anda mengajukan perubahan jadwal?</p>
+                        <textarea
+                            value={reason}
+                            onChange={(event) => setReason(event.target.value.slice(0, 90))}
+                            rows={3}
+                            className="w-full resize-none rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2 text-xs text-white outline-none focus:border-[#00917B]"
+                            placeholder="Ketik alasan anda disini"
+                        />
+                        <p className="mt-1 text-right text-[10px] text-white/35">{reason.length}/90</p>
+
+                        <label className="mt-3 flex cursor-pointer items-start gap-2 text-[11px] leading-5 text-white/60">
+                            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-1 accent-[#00917B]" />
+                            Dengan ini saya setuju untuk merubah waktu reservasi
+                        </label>
+
+                        {error ? <p className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-100">{error}</p> : null}
+
+                        <div className="mt-5 flex gap-2">
+                            <ModalActionButton outline disabled={submitting} onClick={() => setStep('confirm')}>
+                                Kembali
+                            </ModalActionButton>
+                            <ModalActionButton disabled={!reason.trim() || !agreed || submitting || loadingSchedules || loadingWindows} onClick={submit}>
+                                {submitting ? 'Mengajukan...' : 'Lanjut'}
+                            </ModalActionButton>
+                        </div>
+                    </>
+                ) : null}
+
+                {step === 'success' ? (
+                    <div className="text-center">
                         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#00917B]/20 text-[#00917B]">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6">
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
                         </div>
-                        <h3 className="text-base font-semibold">Perubahan jadwal berhasil diajukan.</h3>
-                        <p className="mt-2 text-xs text-white/50">Reservasi kembali ke status pending untuk diproses admin klinik.</p>
+                        <h3 className="text-base font-medium">Perubahan waktu reservasi mu berhasil diajukan.</h3>
+                        <p className="mt-2 text-xs text-white/50">Status pada website akan segera mengikuti perubahan yang diajukan.</p>
                     </div>
-                ) : (
-                    <>
-                        <h3 className="text-base font-semibold">Reschedule reservasi</h3>
-                        <p className="mt-1 text-xs text-white/50">
-                            {reservation.clinic?.name ?? '-'} - {reservation.doctor?.name ?? '-'} - {dateLabel(reservation.reservation_date)}
-                        </p>
-
-                        <div className="mt-5 grid gap-4 md:grid-cols-2">
-                            <label className="block text-xs font-semibold text-white/70">
-                                Tanggal baru
-                                <input
-                                    type="date"
-                                    value={reservationDate}
-                                    min={todayKey()}
-                                    onChange={(event) => setReservationDate(event.target.value)}
-                                    className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[#00917B]"
-                                />
-                            </label>
-                            <label className="block text-xs font-semibold text-white/70">
-                                Jadwal dokter
-                                <select
-                                    value={scheduleId}
-                                    onChange={(event) => setScheduleId(event.target.value)}
-                                    disabled={loadingSchedules || schedules.length === 0}
-                                    className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[#00917B] disabled:opacity-45"
-                                >
-                                    {schedules.length === 0 ? <option value="">Tidak ada jadwal</option> : null}
-                                    {schedules.map((schedule) => (
-                                        <option key={schedule.id} value={schedule.id} className="bg-[#1c1c1c]">
-                                            {shortTime(schedule.start_time)} - {shortTime(schedule.end_time)} ({schedule.window_minutes} menit)
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                        </div>
-
-                        <div className="mt-5">
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-white/45">Slot waktu tersedia</p>
-                            {loadingWindows ? (
-                                <p className="rounded-lg bg-white/5 px-3 py-3 text-xs text-white/50">Memuat slot waktu...</p>
-                            ) : windows.length === 0 ? (
-                                <p className="rounded-lg bg-white/5 px-3 py-3 text-xs text-white/50">Tidak ada slot untuk tanggal ini.</p>
-                            ) : (
-                                <div className="grid max-h-52 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                                    {windows.map((window) => {
-                                        const selected = shortTime(window.window_start_time) === windowStart;
-                                        const disabled = !window.is_available;
-
-                                        return (
-                                            <button
-                                                key={`${window.window_start_time}-${window.window_end_time}`}
-                                                type="button"
-                                                onClick={() => setWindowStart(shortTime(window.window_start_time))}
-                                                disabled={disabled}
-                                                className={`rounded-xl border px-3 py-2 text-left text-xs transition ${
-                                                    selected
-                                                        ? 'border-[#00917B] bg-[#00917B]/20 text-[#00917B]'
-                                                        : 'border-white/15 bg-white/5 text-white/75 hover:border-white/35'
-                                                } ${disabled ? 'cursor-not-allowed opacity-35 hover:border-white/15' : ''}`}
-                                            >
-                                                <span className="block font-semibold">
-                                                    {shortTime(window.window_start_time)} - {shortTime(window.window_end_time)}
-                                                </span>
-                                                <span className="mt-1 block text-[11px] opacity-70">
-                                                    {window.available_slots}/{window.max_slots} slot tersedia
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-
-                        <label className="mt-5 block text-xs font-semibold text-white/70">Alasan reschedule</label>
-                        <textarea
-                            value={reason}
-                            onChange={(event) => setReason(event.target.value.slice(0, 1000))}
-                            rows={3}
-                            className="mt-2 w-full resize-none rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[#00917B]"
-                            placeholder="Ketik alasan perubahan jadwal"
-                        />
-
-                        <label className="mt-4 flex cursor-pointer gap-2 text-xs leading-5 text-white/60">
-                            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 accent-[#00917B]" />
-                            Saya setuju untuk mengajukan perubahan jadwal reservasi ini.
-                        </label>
-
-                        {error ? <p className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-100">{error}</p> : null}
-
-                        <div className="mt-6 flex gap-2">
-                            <button type="button" onClick={onClose} disabled={submitting} className="flex-1 rounded-lg border border-white/20 px-3 py-2 text-sm text-white/75 transition hover:bg-white/10 disabled:opacity-50">
-                                Kembali
-                            </button>
-                            <button
-                                type="button"
-                                onClick={submit}
-                                disabled={!agreed || submitting || loadingSchedules || loadingWindows}
-                                className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-[#1c1c1c] transition hover:bg-[#DED0B6] disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                {submitting ? 'Mengajukan...' : 'Ajukan'}
-                            </button>
-                        </div>
-                    </>
-                )}
+                ) : null}
             </ModalCard>
         </ModalShell>
     );
@@ -779,7 +985,7 @@ function HistoryCard({ reservation, order }: { reservation: ReservationEntry; or
                         </p>
                     </div>
                     <Link
-                        href={canOpenMedicalRecord ? '/rekam-medis' : '/reservasi'}
+                        href={canOpenMedicalRecord ? `/rekam-medis?search=${encodeURIComponent(reservation.reservation_number)}` : '/reservasi'}
                         className={`inline-flex items-center gap-1 rounded-lg border border-[#40311D]/30 px-3 py-2 text-xs font-semibold transition ${
                             canOpenMedicalRecord ? 'hover:bg-[#40311D]/5' : 'cursor-not-allowed opacity-40'
                         }`}

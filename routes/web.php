@@ -46,7 +46,9 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/reservasi', [ReservationController::class, 'index'])
         ->middleware('authorize:patient')
         ->name('patient.reservations');
-    Route::get('/rekam-medis', [MedicalRecordController::class, 'page'])->name('patient.medical-records');
+    Route::get('/rekam-medis', [MedicalRecordController::class, 'page'])
+        ->middleware('authorize:patient')
+        ->name('patient.medical-records');
     Route::post('/logout', [DashboardController::class, 'logout'])->name('logout');
 
     Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.page');

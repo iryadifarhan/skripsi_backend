@@ -200,6 +200,7 @@ export type MedicalRecordEntry = {
     reservation_id: number;
     patient_id: number | null;
     guest_name?: string | null;
+    guest_phone_number?: string | null;
     diagnosis?: string | null;
     treatment?: string | null;
     prescription_notes?: string | null;
@@ -215,10 +216,19 @@ export type MedicalRecordEntry = {
     doctor?: {
         id: number;
         name: string;
+        username?: string;
+        email?: string;
+        phone_number?: string | null;
+        image_url?: string | null;
+        display_avatar_url?: string | null;
     } | null;
     clinic?: {
         id: number;
         name: string;
+        address?: string | null;
+        phone_number?: string | null;
+        email?: string | null;
+        image_url?: string | null;
     } | null;
     reservation?: {
         id: number;

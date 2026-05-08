@@ -100,7 +100,7 @@ class MedicalRecordWebTest extends TestCase
             $job->phoneNumber === '081234500006'
             && str_contains($job->message, 'completed')
             && str_contains($job->message, 'Patient should rest for three days.')
-            && str_contains($job->message, '/medical-records')
+            && str_contains($job->message, '/rekam-medis')
         );
     }
 
@@ -212,7 +212,7 @@ class MedicalRecordWebTest extends TestCase
             $job->phoneNumber === '081234500012'
             && str_contains($job->message, 'completed')
             && str_contains($job->message, 'Admin recorded the consultation result.')
-            && str_contains($job->message, '/medical-records')
+            && str_contains($job->message, '/rekam-medis')
         );
     }
 
@@ -325,7 +325,7 @@ class MedicalRecordWebTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->getJson('/medical-records', $this->spaHeaders())
+        $this->getJson('/rekam-medis', $this->spaHeaders())
             ->assertOk()
             ->assertJsonCount(1, 'medical_records')
             ->assertJsonPath('medical_records.0.id', $medicalRecord->id)

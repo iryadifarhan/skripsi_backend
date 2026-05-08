@@ -27,10 +27,19 @@ class MedicalRecordController extends Controller
     ) {
     }
 
-    public function page(Request $request): JsonResponse|Response
+    public function page(Request $request): JsonResponse|RedirectResponse|Response
     {
         /** @var User $user */
         $user = $request->user();
+
+        if ($user->role === User::ROLE_PATIENT && !$request->routeIs('patient.medical-records')) {
+            if ($request->expectsJson()) {
+                abort(404);
+            }
+
+            return redirect()->route('patient.medical-records', $request->query());
+        }
+
         $context = $this->workspace->context($request);
         $payload = $request->validate([
             'clinic_id' => ['nullable', 'integer', 'exists:clinics,id'],
@@ -88,6 +97,12 @@ class MedicalRecordController extends Controller
             ]);
         }
 
+        if ($request->routeIs('patient.medical-records')) {
+            return Inertia::render('patient/medical-records', [
+                'medicalRecords' => $medicalRecords,
+            ]);
+        }
+
         return Inertia::render('medical-records/index', [
             'context' => $context,
             'medicalRecords' => $medicalRecords,
@@ -102,6 +117,13 @@ class MedicalRecordController extends Controller
 
     public function redirectLegacy(Request $request): RedirectResponse
     {
+        /** @var User|null $user */
+        $user = $request->user();
+
+        if ($user?->role === User::ROLE_PATIENT) {
+            return redirect()->route('patient.medical-records', $request->query());
+        }
+
         return redirect()->route('medical-records.page', $request->query());
     }
 
