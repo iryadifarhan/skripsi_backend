@@ -185,9 +185,11 @@ class WorkspaceViewService
     {
         return [
             'patient:id,name,username,email,phone_number,gender',
-            'doctor:id,name,username,email,phone_number,image_path',
-            'clinic:id,name,address,phone_number,email,image_path',
+            'doctor:id,name,username,email,phone_number,profile_picture,image_path',
+            'clinic:id,name,address,city_id,phone_number,email,image_path',
+            'clinic.city:id,name',
             'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
+            'medicalRecord:id,reservation_id',
         ];
     }
 }

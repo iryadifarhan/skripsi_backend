@@ -43,7 +43,9 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'dashboard'])->name('dashboard');
     Route::get('/beranda', [PatientHomeController::class, 'index'])->name('patient.home');
-    Route::get('/reservasi', [ReservationController::class, 'index'])->name('patient.reservations');
+    Route::get('/reservasi', [ReservationController::class, 'index'])
+        ->middleware('authorize:patient')
+        ->name('patient.reservations');
     Route::get('/rekam-medis', [MedicalRecordController::class, 'page'])->name('patient.medical-records');
     Route::post('/logout', [DashboardController::class, 'logout'])->name('logout');
 

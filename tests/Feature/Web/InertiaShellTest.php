@@ -130,10 +130,14 @@ class InertiaShellTest extends TestCase
 
         $this->actingAs($user)
             ->get('/reservations')
+            ->assertRedirect('/reservasi');
+
+        $this->actingAs($user)
+            ->get('/reservasi')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('reservations/index')
-                ->where('context.role', User::ROLE_PATIENT)
+                ->component('patient/reservations')
+                ->has('reservations')
             );
 
         $this->actingAs($user)
@@ -1393,14 +1397,14 @@ class InertiaShellTest extends TestCase
 
         $this->actingAs($user)
             ->get('/reservation')
-            ->assertRedirect('/reservations');
+            ->assertRedirect('/reservasi');
 
         $this->actingAs($user)
             ->get('/medical_record')
             ->assertRedirect('/medical-records');
     }
 
-    public function test_authenticated_dashboard_renders_with_auth_shared_props(): void
+    public function test_patient_dashboard_redirects_to_patient_home(): void
     {
         $user = User::factory()->create([
             'role' => User::ROLE_PATIENT,
@@ -1408,12 +1412,7 @@ class InertiaShellTest extends TestCase
 
         $this->actingAs($user)
             ->get('/dashboard')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('dashboard')
-                ->where('auth.user.id', $user->id)
-                ->has('modules')
-            );
+            ->assertRedirect('/beranda');
     }
 }
 

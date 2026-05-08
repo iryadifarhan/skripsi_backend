@@ -22,11 +22,14 @@ class ReservationFlowWebTest extends TestCase
 
         $this->actingAs($patient)
             ->get('/reservations')
+            ->assertRedirect('/reservasi');
+
+        $this->actingAs($patient)
+            ->get('/reservasi')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('reservations/index')
-                ->where('booking.selectedClinicId', $clinic->id)
-                ->where('booking.selectedDoctorId', $doctor->id)
+                ->component('patient/reservations')
+                ->has('reservations')
             );
 
         $this->actingAs($patient)
@@ -36,7 +39,7 @@ class ReservationFlowWebTest extends TestCase
                 'window_start_time' => '09:00',
                 'complaint' => 'Demam ringan',
             ])
-            ->assertRedirect('/reservations')
+            ->assertRedirect('/reservasi')
             ->assertSessionHas('status', 'Reservasi berhasil dibuat dan menunggu approval admin klinik.');
 
         $reservation = Reservation::query()->firstOrFail();

@@ -105,7 +105,7 @@ class ReservationStatusNotification extends Notification implements ShouldQueue
 
     private function reservationPageUrl(): string
     {
-        return route('reservations.page');
+        return route('patient.reservations');
     }
 
     private function loadContext(): void

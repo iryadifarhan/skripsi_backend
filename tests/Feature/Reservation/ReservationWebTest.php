@@ -571,7 +571,7 @@ class ReservationWebTest extends TestCase
 
         $this->login($patient, 'Password123!');
 
-        $this->getJson('/reservations', $this->spaHeaders())
+        $this->getJson('/reservasi', $this->spaHeaders())
             ->assertOk()
             ->assertJsonCount(1, 'reservations')
             ->assertJsonPath('reservations.0.id', $ownReservation->id)

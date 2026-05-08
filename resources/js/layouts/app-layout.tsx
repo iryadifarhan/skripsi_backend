@@ -229,7 +229,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
 
     const navigation = [
         { href: '/dashboard', label: 'Dashboard', visible: true },
-        { href: '/reservations', label: 'Reservations', visible: user?.role === 'patient' || user?.role === 'admin' },
+        { href: user?.role === 'patient' ? '/reservasi' : '/reservations', label: 'Reservations', visible: user?.role === 'patient' || user?.role === 'admin' },
         { href: '/queue', label: 'Queue', visible: user?.role === 'patient' || user?.role === 'admin' || user?.role === 'doctor' },
         { href: '/medical-records', label: 'Medical Records', visible: user?.role === 'patient' || user?.role === 'admin' || user?.role === 'doctor' },
         { href: '/profile', label: 'Profile', visible: user?.role === 'patient' || user?.role === 'doctor' },

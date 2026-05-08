@@ -57,10 +57,42 @@ export type ReservationEntry = {
     clinic?: {
         id: number;
         name: string;
+        address?: string | null;
+        city_id?: number | null;
+        city?: {
+            id: number;
+            name: string;
+        } | null;
+        city_name?: string | null;
+        phone_number?: string | null;
+        email?: string | null;
+        image_url?: string | null;
     } | null;
     doctor?: {
         id: number;
         name: string;
+        username?: string;
+        email?: string;
+        phone_number?: string | null;
+        profile_picture?: string | null;
+        profile_picture_url?: string | null;
+        image_url?: string | null;
+        display_avatar_url?: string | null;
+    } | null;
+    doctor_clinic_schedule?: {
+        id: number;
+        clinic_id: number;
+        doctor_id: number;
+        day_of_week: number;
+        start_time: string;
+        end_time: string;
+        window_minutes: number;
+        max_patients_per_window: number;
+        is_active: boolean;
+    } | null;
+    medical_record?: {
+        id: number;
+        reservation_id: number;
     } | null;
     queue_summary?: {
         number?: number | null;

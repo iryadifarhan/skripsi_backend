@@ -479,6 +479,10 @@ class ReservationQueueService
             $payload['doctor_clinic_schedule'] = $reservation->doctorClinicSchedule;
         }
 
+        if ($reservation->relationLoaded('medicalRecord')) {
+            $payload['medical_record'] = $reservation->medicalRecord;
+        }
+
         return $payload;
     }
 

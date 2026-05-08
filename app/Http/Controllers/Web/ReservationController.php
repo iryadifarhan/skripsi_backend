@@ -31,10 +31,19 @@ class ReservationController extends Controller
     ) {
     }
 
-    public function index(Request $request): JsonResponse|Response
+    public function index(Request $request): JsonResponse|RedirectResponse|Response
     {
         /** @var User $user */
         $user = $request->user();
+
+        if ($user->role === User::ROLE_PATIENT && !$request->routeIs('patient.reservations')) {
+            if ($request->expectsJson()) {
+                abort(404);
+            }
+
+            return redirect()->route('patient.reservations', $request->query());
+        }
+
         $context = $this->workspace->context($request);
         $payload = $request->validate([
             'status' => ['nullable', 'string', Rule::in(Reservation::STATUSES)],
@@ -72,6 +81,12 @@ class ReservationController extends Controller
             ]);
         }
 
+        if ($request->routeIs('patient.reservations')) {
+            return Inertia::render('patient/reservations', [
+                'reservations' => $reservations,
+            ]);
+        }
+
         return Inertia::render('reservations/index', [
             'context' => $context,
             'reservations' => $reservations,
@@ -85,6 +100,13 @@ class ReservationController extends Controller
 
     public function redirectLegacy(Request $request): RedirectResponse
     {
+        /** @var User|null $user */
+        $user = $request->user();
+
+        if ($user?->role === User::ROLE_PATIENT) {
+            return redirect()->route('patient.reservations', $request->query());
+        }
+
         return redirect()->route('reservations.page', $request->query());
     }
 
@@ -378,6 +400,10 @@ class ReservationController extends Controller
                     'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
                 ])),
             ], 201);
+        }
+
+        if ($actor->role === User::ROLE_PATIENT) {
+            return redirect()->route('patient.reservations')->with('status', 'Reservasi berhasil dibuat dan menunggu approval admin klinik.');
         }
 
         return redirect()->route('reservations.page')->with('status', 'Reservasi berhasil dibuat dan menunggu approval admin klinik.');
@@ -818,9 +844,11 @@ class ReservationController extends Controller
     {
         return [
             'patient:id,name,username,email,phone_number,gender',
-            'clinic:id,name,address,phone_number,email,image_path',
-            'doctor:id,name,username,email,phone_number,image_path',
+            'clinic:id,name,address,city_id,phone_number,email,image_path',
+            'clinic.city:id,name',
+            'doctor:id,name,username,email,phone_number,profile_picture,image_path',
             'doctorClinicSchedule:id,clinic_id,doctor_id,day_of_week,start_time,end_time,window_minutes,max_patients_per_window,is_active',
+            'medicalRecord:id,reservation_id',
         ];
     }
 
