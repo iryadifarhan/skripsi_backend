@@ -74,7 +74,7 @@ const STYLES = `
   .hp-booking-col, .hp-booking-col-middle { padding-left: 2rem; border-left: 1px solid rgba(64,49,29,.12); min-width: 0; }
   .hp-booking-label { font-size: .75rem; font-weight: 700; opacity: .5; margin-bottom: .6rem; text-transform: uppercase; letter-spacing: .07em; }
   .hp-booking-clinic { font-size: clamp(1.25rem, 2.5vw, 1.92rem); font-weight: 700; color: var(--hp-dark); line-height: 1.1; margin-bottom: .4rem; }
-  .hp-booking-chips { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; margin: .35rem 0 .6rem; justify-content: center; }
+  .hp-booking-chips { display: flex; gap: .4rem; align-items: center; margin: .35rem 0 .6rem; justify-content: center; }
   .hp-chip { font-size: .78rem; font-weight: 700; padding: .18rem .55rem; border-radius: 999px; background: var(--hp-dark); color: var(--hp-cream); white-space: nowrap; }
   .hp-chip-teal { background: var(--hp-teal); color: white; }
   .hp-booking-meta { font-size: .875rem; opacity: .62; line-height: 1.75; }
@@ -522,7 +522,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                 <div className="hp-booking-label">Booking saat ini</div>
                                 {currentReservation ? (
                                     <>
-                                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                                        <div className="flex min-w-0 flex-col gap-0 lg:gap-2 lg:flex-row sm:items-center">
                                             <div className="hp-booking-clinic">{currentReservation.clinic?.name ?? 'Klinik'}</div>
                                             <div className="hp-booking-chips">
                                                 <span className="hp-chip">Queue: {currentReservation.queue_summary?.number ?? '-'}</span>
@@ -573,7 +573,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                     <div className="hp-empty">
                                         <div className="hp-empty-icon">-</div>
                                         <div className="hp-empty-text">Saat ini kamu belum mempunyai riwayat booking.</div>
-                                        <div className="hp-empty-btns">
+                                        <div className="hp-empty-btns justify-center lg:justify-start">
                                             <Link href="/klinik" className="hp-pill-btn">Cari Klinik</Link>
                                             <Link href="/dokter" className="hp-pill-btn">Cari Dokter</Link>
                                         </div>
