@@ -1,5 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { csrfHeaders } from '@/lib/csrf';
 
 import {
     ScheduleWindowCompactSummary,
@@ -583,14 +584,13 @@ type JsonResult = {
 };
 
 async function requestJson(url: string, method: 'PATCH', payload: Record<string, unknown>): Promise<JsonResult> {
-    const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
     const response = await fetch(url, {
         method,
         credentials: 'same-origin',
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
+            ...csrfHeaders(),
             'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify(payload),

@@ -1,5 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { csrfHeaders } from '@/lib/csrf';
 
 import { ClinicSelector } from '@/components/clinic-selector';
 import AppLayout from '@/layouts/app-layout';
@@ -1133,13 +1134,12 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 async function patchJson(url: string, payload: Record<string, string | number | null>): Promise<{ ok: boolean; message?: string }> {
-    const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
     const response = await fetch(url, {
         method: 'PATCH',
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
+            ...csrfHeaders(),
             'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify(payload),

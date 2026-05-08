@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+import { csrfHeaders } from '@/lib/csrf';
 
 import { ScheduleWindowCompactSummary } from '@/components/schedule-window';
 import { buildScheduleWindowPreview } from '@/lib/schedule-window';
@@ -540,13 +541,12 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function postJson(url: string, payload: Record<string, string | number | null>): Promise<{ ok: boolean; message?: string }> {
-    const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
     const response = await fetch(url, {
         method: 'POST',
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
+            ...csrfHeaders(),
             'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify(payload),
