@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { type ReactNode, useState } from 'react';
 
 import type { ValidationErrors } from '@/types';
@@ -17,13 +17,22 @@ export function AuthPageShell({ children }: { children: ReactNode }) {
 }
 
 export function BrandHeader({ title, showBack = false }: { title: string; showBack?: boolean }) {
+    const goBack = () => {
+        if (window.history.length > 1 && document.referrer) {
+            window.history.back();
+            return;
+        }
+
+        router.visit('/');
+    };
+
     return (
         <header className="mb-6 text-center sm:mb-8">
             {showBack ? (
                 <div className="flex items-center justify-between gap-3">
                     <button
                         type="button"
-                        onClick={() => window.history.back()}
+                        onClick={goBack}
                         className="shrink-0 text-[28px] leading-none text-[#40311D] transition hover:opacity-60 sm:text-[32px]"
                         aria-label="Kembali"
                     >
