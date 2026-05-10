@@ -124,7 +124,7 @@ function ClinicResultCard({ clinic }: { clinic: PublicClinic }) {
             </div>
             <div className="min-w-0">
                 <div className="flex items-start justify-between gap-3">
-                    <h3 className="line-clamp-2 text-base font-black leading-tight tracking-[-0.03em] group-hover:text-[#00917B]">{clinic.name}</h3>
+                    <h3 className="line-clamp-2 text-base font-bold leading-tight tracking-[-0.03em] group-hover:text-[#00917B]">{clinic.name}</h3>
                     <StatusPill active={clinic.is_open_now}>{clinic.is_open_now ? 'Buka' : 'Tutup'}</StatusPill>
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-[#40311D]/55">{clinic.location || clinic.address || 'Alamat belum tersedia'}</p>
@@ -155,7 +155,7 @@ function DoctorResultCard({ doctor }: { doctor: PublicDoctor }) {
             <div className="min-w-0">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <h3 className="line-clamp-2 text-base font-black leading-tight tracking-[-0.03em] group-hover:text-[#00917B]">{doctor.name}</h3>
+                        <h3 className="line-clamp-2 text-base font-bold leading-tight tracking-[-0.03em] group-hover:text-[#00917B]">{doctor.name}</h3>
                         <p className="mt-0.5 line-clamp-1 text-xs font-extrabold text-[#40311D]/65">{primaryClinic?.name ?? 'Klinik belum tersedia'}</p>
                     </div>
                     <StatusPill active={doctor.is_available_today}>{doctor.is_available_today ? 'Tersedia' : 'Tidak tersedia'}</StatusPill>
