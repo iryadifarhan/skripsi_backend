@@ -25,12 +25,6 @@ class ClinicCitySeeder extends Seeder
             'Bekasi Timur',
             'Kota Bogor',
             'Kabupaten Bogor',
-            'Depok',
-            'Tangerang',
-            'Tangerang Selatan',
-            'Karawang',
-            'Cikarang',
-            'Cibitung',
             'Tambun',
         ];
 
