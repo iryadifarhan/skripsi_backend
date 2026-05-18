@@ -182,6 +182,9 @@ class ClinicController extends Controller
         $payload = $request->validate([
             'clinic_id' => 'sometimes|nullable|integer|exists:clinics,id',
             'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+        ], [
+            'image.max' => 'Ukuran gambar tidak boleh lebih dari 5MB.',
+            'image.mimes' => 'Format gambar tidak valid. Harap unggah gambar dengan format JPG, JPEG, PNG, atau WebP.',
         ]);
 
         if (!$clinic = Clinic::find($clinicId)) {
@@ -218,6 +221,9 @@ class ClinicController extends Controller
             'clinic_id' => 'sometimes|nullable|integer|exists:clinics,id',
             'doctor_id' => 'required|integer|exists:users,id',
             'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+        ], [
+            'image.max' => 'Ukuran gambar tidak boleh lebih dari 5MB.',
+            'image.mimes' => 'Format gambar tidak valid. Harap unggah gambar dengan format JPG, JPEG, PNG, atau WebP.',
         ]);
 
         if (!$clinic = Clinic::find($clinicId)) {

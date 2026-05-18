@@ -205,6 +205,9 @@ class PatientController extends Controller
         $patientModel = $this->findPatientForMutation($patient);
         $payload = $request->validate([
             'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'image.max' => 'Ukuran gambar tidak boleh lebih dari 5MB.',
+            'image.mimes' => 'Format gambar tidak valid. Harap unggah gambar dengan format JPG, JPEG, PNG, atau WebP.',
         ]);
 
         $disk = (string) config('filesystems.media_disk', 'public');
