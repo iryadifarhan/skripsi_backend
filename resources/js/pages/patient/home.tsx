@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 
 import { PublicFooter } from '@/components/landing/public-footer';
 import { PublicNavbar } from '@/components/landing/public-navbar';
+import { queueWaitLabel } from '@/lib/queue-estimate';
 import type { ReservationEntry } from '@/types';
 
 type HomeClinic = {
@@ -492,8 +493,13 @@ export default function PatientHome({ userName, currentReservation, lastReservat
     const [activeClinic, setActiveClinic] = useState<number | null>(null);
     const [activeDoctor, setActiveDoctor] = useState<number | null>(null);
 
-    const waitingAhead = currentReservation?.queue_summary?.waiting_ahead;
-    const estimatedWait = typeof waitingAhead === 'number' ? `~${waitingAhead * 20} menit` : '-';
+    const isWaitingForAdminConfirmation = currentReservation != null && currentReservation.status !== 'approved';
+    const estimatedWait = isWaitingForAdminConfirmation ? '-' : queueWaitLabel(currentReservation?.queue_summary);
+    const queueWaitChipLabel = isWaitingForAdminConfirmation
+        ? 'Menunggu konfirmasi admin'
+        : (currentReservation?.queue_summary?.status === 'waiting'
+            ? `Estimasi: ~${estimatedWait}`
+            : estimatedWait);
 
     return (
         <>
@@ -525,8 +531,8 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                         <div className="flex min-w-0 flex-col gap-0 lg:gap-2 lg:flex-row sm:items-center">
                                             <div className="hp-booking-clinic">{currentReservation.clinic?.name ?? 'Klinik'}</div>
                                             <div className="hp-booking-chips">
-                                                <span className="hp-chip">Queue: {currentReservation.queue_summary?.number ?? '-'}</span>
-                                                <span className="hp-chip hp-chip-teal">Estimasi: {estimatedWait}</span>
+                                                <span className="hp-chip">Antrean: {currentReservation.queue_summary?.number ?? '-'}</span>
+                                                <span className="hp-chip hp-chip-teal">{queueWaitChipLabel}</span>
                                             </div>
                                         </div>
                                         <div className="hp-booking-meta">

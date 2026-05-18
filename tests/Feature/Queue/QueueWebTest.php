@@ -57,7 +57,17 @@ class QueueWebTest extends TestCase
             ->assertJsonPath('queues.0.queue.number', 2)
             ->assertJsonPath('queues.0.queue.current_called_number', 1)
             ->assertJsonPath('queues.0.reschedule_reason', 'Pasien sebelumnya meminta pindah antrean.')
-            ->assertJsonPath('queues.0.queue.waiting_ahead', 1);
+            ->assertJsonPath('queues.0.queue.waiting_ahead', 1)
+            ->assertJsonPath('queues.0.queue.estimated_wait', 15);
+
+        $this->postJson('/logout', [], $this->spaHeaders())->assertOk();
+
+        $this->login($patientAhead, 'Password123!');
+
+        $this->getJson('/queues/my?reservation_date='.$reservationDate, $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('queues.0.queue.status', Reservation::QUEUE_STATUS_CALLED)
+            ->assertJsonPath('queues.0.queue.estimated_wait', null);
     }
 
     public function test_admin_can_view_and_reorder_clinic_queue(): void

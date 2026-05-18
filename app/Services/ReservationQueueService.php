@@ -330,6 +330,7 @@ class ReservationQueueService
                 'current_called_number' => null,
                 'position' => null,
                 'waiting_ahead' => null,
+                'estimated_wait' => null,
                 'is_current' => false,
             ];
         }
@@ -362,8 +363,26 @@ class ReservationQueueService
             'current_called_number' => $currentCalled?->queue_number,
             'position' => $position,
             'waiting_ahead' => $waitingAhead,
+            'estimated_wait' => $this->estimatedWaitMinutes($reservation, $normalizedStatus, $waitingAhead),
             'is_current' => $currentCalled !== null && (int) $currentCalled->id === (int) $reservation->id,
         ];
+    }
+
+    private function estimatedWaitMinutes(Reservation $reservation, string $queueStatus, ?int $waitingAhead): ?int
+    {
+        if ($queueStatus !== Reservation::QUEUE_STATUS_WAITING || $waitingAhead === null) {
+            return null;
+        }
+
+        $schedule = $reservation->relationLoaded('doctorClinicSchedule')
+            ? $reservation->doctorClinicSchedule
+            : $reservation->doctorClinicSchedule()->first(['id', 'window_minutes', 'max_patients_per_window']);
+
+        if ($schedule === null || $schedule->window_minutes <= 0 || $schedule->max_patients_per_window <= 0) {
+            return null;
+        }
+
+        return $waitingAhead * (int) ceil($schedule->window_minutes / $schedule->max_patients_per_window);
     }
 
     /**

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { PublicFooter } from '@/components/landing/public-footer';
 import { PublicNavbar } from '@/components/landing/public-navbar';
 import { csrfHeaders } from '@/lib/csrf';
+import { queueWaitLabel } from '@/lib/queue-estimate';
 import type { ReservationEntry, SharedData } from '@/types';
 
 type PatientReservationsProps = {
@@ -165,17 +166,6 @@ function currentReservationFrom(reservations: ReservationEntry[]): ReservationEn
     const candidates = upcoming.length > 0 ? upcoming : active;
 
     return [...candidates].sort(compareReservationDateTime)[0] ?? null;
-}
-
-function estimateWait(reservation: ReservationEntry): string {
-    const waitingAhead = reservation.queue_summary?.waiting_ahead;
-    const windowMinutes = reservation.doctor_clinic_schedule?.window_minutes;
-
-    if (waitingAhead === null || waitingAhead === undefined || !windowMinutes) {
-        return '-';
-    }
-
-    return `${waitingAhead * windowMinutes} menit`;
 }
 
 async function readJsonResponse(response: Response): Promise<RequestResult> {
@@ -867,7 +857,7 @@ function CurrentReservationPanel({ reservation, openModal }: { reservation: Rese
     const status = reservationStatus(reservation);
     const canChange = ACTIVE_STATUSES.has(reservation.status);
     const clinicPhone = reservation.clinic?.phone_number;
-    const waitEstimate = estimateWait(reservation);
+    const waitEstimate = reservation.status === 'approved' ? queueWaitLabel(reservation.queue_summary) : '-';
 
     return (
         <div className="mb-16 overflow-hidden rounded-[14px] border border-[#40311D]/15 lg:flex">
@@ -922,10 +912,7 @@ function CurrentReservationPanel({ reservation, openModal }: { reservation: Rese
                         </div>
                         <div>
                             <p className="mb-1 text-[11px] text-[#40311D]/40">Estimasi waktu tunggu</p>
-                            <p className="text-2xl font-medium">
-                                {waitEstimate}
-                                {waitEstimate !== '-' ? '~' : ''}
-                            </p>
+                            <p className="text-2xl font-medium">{waitEstimate !== '-' ? '~' : ''}{waitEstimate}</p>
                         </div>
                     </div>
 

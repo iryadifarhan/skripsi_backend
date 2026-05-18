@@ -99,6 +99,7 @@ export type ReservationEntry = {
         status?: string | null;
         position?: number | null;
         waiting_ahead?: number | null;
+        estimated_wait?: number | null;
         size?: number | null;
         current_called_number?: number | null;
         is_current?: boolean;
@@ -191,6 +192,7 @@ export type QueueEntry = {
         current_called_number: number | null;
         position: number | null;
         waiting_ahead: number | null;
+        estimated_wait: number | null;
         is_current: boolean;
     };
 };
