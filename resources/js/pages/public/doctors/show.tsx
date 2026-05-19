@@ -476,7 +476,11 @@ function ClinicCard({
                 <ClinicImage imageUrl={clinic.image_url} name={clinic.name} />
             </div>
             <div className="mt-4">
-                <h3 className="text-lg font-bold leading-tight text-[#40311D]">{clinic.name}</h3>
+                <Link
+                href={`/klinik/${clinic.slug}`}
+                key={clinic.id}>
+                    <h3 className="text-lg font-bold leading-tight text-[#40311D]">{clinic.name}</h3>
+                </Link>
                 <p className="mt-1 text-sm text-[#40311D]/55">{clinic.location || [clinic.address, clinic.city_name].filter(Boolean).join(', ') || '-'}</p>
             </div>
 

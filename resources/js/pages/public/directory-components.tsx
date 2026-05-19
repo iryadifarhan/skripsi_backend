@@ -1,7 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClock, faEnvelope, faFilter, faHospital, faLocationDot, faMagnifyingGlass, faPhone, faUser, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { Link, usePage } from '@inertiajs/react';
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import type { IconDefinition, SizeProp } from '@fortawesome/fontawesome-svg-core';
 import type { ReactNode } from 'react';
 
 import { PublicFooter } from '@/components/landing/public-footer';
@@ -327,14 +327,14 @@ export function FilterModal({ open, onClose, children }: { open: boolean; onClos
     );
 }
 
-export function ClinicImage({ imageUrl, name, className = '' }: { imageUrl?: string | null; name: string; className?: string }) {
+export function ClinicImage({ imageUrl, name, className = '', iconSize = "2x"}: { imageUrl?: string | null; name: string; className?: string; iconSize?: SizeProp }) {
     if (imageUrl) {
         return <img src={imageUrl} alt={name} className={`h-full w-full object-cover ${className}`} />;
     }
 
     return (
         <div className={`flex h-full w-full items-center justify-center bg-[#40311d1a] text-[#40311D]/30 ${className}`}>
-            <FontAwesomeIcon icon={faHospital} className="h-12 w-12" />
+            <FontAwesomeIcon icon={faHospital} size={iconSize} />
         </div>
     );
 }

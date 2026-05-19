@@ -222,7 +222,7 @@ export default function ClinicDetail({ clinic }: ClinicDetailProps) {
                 <main className="mx-auto w-full max-w-[1400px] px-5 py-10 md:px-8">
                     <section className="grid items-start gap-8 lg:grid-cols-[324px_minmax(0,1fr)_370px]">
                         <div className="h-[209px] overflow-hidden rounded-xl border border-[#40311D]/10 bg-[#40311D]/10">
-                            <ClinicImage imageUrl={clinic.image_url} name={clinic.name} />
+                            <ClinicImage imageUrl={clinic.image_url} name={clinic.name} iconSize="4x"/>
                         </div>
 
                         <div className="max-w-fit">
@@ -489,7 +489,11 @@ function DoctorCard({
                 <DoctorImage imageUrl={doctor.image_url} name={doctor.name} />
             </div>
             <div className="mt-4">
-                <h3 className="text-lg font-bold leading-tight text-[#40311D]">{doctor.name}</h3>
+                <Link
+                    href={`/dokter/${doctor.slug}`}
+                    key={doctor.id}>
+                    <h3 className="text-lg font-bold leading-tight text-[#40311D]">{doctor.name}</h3>
+                </Link>
                 <p className="mt-1 text-sm text-[#40311D]/55">{doctor.primary_speciality || 'Dokter Umum'}</p>
             </div>
 
