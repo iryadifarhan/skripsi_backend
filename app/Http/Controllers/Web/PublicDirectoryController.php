@@ -326,7 +326,7 @@ class PublicDirectoryController extends Controller
             'phone_number' => $doctor->phone_number,
             'image_url' => $doctor->display_avatar_url,
             'specialities' => $specialities,
-            'primary_speciality' => $specialities[0] ?? 'Dokter Klinik',
+            'primary_speciality' => $specialities[0] ?? 'Dokter Umum',
             'status_label' => $this->doctorHasScheduleToday($doctor) ? 'Tersedia hari ini' : 'Lihat jadwal',
             'is_available_today' => $this->doctorHasScheduleToday($doctor),
             'operational_label' => $this->scheduleDaysLabel($doctor->doctorClinicSchedules),
@@ -369,7 +369,7 @@ class PublicDirectoryController extends Controller
             'phone_number' => $doctor->phone_number,
             'image_url' => $doctor->display_avatar_url,
             'specialities' => $specialities,
-            'primary_speciality' => $specialities[0] ?? 'Dokter Klinik',
+            'primary_speciality' => $specialities[0] ?? 'Dokter Umum',
         ];
     }
 

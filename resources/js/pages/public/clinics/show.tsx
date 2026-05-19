@@ -490,7 +490,7 @@ function DoctorCard({
             </div>
             <div className="mt-4">
                 <h3 className="text-lg font-bold leading-tight text-[#40311D]">{doctor.name}</h3>
-                <p className="mt-1 text-sm text-[#40311D]/55">{doctor.primary_speciality || 'Dokter umum'}</p>
+                <p className="mt-1 text-sm text-[#40311D]/55">{doctor.primary_speciality || 'Dokter Umum'}</p>
             </div>
 
             <div className="mt-4">
