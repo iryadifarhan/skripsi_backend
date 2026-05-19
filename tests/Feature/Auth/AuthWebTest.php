@@ -89,6 +89,41 @@ class AuthWebTest extends TestCase
             ->assertUnauthorized();
     }
 
+    public function test_user_can_login_with_case_sensitive_username(): void
+    {
+        $user = User::factory()->create([
+            'username' => 'Doctor_Exact',
+            'email' => 'doctor-username@example.com',
+            'role' => User::ROLE_DOCTOR,
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/login', [
+            'login' => 'Doctor_Exact',
+            'password' => 'Password123!',
+        ], $this->spaHeaders())
+            ->assertOk()
+            ->assertJsonPath('user.id', $user->id)
+            ->assertJsonPath('user.username', 'Doctor_Exact');
+    }
+
+    public function test_username_login_rejects_different_casing(): void
+    {
+        User::factory()->create([
+            'username' => 'Doctor_Case',
+            'email' => 'doctor-case@example.com',
+            'role' => User::ROLE_DOCTOR,
+            'password' => Hash::make('Password123!'),
+        ]);
+
+        $this->postJson('/login', [
+            'login' => 'doctor_case',
+            'password' => 'Password123!',
+        ], $this->spaHeaders())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['message']);
+    }
+
     public function test_doctor_me_and_profile_include_clinic_specialities(): void
     {
         $clinic = \App\Models\Clinic::create([

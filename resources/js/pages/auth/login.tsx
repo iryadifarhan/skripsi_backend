@@ -18,7 +18,7 @@ export default function Login() {
     const { flash } = page.props;
     const next = new URLSearchParams(page.url.split('?')[1] ?? '').get('next');
     const [form, setForm] = useState({
-        email: '',
+        login: '',
         password: '',
         remember: false,
     });
@@ -48,14 +48,14 @@ export default function Login() {
                     ) : null}
 
                     <TextInput
-                        id="email"
-                        label="Email*"
-                        type="email"
-                        placeholder="CliniQ@gmail.co.id"
-                        value={form.email}
+                        id="login"
+                        label="Email atau Username*"
+                        type="text"
+                        placeholder="CliniQ@gmail.co.id atau cliniq_user"
+                        value={form.login}
                         required
-                        errors={errors.email}
-                        onChange={(value) => setForm((current) => ({ ...current, email: value }))}
+                        errors={errors.login ?? errors.email}
+                        onChange={(value) => setForm((current) => ({ ...current, login: value }))}
                     />
 
                     <PasswordInput

@@ -8,6 +8,7 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -52,28 +53,46 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $payload = $request->validate([
-            'email' => ['required', 'string', 'email'],
+            'login' => ['nullable', 'string', 'max:255', 'required_without:email'],
+            'email' => ['nullable', 'string', 'max:255', 'required_without:login'],
             'password' => ['required', 'string'],
             'remember' => ['nullable', 'boolean'],
         ]);
 
-        $authenticated = Auth::guard('web')->attempt([
-            'email' => $payload['email'],
-            'password' => $payload['password'],
-        ], $payload['remember'] ?? false);
+        $identifier = trim((string) ($payload['login'] ?? $payload['email'] ?? ''));
+        $user = $identifier !== '' ? $this->findUserForLogin($identifier) : null;
+        $authenticated = $user !== null && Hash::check($payload['password'], $user->password);
 
         if (! $authenticated) {
             throw ValidationException::withMessages([
-                'message' => ['Email atau password yang diberikan salah.'],
+                'message' => ['Email/username atau password yang diberikan salah.'],
             ]);
         }
 
+        Auth::guard('web')->login($user, $payload['remember'] ?? false);
         $request->session()->regenerate();
 
         return response()->json([
             'message' => 'Login berhasil.',
             'user' => $request->user(),
         ]);
+    }
+
+    private function findUserForLogin(string $identifier): ?User
+    {
+        if (str_contains($identifier, '@')) {
+            return User::query()->where('email', $identifier)->first();
+        }
+
+        $query = User::query();
+
+        if (in_array($query->getConnection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            $wrappedColumn = $query->getQuery()->getGrammar()->wrap('username');
+
+            return $query->whereRaw("BINARY {$wrappedColumn} = ?", [$identifier])->first();
+        }
+
+        return $query->where('username', $identifier)->first();
     }
 
     public function me(Request $request): JsonResponse
