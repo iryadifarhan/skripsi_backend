@@ -1,5 +1,7 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBars, faChevronLeft, faChevronRight, faRightFromBracket, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { Link, router, usePage } from '@inertiajs/react';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, useEffect, useState } from 'react';
 
 import type { SharedData } from '@/types';
 
@@ -10,6 +12,22 @@ const roleLabels: Record<string, string> = {
     patient: 'Patient',
 };
 
+type NavigationItem = {
+    href: string;
+    label: string;
+    enabled?: boolean;
+    visible?: boolean;
+    activePrefixes?: string[];
+};
+
+type WorkspaceShellProps = PropsWithChildren<{
+    storageKey: string;
+    brandLabel: string;
+    contextLabel: string;
+    pageTitle: string;
+    navigation: NavigationItem[];
+}>;
+
 export default function AppLayout({ children }: PropsWithChildren) {
     const page = usePage<SharedData>();
     const { auth, app } = page.props;
@@ -19,7 +37,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
     const isDoctorWorkspace = user?.role === 'doctor';
 
     if (isAdminWorkspace) {
-        const adminNavigation = [
+        const adminNavigation: NavigationItem[] = [
             { href: '/dashboard', label: 'Dashboard', enabled: true },
             { href: '/reservations', label: 'Reservasi', enabled: true },
             { href: '/queue', label: 'Manajemen Antrean', enabled: true },
@@ -31,109 +49,41 @@ export default function AppLayout({ children }: PropsWithChildren) {
                 ? { href: '/clinics', label: 'Data Klinik', enabled: true, activePrefixes: ['/clinics', '/clinic-settings'] }
                 : { href: '/clinic-settings', label: 'Pengaturan Klinik', enabled: true, activePrefixes: ['/clinic-settings'] },
         ];
-        const pageTitle = page.url.startsWith('/doctors/') ? 'Edit Data Dokter Page' : page.url.startsWith('/patients/') ? 'Detail Pasien Page' : page.url.startsWith('/clinic-settings/') ? 'Pengaturan Klinik Page' : {
-            '/dashboard': 'Dashboard Page',
-            '/reservations': 'Reservasi Page',
-            '/queue': 'Manajemen Antrean Page',
-            '/doctors': 'Data Dokter Page',
-            '/patients': 'Data Pasien Page',
-            '/medical-records': 'Data Rekam Medis Page',
-            '/clinic-settings': 'Pengaturan Klinik Page',
-            '/clinics': 'Data Klinik Page',
-        }[page.url.split('?')[0]] ?? 'Admin Page';
+        const pageTitle = page.url.startsWith('/doctors/')
+            ? 'Edit Data Dokter Page'
+            : page.url.startsWith('/patients/')
+                ? 'Detail Pasien Page'
+                : page.url.startsWith('/clinic-settings/')
+                    ? 'Pengaturan Klinik Page'
+                    : {
+                        '/dashboard': 'Dashboard Page',
+                        '/reservations': 'Reservasi Page',
+                        '/queue': 'Manajemen Antrean Page',
+                        '/doctors': 'Data Dokter Page',
+                        '/patients': 'Data Pasien Page',
+                        '/medical-records': 'Data Rekam Medis Page',
+                        '/clinic-settings': 'Pengaturan Klinik Page',
+                        '/clinics': 'Data Klinik Page',
+                    }[page.url.split('?')[0]] ?? 'Admin Page';
         const clinicLabel = user?.role === 'admin'
             ? user.clinic?.name ?? 'Klinik'
             : 'Superadmin';
 
         return (
-            <div className="flex h-screen overflow-hidden bg-[#DFE0DF] font-sans text-[#40311D]">
-                <aside className="hidden w-[220px] shrink-0 flex-col bg-[#40311D] text-white md:flex">
-                    <div className="border-b border-white/10 px-4 py-5">
-                        <p className="text-[15px] font-bold leading-snug">Clini&gt;Queue&gt; Admin</p>
-                        <p className="mt-1 text-[11px] text-white/50">{clinicLabel}</p>
-                    </div>
-
-                    <nav className="flex-1 py-3">
-                        {adminNavigation.map((item) => {
-                            const activePrefixes = 'activePrefixes' in item ? item.activePrefixes : [item.href];
-                            const active = item.href !== '#' && activePrefixes.some((prefix) => page.url.startsWith(prefix));
-
-                            if (!item.enabled) {
-                                return (
-                                    <span key={item.label} className="block px-4 py-2.5 text-[13px] text-white/45">
-                                        {item.label}
-                                    </span>
-                                );
-                            }
-
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`block px-4 py-2.5 text-[13px] transition-colors ${
-                                        active ? 'bg-[#2c2115] font-medium text-[#DED0B6]' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                                    }`}
-                                >
-                                    {item.label}
-                                </Link>
-                            );
-                        })}
-                    </nav>
-
-                    <div className="border-t border-white/10 p-4">
-                        <button
-                            type="button"
-                            onClick={() => router.post('/logout')}
-                            className="w-full rounded-lg bg-[#2c2115] px-4 py-2.5 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-[#1a140d] hover:text-white"
-                        >
-                            Keluar
-                        </button>
-                    </div>
-                </aside>
-
-                <div className="flex flex-1 flex-col overflow-hidden">
-                    <header className="border-b border-[#c8bfb0] bg-[#DED0B6] px-6 py-5">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                            <h1 className="text-[22px] font-bold text-[#40311D]">{pageTitle}</h1>
-                            <div className="flex items-center justify-between gap-3 md:hidden">
-                                <span className="text-sm font-bold text-[#40311D]">{appName} Admin</span>
-                                <button
-                                    type="button"
-                                    onClick={() => router.post('/logout')}
-                                    className="rounded-md bg-[#40311D] px-4 py-2 text-sm font-bold text-white"
-                                >
-                                    Keluar
-                                </button>
-                            </div>
-                        </div>
-                        <nav className="mt-4 flex gap-2 overflow-x-auto md:hidden">
-                            {adminNavigation.filter((item) => item.enabled).map((item) => {
-                                const activePrefixes = 'activePrefixes' in item ? item.activePrefixes : [item.href];
-                                const active = item.href !== '#' && activePrefixes.some((prefix) => page.url.startsWith(prefix));
-
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        className={`shrink-0 rounded-md px-3 py-2 text-xs font-bold ${
-                                            active ? 'bg-[#40311D] text-white' : 'bg-white/60 text-[#40311D]'
-                                        }`}
-                                    >
-                                        {item.label}
-                                    </Link>
-                                );
-                            })}
-                        </nav>
-                    </header>
-
-                    <main className="flex-1 overflow-hidden">{children}</main>
-                </div>
-            </div>
+            <WorkspaceShell
+                storageKey="cliniqueue-admin-sidebar-open"
+                brandLabel="Clini>Queue> Admin"
+                contextLabel={clinicLabel}
+                pageTitle={pageTitle}
+                navigation={adminNavigation}
+            >
+                {children}
+            </WorkspaceShell>
         );
     }
 
     if (isDoctorWorkspace) {
-        const doctorNavigation = [
+        const doctorNavigation: NavigationItem[] = [
             { href: '/dashboard', label: 'Dashboard', activePrefixes: ['/dashboard'] },
             { href: '/queue', label: 'Antrean Saya', activePrefixes: ['/queue'] },
             { href: '/medical-records', label: 'Rekam Medis', activePrefixes: ['/medical-records'] },
@@ -151,79 +101,15 @@ export default function AppLayout({ children }: PropsWithChildren) {
         }[page.url.split('?')[0]] ?? 'Dokter Page';
 
         return (
-            <div className="flex h-screen overflow-hidden bg-[#DFE0DF] font-sans text-[#40311D]">
-                <aside className="hidden w-[220px] shrink-0 flex-col bg-[#40311D] text-white md:flex">
-                    <div className="border-b border-white/10 px-4 py-5">
-                        <p className="text-[15px] font-bold leading-snug">Clini&gt;Queue&gt; Doctor</p>
-                        <p className="mt-1 text-[11px] text-white/50">{user?.name ?? 'Doctor'}</p>
-                    </div>
-
-                    <nav className="flex-1 py-3">
-                        {doctorNavigation.map((item) => {
-                            const active = item.activePrefixes.some((prefix) => page.url.startsWith(prefix));
-
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`block px-4 py-2.5 text-[13px] transition-colors ${
-                                        active ? 'bg-[#2c2115] font-medium text-[#DED0B6]' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                                    }`}
-                                >
-                                    {item.label}
-                                </Link>
-                            );
-                        })}
-                    </nav>
-
-                    <div className="border-t border-white/10 p-4">
-                        <button
-                            type="button"
-                            onClick={() => router.post('/logout')}
-                            className="w-full rounded-lg bg-[#2c2115] px-4 py-2.5 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-[#1a140d] hover:text-white"
-                        >
-                            Keluar
-                        </button>
-                    </div>
-                </aside>
-
-                <div className="flex flex-1 flex-col overflow-hidden">
-                    <header className="border-b border-[#c8bfb0] bg-[#DED0B6] px-6 py-5">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                            <h1 className="text-[22px] font-bold text-[#40311D]">{pageTitle}</h1>
-                            <div className="flex items-center justify-between gap-3 md:hidden">
-                                <span className="text-sm font-bold text-[#40311D]">{appName} Doctor</span>
-                                <button
-                                    type="button"
-                                    onClick={() => router.post('/logout')}
-                                    className="rounded-md bg-[#40311D] px-4 py-2 text-sm font-bold text-white"
-                                >
-                                    Keluar
-                                </button>
-                            </div>
-                        </div>
-                        <nav className="mt-4 flex gap-2 overflow-x-auto md:hidden">
-                            {doctorNavigation.map((item) => {
-                                const active = item.activePrefixes.some((prefix) => page.url.startsWith(prefix));
-
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        className={`shrink-0 rounded-md px-3 py-2 text-xs font-bold ${
-                                            active ? 'bg-[#40311D] text-white' : 'bg-white/60 text-[#40311D]'
-                                        }`}
-                                    >
-                                        {item.label}
-                                    </Link>
-                                );
-                            })}
-                        </nav>
-                    </header>
-
-                    <main className="flex-1 overflow-hidden">{children}</main>
-                </div>
-            </div>
+            <WorkspaceShell
+                storageKey="cliniqueue-doctor-sidebar-open"
+                brandLabel="Clini>Queue> Doctor"
+                contextLabel={user?.name ?? 'Doctor'}
+                pageTitle={pageTitle}
+                navigation={doctorNavigation}
+            >
+                {children}
+            </WorkspaceShell>
         );
     }
 
@@ -288,4 +174,171 @@ export default function AppLayout({ children }: PropsWithChildren) {
             </div>
         </div>
     );
+}
+
+function WorkspaceShell({ storageKey, brandLabel, contextLabel, pageTitle, navigation, children }: WorkspaceShellProps) {
+    const page = usePage<SharedData>();
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [hydrated, setHydrated] = useState(false);
+
+    useEffect(() => {
+        const stored = window.localStorage.getItem(storageKey);
+
+        if (stored !== null) {
+            setSidebarOpen(stored === 'true');
+        }
+
+        setHydrated(true);
+    }, [storageKey]);
+
+    useEffect(() => {
+        if (hydrated) {
+            window.localStorage.setItem(storageKey, String(sidebarOpen));
+        }
+    }, [hydrated, sidebarOpen, storageKey]);
+
+
+    return (
+        <div className="flex h-screen overflow-hidden bg-[#DFE0DF] font-sans text-[#40311D]">
+            <WorkspaceSidebar
+                brandLabel={brandLabel}
+                contextLabel={contextLabel}
+                navigation={navigation}
+                pageUrl={page.url}
+                open={sidebarOpen}
+                onToggle={() => setSidebarOpen((current) => !current)}
+                onNavigateMobile={() => setSidebarOpen(false)}
+            />
+
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <header className="border-b border-[#c8bfb0] bg-[#DED0B6] px-6 py-5">
+                    <div className="flex items-center justify-between gap-4">
+                        <h1 className="text-[22px] font-bold text-[#40311D]">{pageTitle}</h1>
+                        <button
+                            type="button"
+                            onClick={() => setSidebarOpen(true)}
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#40311D]/15 bg-white/55 text-[#40311D] transition hover:bg-white md:hidden ${sidebarOpen ? 'invisible pointer-events-none' : ''}`}
+                            aria-label="Buka navigasi"
+                        >
+                            <FontAwesomeIcon icon={faBars} />
+                        </button>
+                    </div>
+                </header>
+
+                <main className="flex-1 overflow-hidden">{children}</main>
+            </div>
+        </div>
+    );
+}
+
+function WorkspaceSidebar({
+    brandLabel,
+    contextLabel,
+    navigation,
+    pageUrl,
+    open,
+    onToggle,
+    onNavigateMobile,
+}: {
+    brandLabel: string;
+    contextLabel: string;
+    navigation: NavigationItem[];
+    pageUrl: string;
+    open: boolean;
+    onToggle: () => void;
+    onNavigateMobile: () => void;
+}) {
+    return (
+        <>
+            {open ? <button type="button" aria-label="Tutup navigasi overlay" className="fixed inset-0 z-30 bg-black/35 md:hidden" onClick={onToggle} /> : null}
+
+            <aside
+                className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-[#40311D] text-white shadow-2xl transition-[width,transform] duration-300 md:static md:z-auto md:shadow-none ${
+                    open ? 'w-[240px] translate-x-0 md:w-[220px]' : 'w-[240px] -translate-x-full md:w-14 md:translate-x-0'
+                }`}
+            >
+                {open ? (
+                    <>
+                        <div className="border-b border-white/10 px-4 py-5">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="truncate text-[15px] font-bold leading-snug">{brandLabel}</p>
+                                    <p className="mt-1 truncate text-[11px] text-white/50">{contextLabel}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={onToggle}
+                                    className="inline-flex h-8 w-fit shrink-0 items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10 hover:text-white"
+                                    aria-label="Minimize navigasi"
+                                >
+                                    <FontAwesomeIcon icon={faChevronLeft} className="!hidden md:!block" />
+                                    <FontAwesomeIcon icon={faXmark} className="md:!hidden" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <nav className="flex-1 py-3">
+                            {navigation.map((item) => {
+                                const active = isNavigationActive(item, pageUrl);
+
+                                if (item.enabled === false) {
+                                    return (
+                                        <span key={item.label} className="block px-4 py-2.5 text-[13px] text-white/45">
+                                            {item.label}
+                                        </span>
+                                    );
+                                }
+
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        onClick={() => {
+                                            if (window.innerWidth < 768) {
+                                                onNavigateMobile();
+                                            }
+                                        }}
+                                        className={`block px-4 py-2.5 text-[13px] transition-colors ${
+                                            active ? 'bg-[#2c2115] font-medium text-[#DED0B6]' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                                        }`}
+                                    >
+                                        {item.label}
+                                    </Link>
+                                );
+                            })}
+                        </nav>
+
+                        <div className="border-t border-white/10 p-4">
+                            <button
+                                type="button"
+                                onClick={() => router.post('/logout')}
+                                className="flex w-full items-center gap-2 rounded-lg bg-[#2c2115] px-4 py-2.5 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-[#1a140d] hover:text-white"
+                            >
+                                <FontAwesomeIcon icon={faRightFromBracket} />
+                                Keluar
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex h-full flex-col items-center border-r border-white/10 py-4">
+                        <button
+                            type="button"
+                            onClick={onToggle}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/75 transition hover:bg-white/10 hover:text-white"
+                            aria-label="Expand navigasi"
+                        >
+                            <FontAwesomeIcon icon={faChevronRight} />
+                        </button>
+                        <div className="mt-4 h-px w-6 bg-white/15" />
+                    </div>
+                )}
+            </aside>
+        </>
+    );
+}
+
+function isNavigationActive(item: NavigationItem, pageUrl: string): boolean {
+    const activePrefixes = item.activePrefixes ?? [item.href];
+
+    return item.href !== '#' && activePrefixes.some((prefix) => pageUrl.startsWith(prefix));
 }
