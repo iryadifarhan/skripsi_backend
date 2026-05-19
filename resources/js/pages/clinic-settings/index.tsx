@@ -879,8 +879,8 @@ function CreateAdminModal({
                         </select>
                         {errors.gender?.[0] ? <span className="text-[11px] font-medium text-red-600">{errors.gender[0]}</span> : null}
                     </label>
-                    <TextField label="Password" type="password" value={form.password} error={errors.password?.[0]} onChange={(value) => onChange({ ...form, password: value })} />
-                    <TextField label="Konfirmasi Password" type="password" value={form.password_confirmation} error={errors.password_confirmation?.[0]} onChange={(value) => onChange({ ...form, password_confirmation: value })} />
+                    <PasswordField label="Password" type="password" value={form.password} error={errors.password?.[0]} onChange={(value) => onChange({ ...form, password: value })} />
+                    <PasswordField label="Konfirmasi Password" type="password" value={form.password_confirmation} error={errors.password_confirmation?.[0]} onChange={(value) => onChange({ ...form, password_confirmation: value })} />
                 </div>
 
                 <div className="flex justify-end gap-2 border-t border-[#e4ddd4] px-5 py-4">
@@ -1022,6 +1022,34 @@ function TextField({
             />
             {error ? <span className="text-[11px] font-medium text-red-600">{error}</span> : null}
         </label>
+    );
+}
+
+function PasswordField({ label, value, onChange, error, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; error?: string; type?: string }) {
+    const [show, setShow] = useState(false);
+    
+    return (
+        <div>
+            <label className="flex flex-col gap-1 text-[11px] text-[#40311D]">
+                {label}
+            </label>
+            <div className="relative">
+                <input
+                    type={show ? 'text' : 'password'}
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-[12px] text-gray-700 outline-none focus:border-[#40311D] pr-16"
+                />
+                <button
+                    type="button"
+                    onClick={() => setShow((current) => !current)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#40311D]/60 opacity-50 transition-opacity duration-200 hover:text-[#40311D] w-[16px]"
+                >
+                    {show ? '👁' : '⌣'}
+                </button>
+            </div>
+            {error ? <span className="text-[11px] font-medium text-red-600">{error}</span> : null}
+        </div>
     );
 }
 
