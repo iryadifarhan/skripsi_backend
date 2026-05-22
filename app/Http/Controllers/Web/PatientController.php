@@ -129,6 +129,11 @@ class PatientController extends Controller
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ], [
+            'name.required' => 'Nama wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'password.required' => 'Password wajib diisi.',
         ]);
 
         $patient = User::create([
@@ -162,6 +167,11 @@ class PatientController extends Controller
             'phone_number' => ['nullable', 'string', 'max:30', Rule::unique('users', 'phone_number')->ignore($patientModel->id)],
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
+        ], [
+            'name.required' => 'Nama wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'password.required' => 'Password wajib diisi.',
         ]);
 
         $patientModel->update($payload);

@@ -78,6 +78,11 @@ class DoctorController extends Controller
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ], [
+            'name.required' => 'Nama wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'password.required' => 'Password wajib diisi.',
         ]);
 
         $doctor = User::create([
@@ -121,7 +126,12 @@ class DoctorController extends Controller
             $rules['specialities.*'] = ['required', 'string', 'max:255', 'distinct'];
         }
 
-        $payload = $request->validate($rules);
+        $payload = $request->validate($rules, [
+            'name.required' => 'Nama wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'password.required' => 'Password wajib diisi.',
+        ]);
 
         if ($request->user()->role === User::ROLE_ADMIN) {
             abort_unless((int) $payload['clinic_id'] === $clinic->id, 403);

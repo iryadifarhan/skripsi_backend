@@ -72,6 +72,9 @@ class AdminController extends Controller
             'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
             'role'     => ['required', 'string', 'in:' . implode(',', User::ROLES)],
+        ],[
+            'name.required' => 'Nama wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
         ]);
 
         $user = User::create([

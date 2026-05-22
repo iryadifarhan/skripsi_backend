@@ -35,15 +35,8 @@ type JsonResult = {
     errors?: ValidationErrors;
 };
 
-export default function DoctorsPage({ context, selectedClinicId, clinic, unassignedDoctors, schedules }: DoctorsPageProps) {
-    const { flash } = usePage<SharedData>().props;
-    const isSuperadmin = context.role === 'superadmin';
-    const [activeTab, setActiveTab] = useState<DoctorTab>('registered');
-    const [search, setSearch] = useState('');
-    const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(clinic?.doctors?.[0]?.id ?? unassignedDoctors[0]?.id ?? null);
-    const [assignSpecialities, setAssignSpecialities] = useState('');
-    const [showCreateDoctor, setShowCreateDoctor] = useState(false);
-    const [createDoctorForm, setCreateDoctorForm] = useState<DoctorCreateForm>({
+function emptyDoctorCreateForm(): DoctorCreateForm {
+    return {
         name: '',
         username: '',
         email: '',
@@ -52,7 +45,18 @@ export default function DoctorsPage({ context, selectedClinicId, clinic, unassig
         gender: '',
         password: '',
         password_confirmation: '',
-    });
+    };
+}
+
+export default function DoctorsPage({ context, selectedClinicId, clinic, unassignedDoctors, schedules }: DoctorsPageProps) {
+    const { flash } = usePage<SharedData>().props;
+    const isSuperadmin = context.role === 'superadmin';
+    const [activeTab, setActiveTab] = useState<DoctorTab>('registered');
+    const [search, setSearch] = useState('');
+    const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(clinic?.doctors?.[0]?.id ?? unassignedDoctors[0]?.id ?? null);
+    const [assignSpecialities, setAssignSpecialities] = useState('');
+    const [showCreateDoctor, setShowCreateDoctor] = useState(false);
+    const [createDoctorForm, setCreateDoctorForm] = useState<DoctorCreateForm>(emptyDoctorCreateForm());
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [errors, setErrors] = useState<ValidationErrors>({});
@@ -107,6 +111,11 @@ export default function DoctorsPage({ context, selectedClinicId, clinic, unassig
             },
             {
                 preserveScroll: true,
+                onSuccess: () => {
+                    setShowCreateDoctor(false);
+                    setCreateDoctorForm(emptyDoctorCreateForm());
+                    setErrors({});
+                },
                 onError: (validationErrors) => {
                     setErrors(normalizeInertiaErrors(validationErrors));
                     setMessage('Gagal membuat data dokter.');
@@ -219,7 +228,11 @@ export default function DoctorsPage({ context, selectedClinicId, clinic, unassig
                                 {isSuperadmin ? (
                                     <button
                                         type="button"
-                                        onClick={() => setShowCreateDoctor(true)}
+                                        onClick={() => {
+                                            setErrors({});
+                                            setMessage(null);
+                                            setShowCreateDoctor(true);
+                                        }}
                                         className="rounded-full bg-[#00917B] px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-[#006d5c]"
                                     >
                                         Tambah Dokter
@@ -398,11 +411,38 @@ export default function DoctorsPage({ context, selectedClinicId, clinic, unassig
                         </div>
 
                         <div className="grid gap-3 p-5 md:grid-cols-2">
-                            <TextInput label="Nama" value={createDoctorForm.name} onChange={(value) => setCreateDoctorForm((current) => ({ ...current, name: value }))} />
-                            <TextInput label="Username" value={createDoctorForm.username} onChange={(value) => setCreateDoctorForm((current) => ({ ...current, username: value }))} />
-                            <TextInput label="Email" type="email" value={createDoctorForm.email} onChange={(value) => setCreateDoctorForm((current) => ({ ...current, email: value }))} />
-                            <TextInput label="Nomor telepon" value={createDoctorForm.phone_number} onChange={(value) => setCreateDoctorForm((current) => ({ ...current, phone_number: value }))} />
-                            <TextInput label="Tanggal lahir" type="date" value={createDoctorForm.date_of_birth} onChange={(value) => setCreateDoctorForm((current) => ({ ...current, date_of_birth: value }))} />
+                            <TextInput
+                                label="Nama"
+                                value={createDoctorForm.name}
+                                error={fieldError(errors, 'name')}
+                                onChange={(value) => setCreateDoctorForm((current) => ({ ...current, name: value }))}
+                            />
+                            <TextInput
+                                label="Username"
+                                value={createDoctorForm.username}
+                                error={fieldError(errors, 'username')}
+                                onChange={(value) => setCreateDoctorForm((current) => ({ ...current, username: value }))}
+                            />
+                            <TextInput
+                                label="Email"
+                                type="email"
+                                value={createDoctorForm.email}
+                                error={fieldError(errors, 'email')}
+                                onChange={(value) => setCreateDoctorForm((current) => ({ ...current, email: value }))}
+                            />
+                            <TextInput
+                                label="Nomor telepon"
+                                value={createDoctorForm.phone_number}
+                                error={fieldError(errors, 'phone_number')}
+                                onChange={(value) => setCreateDoctorForm((current) => ({ ...current, phone_number: value }))}
+                            />
+                            <TextInput
+                                label="Tanggal lahir"
+                                type="date"
+                                value={createDoctorForm.date_of_birth}
+                                error={fieldError(errors, 'date_of_birth')}
+                                onChange={(value) => setCreateDoctorForm((current) => ({ ...current, date_of_birth: value }))}
+                            />
                             <label className="flex flex-col gap-1 text-[11px] text-[#40311D]">
                                 Gender
                                 <select
@@ -414,21 +454,30 @@ export default function DoctorsPage({ context, selectedClinicId, clinic, unassig
                                     <option value="Laki">Laki</option>
                                     <option value="Perempuan">Perempuan</option>
                                 </select>
+                                {fieldError(errors, 'gender') ? <span className="text-[11px] font-medium text-red-600">{fieldError(errors, 'gender')}</span> : null}
                             </label>
-                            <PasswordField label="Password" type="password" value={createDoctorForm.password} onChange={(value) => setCreateDoctorForm((current) => ({ ...current, password: value }))} />
-                            <PasswordField label="Konfirmasi password" type="password" value={createDoctorForm.password_confirmation} onChange={(value) => setCreateDoctorForm((current) => ({ ...current, password_confirmation: value }))} />
+                            <PasswordField
+                                label="Password"
+                                value={createDoctorForm.password}
+                                error={fieldError(errors, 'password')}
+                                onChange={(value) => setCreateDoctorForm((current) => ({ ...current, password: value }))}
+                            />
+                            <PasswordField
+                                label="Konfirmasi password"
+                                value={createDoctorForm.password_confirmation}
+                                error={fieldError(errors, 'password_confirmation')}
+                                onChange={(value) => setCreateDoctorForm((current) => ({ ...current, password_confirmation: value }))}
+                            />
                         </div>
-
-                        {Object.keys(errors).length > 0 ? (
-                            <div className="mx-5 mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-600">
-                                {Object.values(errors).flat()[0]}
-                            </div>
-                        ) : null}
 
                         <div className="flex justify-end gap-2 border-t border-[#e4ddd4] px-5 py-4">
                             <button
                                 type="button"
-                                onClick={() => setShowCreateDoctor(false)}
+                                onClick={() => {
+                                    setShowCreateDoctor(false);
+                                    setErrors({});
+                                    setCreateDoctorForm(emptyDoctorCreateForm());
+                                }}
                                 className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-[12px] text-[#40311D] transition-colors hover:bg-[#DFE0DF]"
                             >
                                 Batal
@@ -474,7 +523,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     );
 }
 
-function TextInput({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+function TextInput({ label, value, onChange, error, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; error?: string; type?: string }) {
     return (
         <label className="flex flex-col gap-1 text-[11px] text-[#40311D]">
             {label}
@@ -484,11 +533,12 @@ function TextInput({ label, value, onChange, type = 'text' }: { label: string; v
                 onChange={(event) => onChange(event.target.value)}
                 className="rounded-lg border border-gray-300 px-3 py-2 text-[12px] text-gray-700 outline-none focus:border-[#40311D]"
             />
+            {error ? <span className="text-[11px] font-medium text-red-600">{error}</span> : null}
         </label>
     );
 }
 
-function PasswordField({ label, value, onChange, error, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; error?: string; type?: string }) {
+function PasswordField({ label, value, onChange, error }: { label: string; value: string; onChange: (value: string) => void; error?: string }) {
     const [show, setShow] = useState(false);
     
     return (
@@ -534,9 +584,13 @@ function Alert({ tone, children }: { tone: 'success' | 'danger'; children: React
 }
 
 function FieldError({ errors, field }: { errors: ValidationErrors; field: string }) {
-    const message = errors[field]?.[0];
+    const message = fieldError(errors, field);
 
     return message ? <p className="text-[11px] font-medium text-red-600">{message}</p> : null;
+}
+
+function fieldError(errors: ValidationErrors, field: string): string | undefined {
+    return errors[field]?.[0];
 }
 
 function specialitiesLabel(doctor: DoctorEntry): string {
@@ -601,5 +655,3 @@ function normalizeJsonErrors(errors: Record<string, unknown>): ValidationErrors 
 function normalizeInertiaErrors(errors: Record<string, string>): ValidationErrors {
     return Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]]));
 }
-
-

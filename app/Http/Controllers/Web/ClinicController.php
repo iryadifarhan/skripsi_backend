@@ -293,6 +293,13 @@ class ClinicController extends Controller
             'operating_hours.*.open_time' => 'nullable|date_format:H:i:s',
             'operating_hours.*.close_time' => 'nullable|date_format:H:i:s',
             'operating_hours.*.is_closed' => 'nullable|boolean',
+        ], [
+            'name.required' => 'Nama wajib diisi.',
+            'address.required' => 'Alamat wajib diisi.',
+            'city_id.required' => 'Kota wajib diisi.',
+            'phone_number.required' => 'Nomor telepon wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'password.required' => 'Password wajib diisi.',
         ]);
 
         $clinic = Clinic::create([
@@ -325,16 +332,22 @@ class ClinicController extends Controller
         $this->assertCanManageClinic($request, (int) $clinicId);
 
         $request->validate([
-            'name' => 'nullable|string|max:255',
-            'address' => 'nullable|string|max:255',
+            'name' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
             'city_id' => 'sometimes|required|integer|exists:clinic_cities,id',
-            'phone_number' => ['nullable', 'string', 'max:20', Rule::unique('clinics', 'phone_number')->ignore($clinicId)],
-            'email' => ['nullable', 'email', 'max:255', Rule::unique('clinics', 'email')->ignore($clinicId)],
+            'phone_number' => ['required', 'string', 'max:20', Rule::unique('clinics', 'phone_number')->ignore($clinicId)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('clinics', 'email')->ignore($clinicId)],
             'operating_hours' => 'nullable|array',
             'operating_hours.*.day_of_week' => 'required|integer|min:0|max:6',
             'operating_hours.*.open_time' => 'nullable|date_format:H:i:s',
             'operating_hours.*.close_time' => 'nullable|date_format:H:i:s',
             'operating_hours.*.is_closed' => 'nullable|boolean',
+        ], [
+            'name.required' => 'Nama wajib diisi.',
+            'address.required' => 'Alamat wajib diisi.',
+            'city_id.required' => 'Kota wajib diisi.',
+            'phone_number.required' => 'Nomor telepon wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
         ]);
 
         $clinic->update($request->only(['name', 'address', 'city_id', 'phone_number', 'email']));
@@ -1136,11 +1149,11 @@ class ClinicController extends Controller
         }
 
         if ($clinic->doctors()->exists()) {
-            $blockingReasons[] = 'dokter terassign';
+            $blockingReasons[] = 'dokter terdaftar';
         }
 
         if ($clinic->doctorClinicSchedules()->exists()) {
-            $blockingReasons[] = 'jadwal dokter';
+            $blockingReasons[] = 'jadwal dokter terdaftar';
         }
 
         if ($clinic->reservations()->exists()) {
