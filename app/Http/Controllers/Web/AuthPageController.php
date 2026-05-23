@@ -188,6 +188,11 @@ class AuthPageController extends Controller
             'token' => ['required', 'string'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ], [
+            'token.required' => 'Token reset password wajib disertakan.',
+            'email.required' => 'Email wajib diisi.',
+            'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
+            'password.length' => 'Kata sandi harus terdiri dari minimal :min karakter.',
         ]);
 
         $status = Password::reset([
