@@ -76,7 +76,7 @@ export default function Register() {
 
                     <TextInput
                         id="username"
-                        label="Nama User*"
+                        label="Username*"
                         placeholder="Pasien_Satu"
                         value={form.username}
                         required

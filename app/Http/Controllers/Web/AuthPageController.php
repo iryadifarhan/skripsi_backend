@@ -92,6 +92,18 @@ class AuthPageController extends Controller
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ], [
+            'name.required' => 'Nama wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'username.alpha_dash' => 'Username hanya boleh berisi huruf, angka, tanda hubung (-), dan garis bawah (_).',
+            'username.unique' => 'Username sudah digunakan.',
+            'email.required' => 'Email wajib diisi.',
+            'email.unique' => 'Email sudah digunakan.',
+            'phone_number.required' => 'Nomor telepon wajib diisi.',
+            'phone_number.unique' => 'Nomor telepon sudah digunakan.',
+            'date_of_birth.before_or_equal' => 'Tanggal lahir tidak valid.',
+            'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
+            'password.length' => 'Kata sandi harus terdiri dari minimal :min karakter.',
         ]);
 
         $user = User::create([

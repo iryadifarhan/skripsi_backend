@@ -99,6 +99,24 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Automatically assign a default profile picture when creating a user (doctor/patient only).
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function (User $user) {
+            if (
+                empty($user->profile_picture) &&
+                self::supportsProfilePicture($user->role)
+            ) {
+                $options = self::profilePicturesForRole($user->role);
+                $user->profile_picture = $options[array_rand($options)];
+            }
+        });
+    }
+
     public function clinic(): BelongsTo
     {
         return $this->belongsTo(Clinic::class);
