@@ -376,6 +376,11 @@ class ClinicController extends Controller
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ], [
+            'name.required' => 'Nama wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'password.required' => 'Password wajib diisi.',
         ]);
 
         $admin = User::create([
@@ -427,6 +432,11 @@ class ClinicController extends Controller
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', Rule::in(User::GENDERS)],
             'password' => ['nullable', 'confirmed', PasswordRule::defaults()],
+        ], [
+            'name.required' => 'Nama wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
         ]);
 
         $updates = [
