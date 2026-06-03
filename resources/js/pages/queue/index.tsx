@@ -979,7 +979,7 @@ function ActionButton({
                 <span
                     id={`${children.replace(/\W+/g, '-').toLowerCase()}-hint`}
                     role="tooltip"
-                    className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg border border-[#e4ddd4] bg-[#2c2115] px-3 py-2 text-center text-[11px] leading-4 text-white shadow-lg group-hover:block group-focus-within:block"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 hidden -translate-x-1/2 rounded-lg border border-[#e4ddd4] bg-[#2c2115] px-3 py-2 text-center text-[11px] leading-4 text-white shadow-lg group-hover:block group-focus-within:block"
                 >
                     {tooltip}
                 </span>
