@@ -54,7 +54,7 @@ type PracticeScheduleOption = {
     max_patients_per_window: number;
 };
 
-type AdminActionModalType = 'approve' | 'reject' | 'cancel' | 'edit' | 'reschedule';
+type AdminActionModalType = 'approve' | 'reject' | 'edit' | 'reschedule';
 
 type AdminActionModal = {
     type: AdminActionModalType;
@@ -367,7 +367,7 @@ function AdminReservationsPage({
             return;
         }
 
-        if (actionModal.type === 'reject' || actionModal.type === 'cancel') {
+        if (actionModal.type === 'reject') {
             const trimmedReason = reason.trim();
 
             if (!trimmedReason) {
@@ -554,13 +554,10 @@ function AdminReservationsPage({
                                     <ActionButton disabled={!canReject} onClick={() => selectedReservation && openActionModal('reject', selectedReservation)}>
                                         Reject
                                     </ActionButton>
-                                    <ActionButton disabled={!canManageActive} onClick={() => selectedReservation && openActionModal('cancel', selectedReservation)}>
-                                        Cancel
-                                    </ActionButton>
                                     <ActionButton disabled={!canManageActive} onClick={() => selectedReservation && openActionModal('edit', selectedReservation)}>
                                         Edit Detail
                                     </ActionButton>
-                                    <ActionButton disabled={!canManageActive} className="col-span-2" onClick={() => selectedReservation && openActionModal('reschedule', selectedReservation)}>
+                                    <ActionButton disabled={!canManageActive} onClick={() => selectedReservation && openActionModal('reschedule', selectedReservation)}>
                                         Reschedule
                                     </ActionButton>
                                 </div>
@@ -669,7 +666,7 @@ function AdminReservationActionModal({
         edit: 'Save Detail',
         reschedule: 'Save Reschedule',
     }[modal.type];
-    const isReasonModal = modal.type === 'reject' || modal.type === 'cancel';
+    const isReasonModal = modal.type === 'reject';
     const activeWindows = rescheduleWindows.filter((window) => window.is_available);
     const disableSubmit = isSubmitting
         || (isReasonModal && reason.trim() === '')

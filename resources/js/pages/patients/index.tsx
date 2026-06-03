@@ -347,7 +347,7 @@ function PatientSummaryPanel({ entry, selectedClinicId }: { entry: PatientRow; s
                 href={href}
                 className="mt-2 block rounded-lg bg-[#40311D] px-4 py-2.5 text-center text-[12px] font-medium text-white transition hover:bg-[#2c2115]"
             >
-                Detail pasien
+                Detail Pasien
             </Link>
         </div>
     );

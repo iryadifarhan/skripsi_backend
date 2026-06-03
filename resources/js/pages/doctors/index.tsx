@@ -340,7 +340,7 @@ export default function DoctorsPage({ context, selectedClinicId, clinic, unassig
                                                         href={`/doctors/${selectedDoctor.id}/edit?clinic_id=${clinic.id}`}
                                                         className="block w-full rounded-lg bg-[#40311D] px-4 py-2.5 text-center text-[12px] font-medium text-white transition-colors hover:bg-[#2c2115]"
                                                     >
-                                                        Detail dokter
+                                                        Detail Dokter
                                                     </Link>
                                                 ) : null}
                                                 {canRemoveDoctorFromClinic ? (
