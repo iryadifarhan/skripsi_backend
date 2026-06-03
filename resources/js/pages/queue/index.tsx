@@ -355,7 +355,7 @@ function AdminQueuePage({
                         </div>
 
                         <div className="flex flex-col gap-4">
-                            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                            <div className="overflow-visible rounded-xl border border-gray-200 bg-white">
                                 <CardHeader title="Aksi Antrean" subtitle="Operasi antrean terpilih" />
                                 <div className="grid grid-cols-2 gap-2 p-4">
                                     <ActionButton disabled={!canCall} variant="primary" onClick={() => selectedQueue && updateQueue(selectedQueue, { queue_status: 'called' })}>
@@ -654,7 +654,7 @@ function DoctorQueuePage({
                         </div>
 
                         <div className="flex flex-col gap-4">
-                            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                            <div className="overflow-visible rounded-xl border border-gray-200 bg-white">
                                 <CardHeader title="Aksi Dokter" subtitle="Operasi antrean terpilih" />
                                 <div className="grid gap-2 p-4">
                                     <ActionButton disabled={!canStart} variant="primary" tooltip={startDisabledHint} onClick={() => selectedQueue && startQueue(selectedQueue)}>
@@ -965,7 +965,7 @@ function ActionButton({
             : 'border border-gray-200 bg-white text-[#40311D] hover:bg-[#DFE0DF]';
 
     const button = (
-        <span className="group relative block">
+        <span className="group relative block overflow-visible">
             <button
                 type="button"
                 onClick={onClick}
@@ -979,7 +979,7 @@ function ActionButton({
                 <span
                     id={`${children.replace(/\W+/g, '-').toLowerCase()}-hint`}
                     role="tooltip"
-                    className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-lg border border-[#e4ddd4] bg-[#2c2115] px-3 py-2 text-center text-[11px] leading-4 text-white shadow-lg group-hover:block group-focus-within:block"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg border border-[#e4ddd4] bg-[#2c2115] px-3 py-2 text-center text-[11px] leading-4 text-white shadow-lg group-hover:block group-focus-within:block"
                 >
                     {tooltip}
                 </span>
@@ -1196,5 +1196,3 @@ function normalizeJsonErrors(errors: Record<string, unknown>): ValidationErrors 
         ]),
     );
 }
-
-
