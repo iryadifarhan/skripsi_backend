@@ -92,7 +92,7 @@ const STYLES = `
   .hp-section-title { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 1.1rem; }
   .hp-scroll-region { overflow-x: auto; overflow-y: visible; padding-bottom: .5rem; scrollbar-width: none; -ms-overflow-style: none; }
   .hp-scroll-region::-webkit-scrollbar { display: none; }
-  .hp-card-grid { display: grid; grid-template-columns: repeat(6, 220px); gap: 1rem; grid-auto-flow: column; width: max-content; }
+  .hp-card-grid { display: grid; grid-template-rows: 1fr; grid-auto-columns: 220px; grid-auto-flow: column; gap: 1rem; width: max-content; }
   .hp-card-scene { perspective: 1000px; width: 100%; aspect-ratio: 1 / 1; cursor: pointer; }
   .hp-card-flipper { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform .55s cubic-bezier(.4,0,.2,1); border-radius: 10px; }
   .hp-card-flipper.flipped { transform: rotateY(180deg); }
@@ -443,6 +443,8 @@ function DokterBack({ doctor }: { doctor: HomeDoctor }) {
 }
 
 function FlipCard({
+    type,
+    slug,
     image,
     label,
     subLabel,
@@ -452,6 +454,8 @@ function FlipCard({
     isDark = false,
     useClinicPlaceholder = false,
 }: {
+    type: string;
+    slug: string;
     image?: string | null;
     label: string;
     subLabel?: string | null;
@@ -461,7 +465,7 @@ function FlipCard({
     isDark?: boolean;
     useClinicPlaceholder?: boolean;
 }) {
-    const imageUrl = image || (useClinicPlaceholder ? null : reservasiImg);
+    const imageUrl = image;
 
     return (
         <div>
@@ -478,7 +482,9 @@ function FlipCard({
                 </div>
             </div>
             <div className={`hp-card-label ${isActive ? 'teal' : isDark ? 'cream' : ''}`}>
-                {label}
+                <Link href={`/${type}/${slug}`} className='hover:underline'>
+                    {label}
+                </Link>
                 <br />
                 <span className="hp-label-sub">{subLabel || '-'}</span>
             </div>
@@ -594,6 +600,8 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                 <ScrollableCards>
                                     {clinics.map((clinic) => (
                                         <FlipCard
+                                            type='clinic'
+                                            slug={clinic.slug}
                                             key={clinic.id}
                                             label={clinic.name}
                                             subLabel={clinic.city_name}
@@ -623,6 +631,8 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                 <ScrollableCards dark>
                                     {doctors.map((doctor) => (
                                         <FlipCard
+                                            type='dokter'
+                                            slug={doctor.slug}
                                             key={doctor.id}
                                             label={doctor.name}
                                             subLabel={doctor.specialities?.join(', ') || 'Dokter'}
