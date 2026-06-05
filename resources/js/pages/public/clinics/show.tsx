@@ -489,11 +489,13 @@ function DoctorCard({
                 <DoctorImage imageUrl={doctor.image_url} name={doctor.name} />
             </div>
             <div className="mt-4">
-                <Link
-                    href={`/dokter/${doctor.slug}`}
-                    key={doctor.id}>
-                    <h3 className="text-lg font-bold leading-tight text-[#40311D]">{doctor.name}</h3>
-                </Link>
+                <div className="h-[45px] flex items-center">
+                    <Link
+                        href={`/dokter/${doctor.slug}`}
+                        key={doctor.id}>
+                        <h3 className="text-lg font-bold leading-tight text-[#40311D] line-clamp-2">{doctor.name}</h3>
+                    </Link>
+                </div>
                 <p className="mt-1 text-sm text-[#40311D]/55">{doctor.primary_speciality || 'Dokter Umum'}</p>
             </div>
 
@@ -510,7 +512,7 @@ function DoctorCard({
                     <span className="text-lg font-bold text-[#40311D]">{capacity > 0 ? `${bookedSlots}/${capacity}` : '-'}</span>
                     <QueueDots total={capacity} filled={bookedSlots} />
                 </div>
-                <p className="mt-1 text-xs text-[#40311D]/45">Antrean untuk jam {queueLabel}</p>
+                <p className="mt-1 text-xs text-[#40311D]/45 h-[32px]">Antrean untuk jam {queueLabel}</p>
             </div>
 
             <button
