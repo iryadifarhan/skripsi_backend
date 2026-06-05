@@ -577,7 +577,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                         </div>
                                         <div className="mt-3">
                                             <Link href="/rekam-medis" className="hp-pill-btn hp-pill-btn-outline">
-                                            <FontAwesomeIcon icon={faChevronRight} aria-hidden="true" /> Rekam medis
+                                            <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" /> Rekam medis
                                             </Link>
                                         </div>
                                     </>
