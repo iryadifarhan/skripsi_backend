@@ -1,6 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faHospital, faMapMarkerAlt, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { faHospital, faMapMarkerAlt, faChevronLeft, faChevronRight, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -121,10 +121,10 @@ const STYLES = `
   .hp-card-label.cream { color: var(--hp-cream); }
   .hp-label-sub { display: inline-block; margin-top: .1rem; font-weight: 500; opacity: .75; text-transform: none; letter-spacing: 0; }
   .hp-review-wrap { text-align: center; margin-top: 1.25rem; }
-  .hp-review-btn { display: inline-block; padding: .5rem 1.75rem; border-radius: 999px; border: 1.5px solid var(--hp-dark); background: transparent; font-size: .85rem; font-weight: 700; color: var(--hp-dark); text-decoration: none; transition: background .2s, color .2s; }
+  .hp-review-btn { display: inline-block; padding: .6rem 1.75rem; border-radius: 999px; border: 1.5px solid var(--hp-dark); background: transparent; font-size: .85rem; font-weight: 700; color: var(--hp-dark); text-decoration: none; transition: background .2s, color .2s; }
   .hp-review-btn:hover { background: var(--hp-dark); color: var(--hp-cream); }
   .hp-dokter-bg { background: var(--hp-dark); color: var(--hp-cream); padding: 2rem 0 3rem; }
-  .hp-dokter-bg .hp-card-front { background-color: rgba(222,208,182,.12); }
+  .hp-dokter-bg .hp-card-front { background-color: rgba(0,0,0,0); }
   .hp-dokter-bg .hp-review-btn { border-color: var(--hp-cream); color: var(--hp-cream); }
   .hp-dokter-bg .hp-review-btn:hover { background: var(--hp-cream); color: var(--hp-dark); }
   .hp-scroll-btn { position: absolute; top: 36%; z-index: 10; width: 32px; height: 32px; border: none; border-radius: 999px; background: var(--hp-dark); color: var(--hp-cream); display: flex; align-items: center; justify-content: center; }
@@ -548,7 +548,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                         </div>
                                         <div className="mt-3">
                                             <Link href="/reservasi" className="hp-pill-btn">
-                                                Detil reservasi -&gt;
+                                                <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" /> Detil reservasi
                                             </Link>
                                         </div>
                                     </>
@@ -577,7 +577,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                         </div>
                                         <div className="mt-3">
                                             <Link href="/rekam-medis" className="hp-pill-btn hp-pill-btn-outline">
-                                                Rekam medis -&gt;
+                                            <FontAwesomeIcon icon={faChevronRight} aria-hidden="true" /> Rekam medis
                                             </Link>
                                         </div>
                                     </>
@@ -617,7 +617,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                 <div className="rounded-2xl border border-[#40311D]/10 bg-white/40 p-6 text-sm text-[#40311D]/60">Belum ada klinik tersedia.</div>
                             )}
                             <div className="hp-review-wrap">
-                                <Link href="/reservasi" className="hp-review-btn">Buat reservasi</Link>
+                                <Link href="/klinik" className="hp-review-btn">Tinjau lebih</Link>
                             </div>
                         </section>
                     </main>
@@ -648,7 +648,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">Belum ada dokter tersedia.</div>
                             )}
                             <div className="hp-review-wrap">
-                                <Link href="/reservasi" className="hp-review-btn">Tinjau jadwal dokter</Link>
+                                <Link href="/dokter" className="hp-review-btn">Tinjau lebih</Link>
                             </div>
                         </div>
                     </div>
