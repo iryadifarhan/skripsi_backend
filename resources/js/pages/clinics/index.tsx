@@ -60,6 +60,7 @@ export default function ClinicsPage({ context, clinics, clinicCities }: ClinicsP
     const [cityName, setCityName] = useState('');
     const [pendingCityName, setPendingCityName] = useState<string | null>(null);
     const [savingCity, setSavingCity] = useState(false);
+    const [deletingCityId, setDeletingCityId] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
 
     const filteredClinics = useMemo(() => {
@@ -144,6 +145,31 @@ export default function ClinicsPage({ context, clinics, clinicCities }: ClinicsP
                 onFinish: () => setSavingCity(false),
             },
         );
+    };
+
+    const deleteCity = (city: ClinicCityOption) => {
+        const usedClinicCount = city.clinics_count ?? 0;
+
+        if (usedClinicCount > 0 || deletingCityId !== null) {
+            return;
+        }
+
+        if (!window.confirm(`Hapus kota ${city.name} dari daftar pilihan?`)) {
+            return;
+        }
+
+        setDeletingCityId(city.id);
+
+        router.delete(`/clinic-cities/${city.id}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                if (form.city_id === String(city.id)) {
+                    setForm((current) => ({ ...current, city_id: '' }));
+                }
+            },
+            onFinish: () => setDeletingCityId(null),
+        });
     };
 
     return (
@@ -293,11 +319,13 @@ export default function ClinicsPage({ context, clinics, clinicCities }: ClinicsP
                     errors={errors}
                     cityName={cityName}
                     savingCity={savingCity}
+                    deletingCityId={deletingCityId}
                     saving={saving}
                     submitLabel="Simpan Klinik"
                     onChange={setForm}
                     onCityNameChange={setCityName}
                     onCitySubmit={submitCity}
+                    onCityDelete={deleteCity}
                     onClose={() => {
                         setShowCreateModal(false);
                         setForm(createEmptyClinicForm(clinicCities));
@@ -319,11 +347,13 @@ function ClinicFormModal({
     errors,
     cityName,
     savingCity,
+    deletingCityId,
     saving,
     submitLabel,
     onChange,
     onCityNameChange,
     onCitySubmit,
+    onCityDelete,
     onClose,
     onSubmit,
 }: {
@@ -334,11 +364,13 @@ function ClinicFormModal({
     errors: ValidationErrors;
     cityName: string;
     savingCity: boolean;
+    deletingCityId: number | null;
     saving: boolean;
     submitLabel: string;
     onChange: (form: ClinicForm) => void;
     onCityNameChange: (value: string) => void;
     onCitySubmit: () => void;
+    onCityDelete: (city: ClinicCityOption) => void;
     onClose: () => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -361,9 +393,11 @@ function ClinicFormModal({
                         cityName={cityName}
                         cityError={errors.city_name?.[0] ?? (cityName.trim() !== '' ? errors.name?.[0] : undefined)}
                         savingCity={savingCity}
+                        deletingCityId={deletingCityId}
                         onChange={(value) => onChange({ ...form, city_id: value })}
                         onCityNameChange={onCityNameChange}
                         onCitySubmit={onCitySubmit}
+                        onCityDelete={onCityDelete}
                     />
                     <TextInput label="Alamat" value={form.address} error={errors.address?.[0]} onChange={(value) => onChange({ ...form, address: value })} />
                 </div>

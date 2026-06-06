@@ -177,6 +177,25 @@ class ClinicController extends Controller
         ], 201, 'Kota klinik berhasil ditambahkan.');
     }
 
+    public function destroyCity(Request $request, ClinicCity $city): JsonResponse|RedirectResponse
+    {
+        abort_unless(in_array($request->user()?->role, [User::ROLE_ADMIN, User::ROLE_SUPERADMIN], true), 403);
+
+        $usedClinicCount = $city->clinics()->count();
+
+        if ($usedClinicCount > 0) {
+            throw ValidationException::withMessages([
+                'city_name' => ["Kota {$city->name} tidak dapat dihapus karena sudah digunakan oleh {$usedClinicCount} klinik."],
+            ]);
+        }
+
+        $city->delete();
+
+        return $this->jsonOrRedirect($request, [
+            'message' => 'Kota klinik berhasil dihapus.',
+        ], flashMessage: 'Kota klinik berhasil dihapus.');
+    }
+
     public function uploadClinicImage(Request $request, $clinicId)
     {
         $payload = $request->validate([
@@ -970,12 +989,13 @@ class ClinicController extends Controller
     }
 
     /**
-     * @return array<int, array{id: int, name: string}>
+     * @return array<int, array{id: int, name: string, clinics_count: int}>
      */
     private function clinicCityOptions(): array
     {
         return ClinicCity::query()
             ->select(['id', 'name'])
+            ->withCount('clinics')
             ->orderBy('name')
             ->get()
             ->map(fn (ClinicCity $city): array => $this->serializeClinicCity($city))
@@ -984,7 +1004,7 @@ class ClinicController extends Controller
     }
 
     /**
-     * @return array{id: int, name: string}|null
+     * @return array{id: int, name: string, clinics_count: int}|null
      */
     private function serializeClinicCity(?ClinicCity $city): ?array
     {
@@ -995,6 +1015,7 @@ class ClinicController extends Controller
         return [
             'id' => $city->id,
             'name' => $city->name,
+            'clinics_count' => (int) ($city->clinics_count ?? 0),
         ];
     }
 

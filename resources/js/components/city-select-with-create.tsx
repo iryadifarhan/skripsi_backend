@@ -3,6 +3,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 export type ClinicCityOption = {
     id: number;
     name: string;
+    clinics_count?: number;
 };
 
 export function CitySelectWithCreate({
@@ -16,6 +17,8 @@ export function CitySelectWithCreate({
     onChange,
     onCityNameChange,
     onCitySubmit,
+    onCityDelete,
+    deletingCityId = null,
 }: {
     label?: string;
     value: string;
@@ -27,6 +30,8 @@ export function CitySelectWithCreate({
     onChange: (value: string) => void;
     onCityNameChange: (value: string) => void;
     onCitySubmit: () => void;
+    onCityDelete?: (city: ClinicCityOption) => void;
+    deletingCityId?: number | null;
 }) {
     const [open, setOpen] = useState(false);
     const rootRef = useRef<HTMLDivElement | null>(null);
@@ -87,22 +92,55 @@ export function CitySelectWithCreate({
                         ) : (
                             cities.map((city) => {
                                 const selected = String(city.id) === value;
+                                const usedClinicCount = city.clinics_count ?? 0;
+                                const isUsed = usedClinicCount > 0;
+                                const deleting = deletingCityId === city.id;
+                                const deleteTitle = isUsed
+                                    ? `Kota ini sudah digunakan oleh ${usedClinicCount} klinik dan tidak dapat dihapus.`
+                                    : `Hapus kota ${city.name}`;
 
                                 return (
-                                    <button
+                                    <div
                                         key={city.id}
-                                        type="button"
-                                        onClick={() => {
-                                            onChange(String(city.id));
-                                            setOpen(false);
-                                        }}
                                         className={`flex w-full items-center justify-between px-3 py-2 text-left text-[12px] transition-colors hover:bg-[#faf9f7] ${
                                             selected ? 'bg-[#faf9f7] font-medium text-[#40311D]' : 'text-gray-700'
                                         }`}
                                     >
-                                        {city.name}
-                                        {selected ? <span className="text-[11px] text-teal-700">Terpilih</span> : null}
-                                    </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                onChange(String(city.id));
+                                                setOpen(false);
+                                            }}
+                                            className="min-w-0 flex-1 truncate text-left"
+                                        >
+                                            {city.name}
+                                        </button>
+                                        <div className="ml-3 flex shrink-0 items-center gap-2">
+                                            {selected ? <span className="text-[11px] text-teal-700">Terpilih</span> : null}
+                                            {onCityDelete ? (
+                                                <span className="relative" title={deleteTitle}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+
+                                                            if (isUsed || deleting) {
+                                                                return;
+                                                            }
+
+                                                            onCityDelete(city);
+                                                        }}
+                                                        disabled={isUsed || deleting}
+                                                        aria-label={`Hapus kota ${city.name}`}
+                                                        className="flex h-6 w-6 items-center justify-center rounded-full border border-red-100 bg-red-50 text-[14px] leading-none text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-gray-100 disabled:text-gray-400"
+                                                    >
+                                                        {deleting ? '...' : 'x'}
+                                                    </button>
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </div>
                                 );
                             })
                         )}

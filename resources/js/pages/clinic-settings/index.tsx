@@ -84,6 +84,7 @@ export default function ClinicSettingsPage({ context, clinic, clinicCities, summ
     const [cityName, setCityName] = useState('');
     const [pendingCityName, setPendingCityName] = useState<string | null>(null);
     const [savingCity, setSavingCity] = useState(false);
+    const [deletingCityId, setDeletingCityId] = useState<number | null>(null);
     const [operatingHours, setOperatingHours] = useState<OperatingHourForm[]>(() => buildOperatingHours(clinic));
     const [localImagePreviewUrl, setLocalImagePreviewUrl] = useState<string | null>(null);
     const [bulkDays, setBulkDays] = useState<number[]>([1, 2, 3, 4, 5]);
@@ -103,6 +104,7 @@ export default function ClinicSettingsPage({ context, clinic, clinicCities, summ
         setCityName('');
         setPendingCityName(null);
         setSavingCity(false);
+        setDeletingCityId(null);
         setOperatingHours(buildOperatingHours(clinic));
         setErrors({});
         setError(null);
@@ -230,6 +232,37 @@ export default function ClinicSettingsPage({ context, clinic, clinicCities, summ
                 onFinish: () => setSavingCity(false),
             },
         );
+    };
+
+    const deleteCity = (city: ClinicCityOption) => {
+        const usedClinicCount = city.clinics_count ?? 0;
+
+        if (usedClinicCount > 0 || deletingCityId !== null) {
+            return;
+        }
+
+        if (!window.confirm(`Hapus kota ${city.name} dari daftar pilihan?`)) {
+            return;
+        }
+
+        setDeletingCityId(city.id);
+        setErrors({});
+        setError(null);
+
+        router.delete(`/clinic-cities/${city.id}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                if (clinicForm.city_id === String(city.id)) {
+                    setClinicForm((current) => ({ ...current, city_id: '' }));
+                }
+            },
+            onError: (validationErrors) => {
+                setErrors(normalizeInertiaErrors(validationErrors));
+                setError('Gagal menghapus kota klinik.');
+            },
+            onFinish: () => setDeletingCityId(null),
+        });
     };
 
     const uploadImage = () => {
@@ -546,9 +579,11 @@ export default function ClinicSettingsPage({ context, clinic, clinicCities, summ
                                                 cityName={cityName}
                                                 cityError={errors.city_name?.[0] ?? (cityName.trim() !== '' ? errors.name?.[0] : undefined)}
                                                 savingCity={savingCity}
+                                                deletingCityId={deletingCityId}
                                                 onChange={(value) => setClinicForm((current) => ({ ...current, city_id: value }))}
                                                 onCityNameChange={setCityName}
                                                 onCitySubmit={submitCity}
+                                                onCityDelete={deleteCity}
                                             />
                                             <TextField label="Alamat" value={clinicForm.address} error={errors.address?.[0]} onChange={(value) => setClinicForm((current) => ({ ...current, address: value }))} />
                                         </div>
