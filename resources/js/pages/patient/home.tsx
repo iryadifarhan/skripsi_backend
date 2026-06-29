@@ -280,7 +280,7 @@ function useUserLocationLabel() {
 function getGreeting() {
     const hour = new Date().getHours();
 
-    if (hour < 3) return 'Selamat malam';
+    if (hour < 6) return 'Selamat malam';
     if (hour < 11) return 'Selamat pagi';
     if (hour < 15) return 'Selamat siang';
     if (hour < 19) return 'Selamat sore';

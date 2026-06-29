@@ -1000,8 +1000,9 @@ function generateWindows(schedule: PublicSchedule, selectedDate: Date, windowUsa
 }
 
 function groupSlots(slots: WindowSlot[]) {
-    const morning = slots.filter((slot) => timeToMinutes(slot.start) < 12 * 60);
-    const afternoon = slots.filter((slot) => timeToMinutes(slot.start) >= 12 * 60);
+    const morning = slots.filter((slot) => timeToMinutes(slot.start) < 11 * 60);
+    const afternoon = slots.filter((slot) => timeToMinutes(slot.start) >= 11 * 60 && timeToMinutes(slot.start) < 15 * 60);
+    const evening = slots.filter((slot) => timeToMinutes(slot.start) >= 15 * 60);
     const groups: { label: string; slots: WindowSlot[] }[] = [];
 
     if (morning.length > 0) {
@@ -1010,6 +1011,10 @@ function groupSlots(slots: WindowSlot[]) {
 
     if (afternoon.length > 0) {
         groups.push({ label: 'Siang - Sore', slots: afternoon });
+    }
+
+    if (evening.length > 0) {
+        groups.push({ label: 'Sore - Malam', slots: evening });
     }
 
     return groups;

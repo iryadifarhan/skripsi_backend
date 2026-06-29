@@ -21,10 +21,10 @@ export const defaultPublicTimeFilter: PublicTimeFilterState = {
 };
 
 const presets = [
-    { label: 'Pagi (06-12)', from: 6, to: 12 },
-    { label: 'Siang (12-17)', from: 12, to: 17 },
-    { label: 'Sore (17-21)', from: 17, to: 21 },
-    { label: 'Malam (21-24)', from: 21, to: 24 },
+    { label: 'Pagi (06-11)', from: 6, to: 12 },
+    { label: 'Siang (11-15)', from: 11, to: 16 },
+    { label: 'Sore (15-19)', from: 15, to: 19 },
+    { label: 'Malam (19-24)', from: 19, to: 24 },
 ];
 
 export function isDefaultPublicTimeFilter(filter: PublicTimeFilterState) {

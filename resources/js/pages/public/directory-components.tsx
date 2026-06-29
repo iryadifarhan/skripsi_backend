@@ -151,10 +151,10 @@ export type DirectoryFilters = {
 
 export const timeFilters = [
     { value: 'all', label: 'Semua Waktu' },
-    { value: 'morning', label: 'Pagi', from: 6 * 60, to: 12 * 60 },
-    { value: 'afternoon', label: 'Siang', from: 12 * 60, to: 17 * 60 },
-    { value: 'evening', label: 'Sore', from: 17 * 60, to: 21 * 60 },
-    { value: 'night', label: 'Malam', from: 21 * 60, to: 24 * 60 },
+    { value: 'morning', label: 'Pagi', from: 6 * 60, to: 11 * 60 },
+    { value: 'afternoon', label: 'Siang', from: 11 * 60, to: 15 * 60 },
+    { value: 'evening', label: 'Sore', from: 15 * 60, to: 19 * 60 },
+    { value: 'night', label: 'Malam', from: 19 * 60, to: 24 * 60 },
     { value: '24h', label: '24 Jam' },
     { value: 'everyday', label: 'Setiap Hari' },
     { value: 'holiday', label: 'Hari Libur' },

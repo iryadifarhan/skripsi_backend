@@ -1206,12 +1206,16 @@ function scheduleWindowLabel(startTime: string): string {
         return '-';
     }
 
-    if (hour < 12) {
+    if (hour < 11) {
         return 'Pagi';
     }
 
-    if (hour < 17) {
+    if (hour < 15) {
         return 'Siang';
+    }
+
+    if (hour < 19) {
+        return 'Sore';
     }
 
     return 'Malam';
