@@ -1351,6 +1351,8 @@ class InertiaShellTest extends TestCase
             ->patch("/clinic-settings/{$clinicA->id}", [
                 'name' => 'Clinic Settings Super A Updated',
                 'address' => 'Jl. Super A Updated',
+                'phone_number' => '081111111111',
+                'email' => 'test@gmail.com',
             ])
             ->assertRedirect()
             ->assertSessionHas('status', 'Data klinik berhasil diperbarui.');

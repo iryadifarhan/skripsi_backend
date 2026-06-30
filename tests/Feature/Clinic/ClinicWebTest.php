@@ -70,7 +70,9 @@ class ClinicWebTest extends TestCase
 
         $this->patchJson("/superadmin/clinic/update/{$clinic->id}", [
             'name' => 'Klinik Superadmin Updated',
+            'address' => 'Address Klinik Superadmin Updated',
             'email' => 'superadmin-clinic-updated@example.test',
+            'phone_number' => '081111111111',
             'operating_hours' => [
                 [
                     'day_of_week' => 1,
@@ -310,6 +312,8 @@ class ClinicWebTest extends TestCase
             'clinic_id' => $clinic->id,
             'name' => 'clinic-admin-route-updated',
             'address' => 'Updated clinic address',
+            'phone_number' => '081111111111',
+            'email' => 'test@gmail.com',
         ], $this->spaHeaders())
             ->assertOk();
 
