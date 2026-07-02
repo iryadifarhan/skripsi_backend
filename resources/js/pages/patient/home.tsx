@@ -600,7 +600,7 @@ export default function PatientHome({ userName, currentReservation, lastReservat
                                 <ScrollableCards>
                                     {clinics.map((clinic) => (
                                         <FlipCard
-                                            type='clinic'
+                                            type='klinik'
                                             slug={clinic.slug}
                                             key={clinic.id}
                                             label={clinic.name}

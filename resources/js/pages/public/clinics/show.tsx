@@ -102,7 +102,6 @@ export default function ClinicDetail({ clinic }: ClinicDetailProps) {
         && patientForm.gender,
     );
     const activeStep = selectedDoctor ? (selectedDay ? (selectedSlot ? (hasPatientData && complaint.trim() ? 4 : 3) : 2) : 1) : 0;
-    const canBook = Boolean(selectedDoctor && selectedDay && selectedDate && selectedSlot && complaint.trim() && hasPatientData && !submitting);
 
     function selectDoctor(doctor: ClinicDoctor) {
         setSelectedDoctor((current) => (current?.id === doctor.id ? null : doctor));
@@ -721,16 +720,20 @@ function TimeSlotGroup({
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#40311D]/35">{label}</p>
             <div className="space-y-2">
                 {slots.map((slot) => {
-                    const remaining = Math.max(slot.filled, 0);
+                    const remaining = Math.max(slot.total - slot.filled, 0);
                     const selected = selectedSlot?.id === slot.id;
+                    const isFull = remaining <= 0;
+
                     return (
                         <button
                             key={slot.id}
                             type="button"
+                            disabled={isFull}
                             onClick={() => onSelectSlot(slot)}
                             className={[
                                 'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition',
                                 selected ? 'border-[#00917B] bg-[#00917B]/10 text-[#40311D]' : 'border-[#40311D]/10 bg-[#DED0B6]/50 text-[#40311D]/60 hover:border-[#00917B]/40',
+                                isFull ? 'cursor-not-allowed opacity-50' : '',
                             ].join(' ')}
                         >
                             <span>{slot.label}</span>

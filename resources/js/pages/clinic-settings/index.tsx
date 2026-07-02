@@ -814,7 +814,7 @@ function ClinicAdminsTable({ admins, onEdit, onDelete }: { admins: ClinicAdmin[]
             <table className="w-full min-w-[1100px] border-collapse text-[12px]">
                 <thead>
                     <tr className="border-b border-[#e4ddd4] bg-[#faf9f7]">
-                        {['No', 'Nama', 'Username', 'Email', 'Telepon', 'Gender', 'Tanggal Lahir', 'Verified', 'Aksi'].map((header) => (
+                        {['No', 'Nama', 'Username', 'Email', 'Telepon', 'Gender', 'Tanggal Lahir', 'Aksi'].map((header) => (
                             <th key={header} className="px-4 py-2 text-left text-[11px] font-medium text-gray-400">
                                 {header}
                             </th>
@@ -831,11 +831,6 @@ function ClinicAdminsTable({ admins, onEdit, onDelete }: { admins: ClinicAdmin[]
                             <td className="px-4 py-3 text-gray-700">{admin.phone_number ?? '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{admin.gender ?? '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{admin.date_of_birth ?? '-'}</td>
-                            <td className="px-4 py-3 text-gray-700">
-                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${admin.email_verified_at ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700'}`}>
-                                    {admin.email_verified_at ? 'Verified' : 'Belum'}
-                                </span>
-                            </td>
                             <td className="px-4 py-3 text-gray-700">
                                 <div className="flex items-center gap-2">
                                     <button
