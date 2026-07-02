@@ -738,7 +738,7 @@ function TimeSlotGroup({
                         >
                             <span>{slot.label}</span>
                             <span className="rounded-full bg-[#40311D]/10 px-2 py-0.5 text-xs font-bold text-[#40311D]/55">
-                                {remaining}/{slot.total}
+                                {slot.filled}/{slot.total}
                             </span>
                         </button>
                     );
