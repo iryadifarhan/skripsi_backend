@@ -263,7 +263,9 @@ function WorkspaceSidebar({
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <p className="truncate text-[15px] font-bold leading-snug">{brandLabel}</p>
-                                    <p className="mt-1 truncate text-[11px] text-white/50">{contextLabel}</p>
+                                    <Link className="mt-1 truncate text-[11px] text-white/50 hover:underline" href="/profile">
+                                        {contextLabel}
+                                    </Link>
                                 </div>
                                 <button
                                     type="button"
