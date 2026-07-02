@@ -77,7 +77,7 @@ class QueueProgressNotification extends Notification implements ShouldQueue
 
     private function queuePageUrl(): string
     {
-        return route('queue.page');
+        return route('patient.reservations');
     }
 
     private function loadContext(): void
