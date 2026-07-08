@@ -16,6 +16,6 @@ Artisan::command('reservations:send-reminders', function (ReservationReminderSer
 })->purpose('Mengirim pengingat untuk reservasi approved yang dimulai kurang dari 2 jam lagi.');
 
 Schedule::command('reservations:send-reminders')
-    ->everyMinute()
+    ->hourly()
     ->onOneServer()
     ->withoutOverlapping();

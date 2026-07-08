@@ -359,7 +359,7 @@ function PatientProfilePage({
                             <PatientField label="Username" value={user.username} editing={editing}>
                                 <PatientInput value={profileForm.username} error={page.props.errors?.username} onChange={(value) => setProfileForm((current) => ({ ...current, username: value }))} />
                             </PatientField>
-                            <PatientField label="Gender" value={user.gender ?? '-'} editing={editing}>
+                            <PatientField label="Jenis Kelamin" value={user.gender ?? '-'} editing={editing}>
                                 <label className="grid gap-1">
                                     <select
                                         value={profileForm.gender}
@@ -376,13 +376,13 @@ function PatientProfilePage({
                         </div>
 
                         <div className="grid content-start gap-y-1 md:pl-2">
-                            <PatientField label="DOB" value={dateLabel(user.date_of_birth)} editing={editing}>
+                            <PatientField label="Tanggal Lahir" value={dateLabel(user.date_of_birth)} editing={editing}>
                                 <PatientInput type="date" value={profileForm.date_of_birth} error={page.props.errors?.date_of_birth} onChange={(value) => setProfileForm((current) => ({ ...current, date_of_birth: value }))} />
                             </PatientField>
                             <PatientField label="Email" value={user.email} editing={editing}>
                                 <PatientInput type="email" value={profileForm.email} error={page.props.errors?.email} onChange={(value) => setProfileForm((current) => ({ ...current, email: value }))} />
                             </PatientField>
-                            <PatientField label="Phone Number" value={user.phone_number ?? '-'} editing={editing}>
+                            <PatientField label="Nomor Telepon" value={user.phone_number ?? '-'} editing={editing}>
                                 <PatientInput value={profileForm.phone_number} error={page.props.errors?.phone_number} onChange={(value) => setProfileForm((current) => ({ ...current, phone_number: value }))} />
                             </PatientField>
                         </div>
