@@ -16,5 +16,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(SuperAdminSeeder::class);
         $this->call(ClinicCitySeeder::class);
+        $this->call(TestUserSeeder::class);
     }
 }
