@@ -24,7 +24,7 @@ class TestUserSeeder extends Seeder
  
     private function seedPatients(): void
     {
-        for ($i = 1; $i <= 100; $i++) {
+        for ($i = 1; $i <= 50; $i++) {
             User::query()->firstOrCreate([
                 'email' => "patient_{$i}@testing.com",
                 'username' => "patient_{$i}",
