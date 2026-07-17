@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -35,10 +36,29 @@ class AuthPageController extends Controller
         ]);
 
         $identifier = trim((string) ($payload['login'] ?? $payload['email'] ?? ''));
-        $user = $identifier !== '' ? $this->findUserForLogin($identifier) : null;
-        $authenticated = $user !== null && Hash::check($payload['password'], $user->password);
 
-        if (!$authenticated) {
+        $start = microtime(true);
+        $user = $identifier !== '' ? $this->findUserForLogin($identifier) : null;
+        $findUserDuration = (microtime(true) - $start) * 1000;
+
+        Log::info('login.timing', [
+            'step' => 'find_user',
+            'identifier' => $identifier,
+            'user_id' => $user?->id,
+            'duration_ms' => $findUserDuration,
+        ]);
+
+        $start = microtime(true);
+        $authenticated = $user !== null && Hash::check($payload['password'], $user->password);
+        $passwordVerifyDuration = (microtime(true) - $start) * 1000;
+
+        Log::info('login.timing', [
+            'step' => 'password_verify',
+            'user_id' => $user?->id,
+            'duration_ms' => $passwordVerifyDuration,
+        ]);
+
+        if (! $authenticated) {
             $errorKey = $request->expectsJson() ? 'message' : ($request->has('login') ? 'login' : 'email');
 
             throw ValidationException::withMessages([
@@ -46,8 +66,25 @@ class AuthPageController extends Controller
             ]);
         }
 
+        $start = microtime(true);
         Auth::guard('web')->login($user, $payload['remember'] ?? false);
+        $authLoginDuration = (microtime(true) - $start) * 1000;
+
+        Log::info('login.timing', [
+            'step' => 'auth_login',
+            'user_id' => $user->id,
+            'duration_ms' => $authLoginDuration,
+        ]);
+
+        $start = microtime(true);
         $request->session()->regenerate();
+        $sessionRegenerateDuration = (microtime(true) - $start) * 1000;
+
+        Log::info('login.timing', [
+            'step' => 'session_regenerate',
+            'user_id' => $user->id,
+            'duration_ms' => $sessionRegenerateDuration,
+        ]);
 
         if ($request->expectsJson()) {
             return response()->json([
